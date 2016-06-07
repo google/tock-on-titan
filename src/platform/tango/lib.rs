@@ -27,8 +27,49 @@ const LED : u32 = 0;
 const LED_GPIO : u16 = 1;
 
 pub unsafe fn init<'a>() -> &'a mut Firestorm {
+    use core::intrinsics::{volatile_load,volatile_store};
 
-    use core::intrinsics::volatile_store;
+    /* ********************
+     * UART
+     * ********************/
+
+    // Turn on UART0 clock
+    let pmu_periclockset1 : *mut u32 = 0x4000006c as *mut u32;
+    volatile_store(pmu_periclockset1, 1 << 5);
+
+    // Drive DIOA0 from TX
+    let pinmux_dioa0_sel : *mut u16 = 0x40060028 as *mut u16;
+    volatile_store(pinmux_dioa0_sel, 70);
+
+    // Setup baud rate
+    let nco = 5300; // 2^20 * 115200 / 24000000
+    let uart_nco : *mut u16 = 0x40600008 as *mut u16;
+    volatile_store(uart_nco, nco);
+
+    // Enable TX
+    let uart_ctrl : *mut u16 = 0x4060000C as *mut u16;
+    volatile_store(uart_ctrl, 1);
+
+    unsafe fn write_char(c : char) {
+        let uart_state : *mut u32 = 0x40600014 as *mut u32;
+        let uart_wdata : *mut u8 = 0x40600004 as *mut u8;
+
+        while volatile_load(uart_state) & 1 != 0 {}
+
+        volatile_store(uart_wdata, c as u8);
+    }
+
+    unsafe fn write_str(s : &str) {
+        for c in s.chars() {
+            write_char(c);
+        }
+    }
+
+    write_str("Hello from Rust!\n");
+
+    /* ********************
+     * Blink
+     * ********************/
 
     // Turn on GPIO clocks
     let pmu_periclockset0 : *mut u32 = 0x40000064 as *mut u32;
