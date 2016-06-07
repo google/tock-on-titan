@@ -1,9 +1,11 @@
 #![crate_name = "hotel"]
 #![crate_type = "rlib"]
 #![no_std]
-#![feature(core_intrinsics)]
 
+extern crate common;
 extern crate support;
+
+pub mod pmu;
 
 extern {
     // _estack is not really a function, but it makes the types work
