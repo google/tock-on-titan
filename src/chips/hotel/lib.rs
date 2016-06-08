@@ -1,10 +1,12 @@
 #![crate_name = "hotel"]
 #![crate_type = "rlib"]
 #![no_std]
+#![feature(const_fn)]
 
 extern crate common;
 extern crate support;
 
+pub mod gpio;
 pub mod pmu;
 
 extern {
