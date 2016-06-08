@@ -29,11 +29,20 @@ const LED_GPIO : u16 = 1;
 pub unsafe fn init<'a>() -> &'a mut Firestorm {
     use core::intrinsics::{volatile_load,volatile_store};
     use hotel::pmu::*;
+    use hotel::gpio;
 
     let uart_clock =
             Clock::new(PeripheralClock::Bank1(PeripheralClock1::Uart0Timer));
     let gpio_clock =
             Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0));
+
+    // Drive DIOA0 from TX
+    let pinmux_dioa0_sel : *mut u16 = 0x40060028 as *mut u16;
+    volatile_store(pinmux_dioa0_sel, 70);
+
+    // Drive DIOM4 from GPIO0_0
+    let pinmux_diom4_sel : *mut u16 = 0x40060020 as *mut u16;
+    volatile_store(pinmux_diom4_sel, LED_GPIO);
 
     /* ********************
      * UART
@@ -41,10 +50,6 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
 
     // Turn on UART0 clock
     uart_clock.enable();
-
-    // Drive DIOA0 from TX
-    let pinmux_dioa0_sel : *mut u16 = 0x40060028 as *mut u16;
-    volatile_store(pinmux_dioa0_sel, 70);
 
     // Setup baud rate
     let nco = 5300; // 2^20 * 115200 / 24000000
@@ -79,27 +84,15 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
     // Turn on GPIO clocks
     gpio_clock.enable();
 
-    // Driver DIOM4 from GPIO0_0
-    let pinmux_diom4_sel : *mut u16 = 0x40060020 as *mut u16;
-    volatile_store(pinmux_diom4_sel, LED_GPIO);
+    let led = &gpio::GPIOPin::new(gpio::GPIO0_BASE, gpio::Pin::P0);
 
-    // Enable output on GPIO0_0
-    let gpio0_outen : *mut u32 = 0x40200010 as *mut u32;
-    volatile_store(gpio0_outen, 1 << LED);
-
-    // Set GPIO0_0
-    let gpio0_out : *mut u32 = 0x40200004 as *mut u32;
-    volatile_store(gpio0_out, 1 << LED);
+    led.enable_output();
 
     loop {
         for _ in 0..3000000 {
             support::nop();
         }
-        volatile_store(gpio0_out, 0 << LED);
-        for _ in 0..3000000 {
-            support::nop();
-        }
-        volatile_store(gpio0_out, 1 << LED);
+        led.toggle();
     }
 
     static_init!(firestorm : Firestorm = Firestorm);
