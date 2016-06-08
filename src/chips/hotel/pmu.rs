@@ -127,9 +127,9 @@ pub struct PMURegisters {
     pub peripheral_clocks1_disable: VolatileCell<u32>,
 }
 
-const PMU_BASE : isize = 0x40000000;
+const PMU_BASE: isize = 0x40000000;
 
-static mut PMU : *mut PMURegisters = PMU_BASE as *mut PMURegisters;
+static mut PMU: *mut PMURegisters = PMU_BASE as *mut PMURegisters;
 
 #[derive(Clone,Copy)]
 pub enum PeripheralClock0 {
@@ -208,7 +208,7 @@ impl Clock {
     }
 
     pub fn enable(&self) {
-        let pmu : &mut PMURegisters = unsafe { transmute(PMU) };
+        let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
         match self.clock {
             PeripheralClock::Bank0(clock) => {
                 pmu.peripheral_clocks0_enable.set(1 << (clock as u32));
@@ -220,7 +220,7 @@ impl Clock {
     }
 
     pub fn disable(&self) {
-        let pmu : &mut PMURegisters = unsafe { transmute(PMU) };
+        let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
         match self.clock {
             PeripheralClock::Bank0(clock) => {
                 pmu.peripheral_clocks0_disable.set(1 << (clock as u32));
