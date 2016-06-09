@@ -1,7 +1,7 @@
 #![crate_name = "platform"]
 #![crate_type = "rlib"]
 #![no_std]
-#![feature(core_intrinsics,lang_items)]
+#![feature(lang_items)]
 
 extern crate hotel;
 extern crate hil;
@@ -23,11 +23,7 @@ macro_rules! static_init {
    }
 }
 
-const LED : u32 = 0;
-const LED_GPIO : u16 = 1;
-
 pub unsafe fn init<'a>() -> &'a mut Firestorm {
-    use core::intrinsics::{volatile_load,volatile_store};
     use hotel::pmu::*;
     use hotel::gpio;
 
@@ -36,13 +32,13 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
     let gpio_clock =
             Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0));
 
+    let pinmux = &mut *hotel::pinmux::PINMUX;
+
     // Drive DIOA0 from TX
-    let pinmux_dioa0_sel : *mut u16 = 0x40060028 as *mut u16;
-    volatile_store(pinmux_dioa0_sel, 70);
+    pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
 
     // Drive DIOM4 from GPIO0_0
-    let pinmux_diom4_sel : *mut u16 = 0x40060020 as *mut u16;
-    volatile_store(pinmux_diom4_sel, LED_GPIO);
+    pinmux.diom4.select.set(hotel::pinmux::Function::Gpio0Gpio0);
 
     /* ********************
      * UART
@@ -51,31 +47,18 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
     // Turn on UART0 clock
     uart_clock.enable();
 
+    let uart = &mut *hotel::uart::UART0;
+
     // Setup baud rate
-    let nco = 5300; // 2^20 * 115200 / 24000000
-    let uart_nco : *mut u16 = 0x40600008 as *mut u16;
-    volatile_store(uart_nco, nco);
+    uart.nco.set(5300); // 2^20 * 115200 / 24000000
 
     // Enable TX
-    let uart_ctrl : *mut u16 = 0x4060000C as *mut u16;
-    volatile_store(uart_ctrl, 1);
+    uart.control.set(1);
 
-    unsafe fn write_char(c : char) {
-        let uart_state : *mut u32 = 0x40600014 as *mut u32;
-        let uart_wdata : *mut u8 = 0x40600004 as *mut u8;
-
-        while volatile_load(uart_state) & 1 != 0 {}
-
-        volatile_store(uart_wdata, c as u8);
+    for c in "Hello from Rust!\n".chars() {
+        while uart.state.get() & 1 != 0 {}
+        uart.write_data.set(c as u32);
     }
-
-    unsafe fn write_str(s : &str) {
-        for c in s.chars() {
-            write_char(c);
-        }
-    }
-
-    write_str("Hello from Rust!\n");
 
     /* ********************
      * Blink
@@ -127,3 +110,4 @@ pub unsafe extern fn rust_begin_unwind(_args: &Arguments,
     _file: &'static str, _line: usize) -> ! {
     loop {}
 }
+
