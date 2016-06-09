@@ -7,6 +7,7 @@ extern crate common;
 extern crate support;
 
 pub mod gpio;
+pub mod pinmux;
 pub mod pmu;
 
 extern {
