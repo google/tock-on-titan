@@ -14,6 +14,14 @@ SECTIONS {
     KEEP(*(.endapp))
   } > rom
 
+  /* .ARM.exidx is sorted, so has to go in its own output section.  */
+  PROVIDE_HIDDEN (__exidx_start = .);
+  .ARM.exidx :
+  {
+    *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+  } > rom
+  PROVIDE_HIDDEN (__exidx_end = .);
+
   .rodata : {
     *(.rodata*)
   } > rom
@@ -23,7 +31,8 @@ SECTIONS {
   .data : AT(_ero) {
     . = ALIGN(4);
     _sdata = .;
-    *(.data)
+    *(.data .data.*)
+    . = ALIGN(4);
     _edata = .;
   } > ram
 
