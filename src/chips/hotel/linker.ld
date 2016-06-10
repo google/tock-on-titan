@@ -7,6 +7,8 @@ SECTIONS {
   .text : {
     KEEP(*(.vectors))
     *(.text)
+
+    _sapps = .;
   } > rom
 
   .rodata : {
