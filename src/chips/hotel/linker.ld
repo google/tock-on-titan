@@ -8,7 +8,9 @@ SECTIONS {
     KEEP(*(.vectors))
     *(.text)
 
+    . = ALIGN(8K);
     _sapps = .;
+    KEEP(*(.app.*))
   } > rom
 
   .rodata : {
@@ -24,16 +26,19 @@ SECTIONS {
     _edata = .;
   } > ram
 
-  .bss : {
+  .bss (NOLOAD) : {
     . = ALIGN(4);
     _sbss = .;
-    *(.bss)
+    *(.bss .bss.*)
     _ebss = .;
 
     _sstack = .;
     . = . + __stack_size__;
     . = ALIGN(8);
     _estack = .;
+
+    . = ALIGN(8K);
+    *(.app_memory)
   } > ram
 
 }

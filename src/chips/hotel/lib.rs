@@ -1,7 +1,7 @@
 #![crate_name = "hotel"]
 #![crate_type = "rlib"]
 #![no_std]
-#![feature(const_fn)]
+#![feature(asm,const_fn)]
 
 extern crate common;
 extern crate support;
@@ -11,6 +11,23 @@ pub mod pinmux;
 pub mod pmu;
 pub mod uart;
 
+unsafe extern "C" fn unhandled_interrupt() {
+    let mut interrupt_number: u32;
+
+    // IPSR[8:0] holds the currently active interrupt
+    asm!(
+        "mrs    r0, ipsr                    "
+        : "={r0}"(interrupt_number)
+        :
+        : "r0"
+        :
+        );
+
+    interrupt_number = interrupt_number & 0x1ff;
+
+    panic!("Unhandled Interrupt. ISR {} is active.", interrupt_number);
+}
+
 extern {
     // _estack is not really a function, but it makes the types work
     // You should never actually invoke it!!
@@ -18,6 +35,8 @@ extern {
 
     // Defined in src/main/main.rs
     fn main();
+
+    fn SVC_Handler();
 
     static mut _ero : u32;
     static mut _sdata : u32;
@@ -28,9 +47,20 @@ extern {
 
 
 #[link_section=".vectors"]
-pub static ISR_VECTOR: [Option<unsafe extern fn()>; 2] = [
+pub static ISR_VECTOR: [Option<unsafe extern fn()>; 16] = [
     /* Stack top */     Option::Some(_estack),
     /* Reset */         Option::Some(reset_handler),
+    /* NMI */           Option::Some(unhandled_interrupt),
+    /* Hard Fault */    Option::Some(unhandled_interrupt),
+    /* MemManage */     Option::Some(unhandled_interrupt),
+    /* BusFault */      Option::Some(unhandled_interrupt),
+    /* UsageFault*/     Option::Some(unhandled_interrupt),
+    None, None, None, None,
+    /* SVC */           Option::Some(SVC_Handler),
+    /* DebugMon */      Option::Some(unhandled_interrupt),
+    None,
+    /* PendSV */        Option::Some(unhandled_interrupt),
+    /* SysTick */       Option::Some(unhandled_interrupt),
 ];
 
 unsafe extern "C" fn reset_handler() {
