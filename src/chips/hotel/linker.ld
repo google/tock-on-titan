@@ -11,6 +11,7 @@ SECTIONS {
     . = ALIGN(8K);
     _sapps = .;
     KEEP(*(.app.*))
+    KEEP(*(.endapp))
   } > rom
 
   .rodata : {
