@@ -7,7 +7,9 @@ extern crate common;
 extern crate support;
 
 pub mod gpio;
+pub mod pinmux;
 pub mod pmu;
+pub mod uart;
 
 extern {
     // _estack is not really a function, but it makes the types work
