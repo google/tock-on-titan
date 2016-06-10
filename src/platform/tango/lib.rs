@@ -64,7 +64,6 @@ impl Firestorm {
     #[inline(never)]
     pub fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R where
             F: FnOnce(Option<&hil::Driver>) -> R {
-        println!("With driver: {}", driver_num);
         match driver_num {
             1 => f(Some(self.gpio)),
             _ => f(None)
