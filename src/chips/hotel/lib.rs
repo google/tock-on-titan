@@ -4,6 +4,7 @@
 #![feature(asm,const_fn)]
 
 extern crate common;
+extern crate hil;
 extern crate support;
 
 pub mod gpio;

@@ -3,6 +3,7 @@
 #![no_std]
 #![feature(lang_items)]
 
+extern crate drivers;
 extern crate hotel;
 extern crate hil;
 extern crate support;
@@ -10,7 +11,9 @@ extern crate support;
 #[macro_use]
 pub mod io;
 
-pub struct Firestorm;
+pub struct Firestorm {
+    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>
+}
 
 macro_rules! static_init {
    ($V:ident : $T:ty = $e:expr) => {
@@ -27,7 +30,24 @@ macro_rules! static_init {
 }
 
 pub unsafe fn init<'a>() -> &'a mut Firestorm {
-    static_init!(firestorm : Firestorm = Firestorm);
+    {
+        use hotel::pmu::*;
+        use hil::gpio::GPIOPin;
+        Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
+        let pinmux = &mut *hotel::pinmux::PINMUX;
+        pinmux.diom4.select.set(hotel::pinmux::Function::Gpio0Gpio0);
+    }
+
+    static_init!(gpio_pins : [&'static hotel::gpio::GPIOPin; 1] =
+        [ &hotel::gpio::PORT0.pins[0] ]
+    );
+
+    static_init!(gpio : drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin> =
+                 drivers::gpio::GPIO::new(gpio_pins));
+
+    static_init!(firestorm : Firestorm = Firestorm {
+        gpio: gpio
+    });
     firestorm
 }
 
@@ -46,7 +66,7 @@ impl Firestorm {
             F: FnOnce(Option<&hil::Driver>) -> R {
         println!("With driver: {}", driver_num);
         match driver_num {
-            //1 => f(Some(self.gpio)),
+            1 => f(Some(self.gpio)),
             _ => f(None)
         }
     }
