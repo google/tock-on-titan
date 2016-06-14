@@ -3,11 +3,17 @@
 #![no_std]
 #![feature(lang_items)]
 
+extern crate drivers;
 extern crate hotel;
 extern crate hil;
 extern crate support;
 
-pub struct Firestorm;
+#[macro_use]
+pub mod io;
+
+pub struct Firestorm {
+    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>
+}
 
 macro_rules! static_init {
    ($V:ident : $T:ty = $e:expr) => {
@@ -24,61 +30,24 @@ macro_rules! static_init {
 }
 
 pub unsafe fn init<'a>() -> &'a mut Firestorm {
-    use hotel::pmu::*;
-    use hotel::gpio;
-
-    let uart_clock =
-            Clock::new(PeripheralClock::Bank1(PeripheralClock1::Uart0Timer));
-    let gpio_clock =
-            Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0));
-
-    let pinmux = &mut *hotel::pinmux::PINMUX;
-
-    // Drive DIOA0 from TX
-    pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
-
-    // Drive DIOM4 from GPIO0_0
-    pinmux.diom4.select.set(hotel::pinmux::Function::Gpio0Gpio0);
-
-    /* ********************
-     * UART
-     * ********************/
-
-    // Turn on UART0 clock
-    uart_clock.enable();
-
-    let uart = &mut *hotel::uart::UART0;
-
-    // Setup baud rate
-    uart.nco.set(5300); // 2^20 * 115200 / 24000000
-
-    // Enable TX
-    uart.control.set(1);
-
-    for c in "Hello from Rust!\n".chars() {
-        while uart.state.get() & 1 != 0 {}
-        uart.write_data.set(c as u32);
+    {
+        use hotel::pmu::*;
+        use hil::gpio::GPIOPin;
+        Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
+        let pinmux = &mut *hotel::pinmux::PINMUX;
+        pinmux.diom4.select.set(hotel::pinmux::Function::Gpio0Gpio0);
     }
 
-    /* ********************
-     * Blink
-     * ********************/
+    static_init!(gpio_pins : [&'static hotel::gpio::GPIOPin; 1] =
+        [ &hotel::gpio::PORT0.pins[0] ]
+    );
 
-    // Turn on GPIO clocks
-    gpio_clock.enable();
+    static_init!(gpio : drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin> =
+                 drivers::gpio::GPIO::new(gpio_pins));
 
-    let led = &gpio::GPIOPin::new(gpio::GPIO0_BASE, gpio::Pin::P0);
-
-    led.enable_output();
-
-    loop {
-        for _ in 0..3000000 {
-            support::nop();
-        }
-        led.toggle();
-    }
-
-    static_init!(firestorm : Firestorm = Firestorm);
+    static_init!(firestorm : Firestorm = Firestorm {
+        gpio: gpio
+    });
     firestorm
 }
 
@@ -96,18 +65,9 @@ impl Firestorm {
     pub fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R where
             F: FnOnce(Option<&hil::Driver>) -> R {
         match driver_num {
-            //1 => f(Some(self.gpio)),
+            1 => f(Some(self.gpio)),
             _ => f(None)
         }
     }
-}
-
-use core::fmt::Arguments;
-#[cfg(not(test))]
-#[lang="panic_fmt"]
-#[no_mangle]
-pub unsafe extern fn rust_begin_unwind(_args: &Arguments,
-    _file: &'static str, _line: usize) -> ! {
-    loop {}
 }
 
