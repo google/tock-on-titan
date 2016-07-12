@@ -39,6 +39,8 @@ extern {
 
     fn SVC_Handler();
 
+    fn generic_isr();
+
     static mut _ero : u32;
     static mut _sdata : u32;
     static mut _edata : u32;
@@ -66,6 +68,12 @@ pub static ISR_VECTOR: [Option<unsafe extern fn()>; 16] = [
     /* PendSV */        Option::Some(unhandled_interrupt),
     /* SysTick */       Option::Some(unhandled_interrupt),
 ];
+
+#[link_section=".vectors"]
+pub static IRQS: [unsafe extern fn(); 0] = [generic_isr; 0];
+
+#[no_mangle]
+pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 0] = [];
 
 unsafe extern "C" fn reset_handler() {
     // Relocate data segment.
