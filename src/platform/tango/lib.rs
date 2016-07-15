@@ -1,7 +1,7 @@
 #![crate_name = "platform"]
 #![crate_type = "rlib"]
 #![no_std]
-#![feature(lang_items)]
+#![feature(core_intrinsics,lang_items)]
 
 extern crate drivers;
 extern crate hotel;
@@ -10,6 +10,8 @@ extern crate support;
 
 #[macro_use]
 pub mod io;
+
+pub mod systick;
 
 pub struct Firestorm {
     gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>
@@ -48,6 +50,7 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
     static_init!(firestorm : Firestorm = Firestorm {
         gpio: gpio
     });
+
     firestorm
 }
 
@@ -56,9 +59,8 @@ impl Firestorm {
     }
 
     pub unsafe fn has_pending_interrupts(&mut self) -> bool {
-        // FIXME: The wfi call from main() blocks forever if no interrupts are generated. For now,
-        // pretend we have interrupts to avoid blocking.
-        true
+        // FIXME: Obviously this won't work when we have interrupts.
+        false
     }
 
     #[inline(never)]

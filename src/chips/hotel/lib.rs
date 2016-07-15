@@ -41,6 +41,8 @@ extern {
 
     fn generic_isr();
 
+    fn systick_handler();
+
     static mut _ero : u32;
     static mut _sdata : u32;
     static mut _edata : u32;
@@ -66,7 +68,7 @@ pub static ISR_VECTOR: [Option<unsafe extern fn()>; 16] = [
     /* DebugMon */      Option::Some(unhandled_interrupt),
     None,
     /* PendSV */        Option::Some(unhandled_interrupt),
-    /* SysTick */       Option::Some(unhandled_interrupt),
+    /* SysTick */       Option::Some(systick_handler),
 ];
 
 #[link_section=".vectors"]
