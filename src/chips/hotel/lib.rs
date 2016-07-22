@@ -3,10 +3,12 @@
 #![no_std]
 #![feature(asm,const_fn)]
 
+extern crate cortexm3;
 extern crate common;
 extern crate hil;
 extern crate support;
 
+pub mod chip;
 pub mod gpio;
 pub mod pinmux;
 pub mod pmu;
