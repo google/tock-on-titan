@@ -7,6 +7,7 @@ SECTIONS {
   .text : {
     KEEP(*(.vectors))
     *(.text)
+    *(.ARM.extab* .gnu.linkonce.armextab.*)
 
     . = ALIGN(8K);
     _sapps = .;

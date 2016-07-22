@@ -3,6 +3,7 @@
 #![no_std]
 #![feature(core_intrinsics,lang_items)]
 
+extern crate cortexm3;
 extern crate drivers;
 extern crate hotel;
 extern crate hil;
@@ -14,6 +15,7 @@ pub mod io;
 pub mod systick;
 
 pub struct Firestorm {
+    chip: hotel::chip::Hotel,
     gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>
 }
 
@@ -48,6 +50,7 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
                  drivers::gpio::GPIO::new(gpio_pins));
 
     static_init!(firestorm : Firestorm = Firestorm {
+        chip: hotel::chip::Hotel::new(),
         gpio: gpio
     });
 
@@ -62,6 +65,11 @@ impl Firestorm {
         // FIXME: Obviously this won't work when we have interrupts.
         false
     }
+
+    pub fn mpu(&mut self) -> &mut cortexm3::mpu::MPU {
+        &mut self.chip.mpu
+    }
+
 
     #[inline(never)]
     pub fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R where
