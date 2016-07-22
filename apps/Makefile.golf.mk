@@ -7,9 +7,7 @@ TANGO_CODESIGNER_KEY ?= loader-testkey-A.pem
 TANGO_BOOTLOADER ?= bootloader.hex
 TANGO_SPIFLASH ?= spiflash
 
-
 include $(TOCK_APPS_DIR)/Makefile.Arm-M.mk
-
 
 # Apps to link may grow over time so defer expanding that
 .SECONDEXPANSION:
@@ -19,6 +17,9 @@ $(TOCK_APP_BUILD_DIR)/kernel_and_app.elf: $(TOCK_BUILD_DIR)/ctx_switch.o $(TOCK_
 	$(Q)$(GENLST) $@ > $(TOCK_APP_BUILD_DIR)/kernel_and_app.lst
 	$(Q)$(SIZE) $@
 
+# XXX Temporary until new kernel build system in place
+$(TOCK_BUILD_DIR)/ctx_switch.o: kernel
+
 $(TOCK_APP_BUILD_DIR)/self_signed_kernel.hex: $(TOCK_APP_BUILD_DIR)/kernel_and_app.elf
 	@echo "Self signing $<"
 	@$(TANGO_CODESIGNER) -k $(TANGO_CODESIGNER_KEY) -i $< -o $@
@@ -27,7 +28,7 @@ $(TOCK_APP_BUILD_DIR)/kernel_and_app.hex: $(TOCK_APP_BUILD_DIR)/self_signed_kern
 	@echo "Concatenating bootloader"
 	@cat $^ > $@
 
-.PHONE: flash
+.PHONY: flash
 flash: $(TOCK_APP_BUILD_DIR)/kernel_and_app.hex
 	@echo "Flashing $<"
 	@$(TANGO_SPIFLASH) -i $<
