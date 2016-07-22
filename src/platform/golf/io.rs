@@ -21,7 +21,7 @@ impl Write for Writer {
             // Drive DIOA0 from TX
             pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
 
-            uart.nco.set(5300);
+            uart.nco.set(5033);
             uart.control.set(1);
         }
         for c in s.bytes() {
