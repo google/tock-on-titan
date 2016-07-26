@@ -12,6 +12,7 @@ pub mod chip;
 pub mod gpio;
 pub mod pinmux;
 pub mod pmu;
+pub mod timeus;
 pub mod uart;
 
 unsafe extern "C" fn unhandled_interrupt() {
