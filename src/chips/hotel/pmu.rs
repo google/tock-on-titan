@@ -80,10 +80,11 @@ pub struct PMURegisters {
     pub nap_enable: VolatileCell<u32>,
 
     _pmu_sw_pdb: VolatileCell<u32>,
+    _pmu_sw_pdb_secure: VolatileCell<u32>,
     _pmu_vref: VolatileCell<u32>,
     _xtl_osc_bypass: VolatileCell<u32>,
     _flash_tm0_test_en_bypass: VolatileCell<u32>,
-    
+
     /// Battery level indicator
     ///
     /// When non-zero, the voltage level is higher than specified in the vref
