@@ -19,6 +19,7 @@ struct Registers {
     interrupt_enable: VolatileCell<u32>,
     interrupt_clear: VolatileCell<u32>,
     _interrupt_test: VolatileCell<u32>,
+    _reserved: [u8; 240],
     counters: [Counter; 4]
 }
 
@@ -38,7 +39,7 @@ impl Timeus {
     }
 
     fn counter(&self) -> &Counter {
-        &&self.regs.counters[self.idx]
+        &self.regs.counters[self.idx]
     }
 }
 

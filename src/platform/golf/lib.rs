@@ -34,6 +34,7 @@ macro_rules! static_init {
 }
 
 pub unsafe fn init<'a>() -> &'a mut Firestorm {
+    use hil::alarm::Alarm;
     {
         use hotel::pmu::*;
         use hil::gpio::GPIOPin;
@@ -41,6 +42,17 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
         let pinmux = &mut *hotel::pinmux::PINMUX;
         pinmux.diob0.select.set(hotel::pinmux::Function::Gpio0Gpio0);
     }
+
+    let timer = {
+        use hotel::pmu::*;
+        use hotel::timeus::Timeus;
+        Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeUs0Timer)).enable();
+        let timer = Timeus::new(0);
+        timer.set_alarm(3);
+        timer
+    };
+
+    let start = timer.now();
 
     static_init!(gpio_pins : [&'static hotel::gpio::GPIOPin; 1] =
         [ &hotel::gpio::PORT0.pins[0] ]
@@ -54,7 +66,8 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
         gpio: gpio
     });
 
-    println!("Hello from Rust!");
+    let end = timer.now();
+    println!("Hello from Rust! {}", end - start);
 
     firestorm
 }
