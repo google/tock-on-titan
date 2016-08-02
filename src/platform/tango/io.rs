@@ -3,9 +3,7 @@ use core::fmt::*;
 
 use hotel::pmu::*;
 
-pub struct Writer { initialized: bool }
-
-pub static mut WRITER : Writer = Writer { initialized: false };
+pub struct Writer;
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
@@ -14,8 +12,9 @@ impl Write for Writer {
             unsafe { Clock::new(PeripheralClock::Bank1(PeripheralClock1::Uart0Timer)) };
         uart_clock.enable();
 
-        if !self.initialized {
-            self.initialized = true;
+        static mut initialized: bool  = false;
+        if unsafe { !initialized } {
+            unsafe { initialized = true };
 
             let pinmux = unsafe { &mut *hotel::pinmux::PINMUX };
             // Drive DIOA0 from TX
@@ -39,9 +38,9 @@ impl Write for Writer {
 pub unsafe extern fn rust_begin_unwind(args: Arguments,
     file: &'static str, line: u32) -> ! {
 
-    let writer = &mut WRITER;
+    let mut writer = Writer;
     let _ = writer.write_fmt(format_args!("Kernel panic at {}:{}:\r\n\t\"", file, line));
-    let _ = write(writer, args);
+    let _ = write(&mut writer, args);
     let _ = writer.write_str("\"\r\n");
 
     loop {}
@@ -52,8 +51,8 @@ macro_rules! print {
         ($($arg:tt)*) => (
             {
                 use core::fmt::write;
-                let writer = unsafe { &mut $crate::io::WRITER };
-                let _ = write(writer, format_args!($($arg)*));
+                let mut writer = $crate::io::Writer;
+                let _ = write(&mut writer, format_args!($($arg)*));
             }
         );
 }
