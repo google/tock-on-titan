@@ -34,6 +34,17 @@ macro_rules! static_init {
 }
 
 pub unsafe fn init<'a>() -> &'a mut Firestorm {
+    let timer = {
+        use hotel::pmu::*;
+        use hotel::timeus::Timeus;
+        Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeUs0Timer)).enable();
+        let timer = Timeus::new(0);
+        timer
+    };
+
+    timer.start();
+    let start = timer.now();
+
     {
         use hotel::pmu::*;
         use hil::gpio::GPIOPin;
@@ -54,7 +65,9 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
         gpio: gpio
     });
 
-    println!("Hello from Rust!");
+    let end = timer.now();
+
+    println!("Hello from Rust! Initialization took {} tics.", end.wrapping_sub(start));
 
     firestorm
 }
