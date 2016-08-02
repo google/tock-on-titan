@@ -1,19 +1,11 @@
 use core::mem;
 use common::volatile_cell::VolatileCell;
-use hil::alarm::{Alarm, Frequency};
 
 #[repr(u32)]
 #[derive(PartialEq, Eq)]
 pub enum Enable {
     Disabled = 0,
     Enabled = 1
-}
-
-#[repr(u32)]
-#[derive(PartialEq, Eq)]
-pub enum Mode {
-    Wrapping = 0,
-    OneShot = 1
 }
 
 #[repr(C, packed)]
@@ -37,29 +29,29 @@ pub enum Mode {
 /// the counter reaches the `programmed_value` it generates an interrupt but
 /// continues counting up to `max_value`.
 pub struct Counter {
-    /// Enables/disables the counter. 0 for disable, 1 for enable.
-    enable: VolatileCell<Enable>,
+    /// Start counter in wrapping mode
+    pub wrapping: VolatileCell<Enable>,
 
-    /// Chooses between oneshot and wrapping mode
-    mode: VolatileCell<Mode>,
+    /// Start counter in one shot mode
+    pub oneshot: VolatileCell<Enable>,
 
     /// Sets the maximum value of the counter. In one-shot mode, the coutner
     /// stops when it reaches this value. In wrapping mode, it resets.
-    max_value: VolatileCell<u32>,
+    pub max_value: VolatileCell<u32>,
 
     /// Sets the intermediate programmed value. If the counter reaches this
     /// value before reaching `max_value` and interrupt will be issued.
-    programmed_value: VolatileCell<u32>,
+    pub programmed_value: VolatileCell<u32>,
 
     /// The counter divider
-    divider: VolatileCell<u32>,
+    pub divider: VolatileCell<u32>,
 
     /// The current value of the counter.
-    current_value: VolatileCell<u32>,
+    pub current_value: VolatileCell<u32>,
 
     /// The current value of the divider. When this register reaches `divider`,
     /// `current_value` is incremented.
-    current_divider_value: VolatileCell<u32>
+    pub current_divider_value: VolatileCell<u32>
 }
 
 #[repr(C, packed)]
@@ -108,51 +100,20 @@ impl Timeus {
         }
     }
 
-    fn counter(&self) -> &Counter {
-        &self.regs.counters[self.idx]
-    }
-}
-
-pub struct Freq24Mhz;
-
-impl Frequency for Freq24Mhz {
-    fn frequency() -> u32 {
-        24_000_000
-    }
-}
-
-impl Alarm for Timeus {
-
-    type Frequency = Freq24Mhz;
-
-    fn now(&self) -> u32 {
+    pub fn now(&self) -> u32 {
         self.counter().current_value.get()
     }
 
-    fn is_armed(&self) -> bool {
-        self.counter().enable.get() == Enable::Enabled
-    }
 
-    fn disable_alarm(&self) {
-        self.counter().enable.set(Enable::Disabled);
-    }
-
-    fn get_alarm(&self) -> u32 {
-        self.counter().programmed_value.get()
-    }
-
-    fn set_alarm(&self, alarm: u32) {
+    pub fn start(&self) {
         let counter = self.counter();
-
-        counter.enable.set(Enable::Disabled);
         counter.max_value.set(!0); // MAX_INT
-        counter.divider.set(24_000_000 / Self::Frequency::frequency());
-        counter.programmed_value.set(alarm);
-        counter.mode.set(Mode::OneShot);
+        counter.divider.set(1);
+        counter.wrapping.set(Enable::Enabled);
+    }
 
-        counter.enable.set(Enable::Enabled);
-
-        self.regs.interrupt_enable.set(1 << (self.idx * 2));
+    fn counter(&self) -> &Counter {
+        &self.regs.counters[self.idx]
     }
 }
 
