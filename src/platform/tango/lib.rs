@@ -14,7 +14,7 @@ pub mod io;
 
 pub mod systick;
 
-pub struct Firestorm {
+pub struct Platform {
     chip: hotel::chip::Hotel,
     gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>
 }
@@ -33,7 +33,7 @@ macro_rules! static_init {
    }
 }
 
-pub unsafe fn init<'a>() -> &'a mut Firestorm {
+pub unsafe fn init<'a>() -> &'a mut Platform {
     {
         use hotel::pmu::*;
         use hil::gpio::GPIOPin;
@@ -49,15 +49,15 @@ pub unsafe fn init<'a>() -> &'a mut Firestorm {
     static_init!(gpio : drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin> =
                  drivers::gpio::GPIO::new(gpio_pins));
 
-    static_init!(firestorm : Firestorm = Firestorm {
+    static_init!(platform : Platform = Platform {
         chip: hotel::chip::Hotel::new(),
         gpio: gpio
     });
 
-    firestorm
+    platform
 }
 
-impl Firestorm {
+impl Platform {
     pub unsafe fn service_pending_interrupts(&mut self) {
     }
 
