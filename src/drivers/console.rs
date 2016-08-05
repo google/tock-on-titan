@@ -37,7 +37,7 @@ pub struct Console<'a, U: UART + 'a> {
 }
 
 impl<'a, U: UART> Console<'a, U> {
-    pub const fn new(uart: &'a U, buffer: &'static mut [u8],
+    pub fn new(uart: &'a U, buffer: &'static mut [u8],
                      container: Container<App>) -> Console<'a, U> {
         Console {
             uart: uart,
@@ -138,8 +138,8 @@ impl<'a, U: UART> Client for Console<'a, U> {
         for cntr in self.apps.iter() {
             let started_tx = cntr.enter(|app, _| {
                 if app.pending_write {
-                    app.write_buffer.take().map(|slice| {
-                        app.pending_write = false;
+                    app.pending_write = false;
+                    app.write_buffer.as_ref().map(|slice| {
                         self.buffer.take().map(|buffer| {
                             for (i, c) in slice.as_ref().iter().enumerate() {
                                 if buffer.len() <= i {
@@ -169,10 +169,9 @@ impl<'a, U: UART> Client for Console<'a, U> {
                 self.apps.each(|app| {
                     let idx = app.read_idx;
                     app.read_buffer = app.read_buffer.take().map(|mut rb| {
-                        use core::raw::Repr;
                         app.read_callback.as_mut().map(|cb| {
                             let buf = rb.as_mut();
-                            cb.schedule(idx, (buf.repr().data as usize), 0);
+                            cb.schedule(idx, (buf.as_ptr() as usize), 0);
                         });
                         rb
                     });

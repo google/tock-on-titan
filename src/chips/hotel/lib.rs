@@ -55,9 +55,11 @@ extern {
 
 // marks the end of the app code segment with a null byte
 #[link_section=".endapp"]
+#[no_mangle]
 pub static ENDAPP: usize = 0;
 
 #[link_section=".vectors"]
+#[no_mangle]
 pub static ISR_VECTOR: [Option<unsafe extern fn()>; 16] = [
     /* Stack top */     Option::Some(_estack),
     /* Reset */         Option::Some(reset_handler),
@@ -75,6 +77,7 @@ pub static ISR_VECTOR: [Option<unsafe extern fn()>; 16] = [
 ];
 
 #[link_section=".vectors"]
+#[no_mangle]
 pub static IRQS: [unsafe extern fn(); 0] = [generic_isr; 0];
 
 #[no_mangle]
