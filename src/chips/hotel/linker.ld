@@ -12,7 +12,7 @@ SECTIONS {
     . = ALIGN(8K);
     _sapps = .;
     KEEP(*(.app.*))
-    KEEP(*(.endapp))
+    LONG(0) /* Marks the end of the app list with a sentinel value. */
   } > rom
 
   /* .ARM.exidx is sorted, so has to go in its own output section.  */
