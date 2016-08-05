@@ -55,6 +55,7 @@ extern {
 
 // marks the end of the app code segment with a null byte
 #[link_section=".endapp"]
+#[no_mangle]
 pub static ENDAPP: usize = 0;
 
 #[link_section=".vectors"]
