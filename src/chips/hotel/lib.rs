@@ -104,5 +104,8 @@ pub unsafe fn init() {
         *pdest = 0;
         pdest = pdest.offset(1);
     }
+
+    cortexm3::nvic::disable_all();
+    cortexm3::nvic::clear_all_pending();
 }
 

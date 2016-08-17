@@ -20,10 +20,19 @@ impl Chip for Hotel {
     type SysTick = cortexm3::systick::SysTick;
 
     fn has_pending_interrupts(&self) -> bool {
-        false
+        unsafe {
+            cortexm3::nvic::next_pending().is_some()
+        }
     }
 
     fn service_pending_interrupts(&mut self) {
+        unsafe {
+            cortexm3::nvic::next_pending().map(|nvic_num| {
+                match nvic_num {
+                    _   => {}
+                }
+            });
+        }
     }
 
     fn mpu(&self) -> &Self::MPU {
