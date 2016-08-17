@@ -80,11 +80,6 @@ struct Firestorm {
 }
 
 impl Platform for Firestorm {
-
-    /*fn mpu(&mut self) -> &mut cortexm4::mpu::MPU {
-        &mut self.chip.mpu
-    }*/
-
     fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R where
             F: FnOnce(Option<&main::Driver>) -> R {
 

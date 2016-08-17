@@ -14,7 +14,7 @@ LDFLAGS += -T$(LOADER) -lm
 OBJDUMP_FLAGS := --disassemble --source --disassembler-options=force-thumb
 OBJDUMP_FLAGS += -C --section-headers
 
-$(BUILD_PLATFORM_DIR)/libhotel.rlib: $(call rwildcard,$(SRC_DIR)chips/hotel,*.rs) $(BUILD_PLATFORM_DIR)/libcortexm3.rlib $(BUILD_PLATFORM_DIR)/libcore.rlib $(BUILD_PLATFORM_DIR)/libhil.rlib $(BUILD_PLATFORM_DIR)/libcommon.rlib | $(BUILD_PLATFORM_DIR)
+$(BUILD_PLATFORM_DIR)/libhotel.rlib: $(call rwildcard,$(SRC_DIR)chips/hotel,*.rs) $(BUILD_PLATFORM_DIR)/libcortexm3.rlib $(BUILD_PLATFORM_DIR)/libcore.rlib $(BUILD_PLATFORM_DIR)/libhil.rlib $(BUILD_PLATFORM_DIR)/libcommon.rlib $(BUILD_PLATFORM_DIR)/libmain.rlib | $(BUILD_PLATFORM_DIR)
 	@echo "Building $@"
 	@$(RUSTC) $(RUSTC_FLAGS) --out-dir $(BUILD_PLATFORM_DIR) $(SRC_DIR)chips/hotel/lib.rs
 
