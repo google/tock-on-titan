@@ -125,8 +125,13 @@ impl UART {
                 buffer.cursor += 1;
                 regs.write_data.set(*b as u32);
             }
+            regs.interrupt_control.set(regs.interrupt_control.get() | 1);
+            unsafe {
+                ::cortexm3::nvic::enable(177);
+            }
             buffer.cursor - init_cursor
         }).unwrap_or(0)
+
     }
 
     pub fn send_mut_bytes(&self, bytes: &'static mut [u8]) {
@@ -139,4 +144,8 @@ impl UART {
         self.send_remaining_bytes();
     }
 }
+
+interrupt_handler!(uart0_handler, 177);
+interrupt_handler!(uart1_handler, 184);
+interrupt_handler!(uart2_handler, 191);
 

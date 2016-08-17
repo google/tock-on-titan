@@ -103,7 +103,13 @@ pub unsafe fn reset_handler() {
 
     let end = timer.now();
 
-    println!("Hello from Rust! Initialization took {} tics.", end.wrapping_sub(start));
+    //println!("Hello from Rust! Initialization took {} tics.", end.wrapping_sub(start));
+
+    let uart = &hotel::uart::UART0;
+    let pinmux = unsafe { &mut *hotel::pinmux::PINMUX };
+    pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
+    uart.set_baudrate(115200);
+    uart.send_bytes("Help".as_bytes());
 
     let mut chip = hotel::chip::Hotel::new();
     chip.mpu().enable_mpu();
