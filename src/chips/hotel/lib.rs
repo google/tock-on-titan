@@ -6,6 +6,7 @@
 extern crate cortexm3;
 extern crate common;
 extern crate hil;
+extern crate main;
 extern crate support;
 
 pub mod chip;
@@ -37,14 +38,13 @@ extern {
     // You should never actually invoke it!!
     fn _estack();
 
-    // Defined in src/main/main.rs
-    fn main();
-
     fn SVC_Handler();
 
     fn generic_isr();
 
     fn systick_handler();
+
+    fn reset_handler();
 
     static mut _ero : u32;
     static mut _sdata : u32;
@@ -78,7 +78,7 @@ pub static IRQS: [unsafe extern fn(); 0] = [generic_isr; 0];
 #[no_mangle]
 pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 0] = [];
 
-unsafe extern "C" fn reset_handler() {
+pub unsafe fn init() {
     // Relocate data segment.
     // Assumes data starts right after text segment as specified by the linker
     // file.
@@ -102,7 +102,5 @@ unsafe extern "C" fn reset_handler() {
         *pdest = 0;
         pdest = pdest.offset(1);
     }
-
-    main()
 }
 

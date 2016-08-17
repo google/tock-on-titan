@@ -7,7 +7,7 @@
 extern crate common;
 extern crate cortexm4;
 extern crate hil;
-extern crate process;
+extern crate main;
 
 #[macro_use]
 mod helpers;
@@ -24,6 +24,7 @@ pub mod gpio;
 pub mod usart;
 pub mod scif;
 pub mod adc;
+pub mod flashcalw;
 
 unsafe extern "C" fn unhandled_interrupt() {
     let mut interrupt_number: u32;
@@ -47,8 +48,8 @@ extern {
     // You should never actually invoke it!!
     fn _estack();
 
-    // Defined in src/main/main.rs
-    fn main();
+    // Defined by platform
+    fn reset_handler();
 
     // Defined in src/arch/cortex-m4/ctx_switch.S
     fn SVC_Handler();
@@ -89,7 +90,7 @@ pub static IRQS: [unsafe extern fn(); 80] = [generic_isr; 80];
 pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 80] = [
     // Perhipheral vectors are defined by Atmel in the SAM4L datasheet section
     // 4.7.
-    /* HFLASHC */       Option::Some(unhandled_interrupt),
+    /* HFLASHC */       Option::Some(flashcalw::flash_handler),
     /* PDCA0 */         Option::Some(dma::pdca0_handler),
     /* PDCA1 */         Option::Some(dma::pdca1_handler),
     /* PDCA2 */         Option::Some(dma::pdca2_handler),
@@ -171,7 +172,7 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 80] = [
     /* LCDCA */         Option::Some(unhandled_interrupt),
 ];
 
-unsafe extern "C" fn reset_handler() {
+pub unsafe fn init() {
 
     // Relocate data segment.
     // Assumes data starts right after text segment as specified by the linker
@@ -196,8 +197,6 @@ unsafe extern "C" fn reset_handler() {
         *pdest = 0;
         pdest = pdest.offset(1);
     }
-
-    main();
 }
 
 unsafe extern "C" fn hard_fault_handler() {

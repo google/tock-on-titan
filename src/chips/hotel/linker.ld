@@ -5,7 +5,7 @@ MEMORY {
 __stack_size__ = DEFINED(__stack_size__) ? __stack_size__ : 0x1000;
 SECTIONS {
   .text : {
-    KEEP(*(.vectors))
+    KEEP(*(.vectors .vectors.*))
     *(.text)
     *(.ARM.extab* .gnu.linkonce.armextab.*)
 

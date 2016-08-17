@@ -1,25 +1,23 @@
-#![crate_name = "platform"]
-#![crate_type = "rlib"]
 #![no_std]
-#![feature(core_intrinsics,const_fn,lang_items)]
+#![no_main]
+#![feature(const_fn,lang_items)]
 
 extern crate common;
 extern crate cortexm4;
 extern crate drivers;
 extern crate hil;
+extern crate main;
 extern crate sam4l;
 extern crate support;
-extern crate process;
 
 use hil::Controller;
 use hil::spi_master::SpiMaster;
 use drivers::virtual_alarm::{MuxAlarm, VirtualMuxAlarm};
 use drivers::virtual_i2c::MuxI2C;
+use main::{Chip, MPU, Platform};
 
 #[macro_use]
 pub mod io;
-
-pub mod systick;
 
 // HAL unit tests. To enable a particular unit test, uncomment
 // the module here and uncomment the call to start the test in
@@ -27,12 +25,50 @@ pub mod systick;
 //mod gpio_dummy;
 //mod spi_dummy;
 //mod i2c_dummy;
+//mod flash_dummy;
 
 static mut spi_read_buf:  [u8; 64] = [0; 64];
 static mut spi_write_buf: [u8; 64] = [0; 64];
 
-pub struct Platform {
-    chip: sam4l::chip::Sam4l,
+unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'static>>] {
+    extern {
+        /// Beginning of the ROM region containing app images.
+        static _sapps : u8;
+    }
+
+    const NUM_PROCS: usize = 2;
+
+    #[link_section = ".app_memory"]
+    static mut MEMORIES: [[u8; 8192]; NUM_PROCS] = [[0; 8192]; NUM_PROCS];
+
+    static mut processes: [Option<main::process::Process<'static>>; NUM_PROCS] = [None, None];
+
+    let mut addr = &_sapps as *const u8;
+    for i in 0..NUM_PROCS {
+        // The first member of the LoadInfo header contains the total size of each process image. A
+        // sentinel value of 0 (invalid because it's smaller than the header itself) is used to
+        // mark the end of the list of processes.
+        let total_size = *(addr as *const usize);
+        if total_size == 0 {
+            break;
+        }
+
+        let process = &mut processes[i];
+        let memory = &mut MEMORIES[i];
+        *process = Some(main::process::Process::create(addr, total_size, memory));
+        // TODO: panic if loading failed?
+
+        addr = addr.offset(total_size as isize);
+    }
+
+    if *(addr as *const usize) != 0 {
+        panic!("Exceeded maximum NUM_PROCS.");
+    }
+
+    &mut processes
+}
+
+struct Firestorm {
     console: &'static drivers::console::Console<'static, sam4l::usart::USART>,
     gpio: &'static drivers::gpio::GPIO<'static, sam4l::gpio::GPIOPin>,
     timer: &'static drivers::timer::TimerDriver<'static,
@@ -43,21 +79,9 @@ pub struct Platform {
     nrf51822: &'static drivers::nrf51822_serialization::Nrf51822Serialization<'static, sam4l::usart::USART>,
 }
 
-impl Platform {
-    pub unsafe fn service_pending_interrupts(&mut self) {
-        self.chip.service_pending_interrupts()
-    }
-
-    pub unsafe fn has_pending_interrupts(&mut self) -> bool {
-        self.chip.has_pending_interrupts()
-    }
-
-    pub fn mpu(&mut self) -> &mut cortexm4::mpu::MPU {
-        &mut self.chip.mpu
-    }
-
-    pub fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R where
-            F: FnOnce(Option<&hil::Driver>) -> R {
+impl Platform for Firestorm {
+    fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R where
+            F: FnOnce(Option<&main::Driver>) -> R {
 
         match driver_num {
             0 => f(Some(self.console)),
@@ -279,7 +303,10 @@ unsafe fn set_pin_primary_functions() {
     PC[10].configure(None);
 }
 
-pub unsafe fn init() -> &'static mut Platform {
+#[no_mangle]
+pub unsafe fn reset_handler() {
+    sam4l::init();
+
     // Workaround for SB.02 hardware bug
     // TODO(alevy): Get rid of this when we think SB.02 are out of circulation
     sam4l::gpio::PA[14].enable();
@@ -297,7 +324,7 @@ pub unsafe fn init() -> &'static mut Platform {
     static_init!(console: drivers::console::Console<sam4l::usart::USART> =
                      drivers::console::Console::new(&sam4l::usart::USART3,
                                                     &mut drivers::console::WRITE_BUF,
-                                                    process::Container::create()),
+                                                    main::Container::create()),
                  24);
     sam4l::usart::USART3.set_client(console);
 
@@ -308,7 +335,7 @@ pub unsafe fn init() -> &'static mut Platform {
             drivers::nrf51822_serialization::Nrf51822Serialization::new(
                 &sam4l::usart::USART2,
                 &mut drivers::nrf51822_serialization::WRITE_BUF
-            ), 124);
+            ), 68);
     sam4l::usart::USART2.set_client(nrf_serialization);
 
     let ast = &sam4l::ast::AST;
@@ -348,14 +375,14 @@ pub unsafe fn init() -> &'static mut Platform {
     static_init!(timer: drivers::timer::TimerDriver<'static,
                                                     VirtualMuxAlarm<'static, sam4l::ast::Ast>> =
                      drivers::timer::TimerDriver::new(virtual_alarm1,
-                                                      process::Container::create()),
+                                                      main::Container::create()),
                  12);
     virtual_alarm1.set_client(timer);
 
     // Initialize and enable SPI HAL
     static_init!(spi: drivers::spi::Spi<'static, sam4l::spi::Spi> =
                      drivers::spi::Spi::new(&mut sam4l::spi::SPI),
-                 140);
+                 84);
     spi.config_buffers(&mut spi_read_buf, &mut spi_write_buf);
     sam4l::spi::SPI.init(spi as &hil::spi_master::SpiCallback);
 
@@ -391,8 +418,7 @@ pub unsafe fn init() -> &'static mut Platform {
     // &sam4l::gpio::PA[14] // No Connection
     //
 
-    static_init!(firestorm: Platform = Platform {
-                     chip: sam4l::chip::Sam4l::new(),
+    static_init!(firestorm: Firestorm = Firestorm {
                      console: console,
                      gpio: gpio,
                      timer: timer,
@@ -401,7 +427,7 @@ pub unsafe fn init() -> &'static mut Platform {
                      spi: spi,
                      nrf51822: nrf_serialization,
                  },
-                 32);
+                 28);
 
     sam4l::usart::USART3.configure(sam4l::usart::USARTParams {
         //client: &console,
@@ -443,11 +469,17 @@ pub unsafe fn init() -> &'static mut Platform {
     //i2c_dummy::i2c_accel_test();
     //i2c_dummy::i2c_li_test();
 
+    // Uncommenting the following lines will test the Flash Controller
+    //flash_dummy::meta_test();
+    //flash_dummy::set_read_write_test();
+
     firestorm.console.initialize();
     firestorm.nrf51822.initialize();
 
-    firestorm.mpu().enable_mpu();
+    let mut chip = sam4l::chip::Sam4l::new();
+    chip.mpu().enable_mpu();
 
-    firestorm
+
+    main::main(firestorm, &mut chip, load_processes());
 }
 

@@ -1,4 +1,4 @@
-.cpu cortex-m4
+.cpu cortex-m3
 .syntax unified
 .thumb
 .text
