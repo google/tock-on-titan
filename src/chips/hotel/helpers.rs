@@ -10,7 +10,7 @@ macro_rules! interrupt_handler {
                 $body
             })*
 
-            ::cortexm3::nvic::disable($nvic);
+            ::cortexm3::nvic::Nvic::new($nvic).disable();
         }
     }
 }
