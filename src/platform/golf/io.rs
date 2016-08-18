@@ -7,27 +7,24 @@ pub struct Writer;
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        let uart = unsafe { &mut *hotel::uart::UART0 };
-        let uart_clock =
-            unsafe { Clock::new(PeripheralClock::Bank1(PeripheralClock1::Uart0Timer)) };
-        uart_clock.enable();
+        unsafe {
+            let uart = &hotel::uart::UART0;
 
-        static mut initialized: bool  = false;
-        if unsafe { !initialized } {
-            unsafe { initialized = true };
+            static mut initialized: bool  = false;
+            if !initialized {
+                initialized = true;
 
-            let pinmux = unsafe { &mut *hotel::pinmux::PINMUX };
-            // Drive DIOA0 from TX
-            pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
+                let pinmux = unsafe { &mut *hotel::pinmux::PINMUX };
+                // Drive DIOA0 from TX
+                pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
 
-            uart.nco.set(5033);
-            uart.control.set(1);
+                uart.config(115200);
+            }
+
+            uart.send_bytes_sync(s.as_bytes());
+
+            Ok(())
         }
-        for c in s.bytes() {
-            while uart.state.get() & 1 != 0 {}
-            uart.write_data.set(c as u32);
-        }
-        Ok(())
     }
 }
 

@@ -204,7 +204,7 @@ pub struct Clock {
 }
 
 impl Clock {
-    pub unsafe fn new(clock: PeripheralClock) -> Clock {
+    pub const unsafe fn new(clock: PeripheralClock) -> Clock {
         Clock { clock: clock }
     }
 

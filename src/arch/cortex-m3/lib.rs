@@ -7,5 +7,6 @@ extern crate common;
 extern crate main;
 
 pub mod mpu;
+pub mod nvic;
 pub mod systick;
 

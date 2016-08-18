@@ -9,12 +9,17 @@ extern crate hil;
 extern crate main;
 extern crate support;
 
+#[macro_use]
+mod helpers;
+
 pub mod chip;
 pub mod gpio;
 pub mod pinmux;
 pub mod pmu;
 pub mod timeus;
 pub mod uart;
+
+pub mod interrupts;
 
 unsafe extern "C" fn unhandled_interrupt() {
     let mut interrupt_number: u32;
@@ -71,12 +76,9 @@ pub static ISR_VECTOR: [Option<unsafe extern fn()>; 16] = [
     /* SysTick */       Option::Some(systick_handler),
 ];
 
-#[link_section=".vectors"]
+#[link_section=".irqs"]
 #[no_mangle]
-pub static IRQS: [unsafe extern fn(); 0] = [generic_isr; 0];
-
-#[no_mangle]
-pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 0] = [];
+pub static IRQS: [unsafe extern fn(); 203] = [generic_isr; 203];
 
 pub unsafe fn init() {
     // Relocate data segment.
@@ -102,5 +104,8 @@ pub unsafe fn init() {
         *pdest = 0;
         pdest = pdest.offset(1);
     }
+
+    cortexm3::nvic::disable_all();
+    cortexm3::nvic::clear_all_pending();
 }
 
