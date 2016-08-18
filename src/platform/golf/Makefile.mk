@@ -10,9 +10,9 @@ PLATFORM_DEPS += $(BUILD_PLATFORM_DIR)/libhil.rlib $(BUILD_PLATFORM_DIR)/libdriv
 PLATFORM_DEPS += $(BUILD_PLATFORM_DIR)/libmain.rlib
 
 
-$(BUILD_PLATFORM_DIR)/kernel.o: $(call rwildcard,$(SRC_DIR)platform/golf,*.rs) $(BUILD_PLATFORM_DIR)/libhotel.rlib $(PLATFORM_DEPS) | $(BUILD_PLATFORM_DIR)
+$(BUILD_PLATFORM_DIR)/kernel.o: $(call rwildcard,$(SRC_DIR)platform/golf/src,*.rs) $(BUILD_PLATFORM_DIR)/libhotel.rlib $(PLATFORM_DEPS) | $(BUILD_PLATFORM_DIR)
 	@echo "Building $@"
-	@$(RUSTC) $(RUSTC_FLAGS) -C lto --emit obj -o $@ $(SRC_DIR)platform/golf/main.rs
+	@$(RUSTC) $(RUSTC_FLAGS) -C lto --emit obj -o $@ $(SRC_DIR)platform/golf/src/main.rs
 	@$(OBJDUMP) $(OBJDUMP_FLAGS) $@ > $(BUILD_PLATFORM_DIR)/kernel.lst
 
 $(BUILD_PLATFORM_DIR)/kernel.elf: $(BUILD_PLATFORM_DIR)/ctx_switch.o $(BUILD_PLATFORM_DIR)/kernel.o | $(BUILD_PLATFORM_DIR)

@@ -1,4 +1,5 @@
 .env
+target/
 doc/*
 build/*
 *.rlib

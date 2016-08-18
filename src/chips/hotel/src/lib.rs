@@ -7,7 +7,6 @@ extern crate cortexm3;
 extern crate common;
 extern crate hil;
 extern crate main;
-extern crate support;
 
 #[macro_use]
 mod helpers;
