@@ -18,7 +18,7 @@ impl Write for Writer {
                 // Drive DIOA0 from TX
                 pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
 
-                uart.set_baudrate(115200);
+                uart.config(115200);
             }
 
             uart.send_bytes_sync(s.as_bytes());
