@@ -1,3 +1,4 @@
+#![crate_name = "tango"]
 #![no_std]
 #![no_main]
 #![feature(lang_items)]
