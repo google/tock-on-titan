@@ -1,8 +1,6 @@
 use hotel;
 use core::fmt::*;
 
-use hotel::pmu::*;
-
 pub struct Writer;
 
 impl Write for Writer {
@@ -14,7 +12,7 @@ impl Write for Writer {
             if !initialized {
                 initialized = true;
 
-                let pinmux = unsafe { &mut *hotel::pinmux::PINMUX };
+                let pinmux = &mut *hotel::pinmux::PINMUX;
                 // Drive DIOA0 from TX
                 pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
 

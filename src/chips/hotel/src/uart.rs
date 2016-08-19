@@ -236,7 +236,7 @@ impl UART {
 
         regs.clear_interrupt_state.set(1);
         if self.send_remaining_bytes() == 0 {
-            let userbuf = self.buffer.take();
+            let _userbuf = self.buffer.take();
             // Done sending, return buffer to client
         }
         self.nvic.clear_pending();
