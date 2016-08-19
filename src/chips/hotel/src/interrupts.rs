@@ -193,7 +193,7 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 203] =
       None, // UART2_RXTOINT
       None, // UART2_TXINT
       None, // UART2_TXOVINT
-      None, // USB0_USBINTR
+      Some(::usb::usb_handler), // USB0_USBINTR
       None, // WATCHDOG0_WDOGINT
       None, // XO0_CLK_JTR_NOP_SEEN_INT
       None, // XO0_CLK_JTR_SW_TRIM_DONE_INT

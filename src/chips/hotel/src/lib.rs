@@ -1,7 +1,7 @@
 #![crate_name = "hotel"]
 #![crate_type = "rlib"]
 #![no_std]
-#![feature(asm,const_fn)]
+#![feature(asm,core_intrinsics,const_fn)]
 
 extern crate cortexm3;
 extern crate common;
@@ -17,6 +17,7 @@ pub mod pinmux;
 pub mod pmu;
 pub mod timeus;
 pub mod uart;
+pub mod usb;
 
 pub mod interrupts;
 

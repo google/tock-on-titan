@@ -1,5 +1,6 @@
 use cortexm3;
 use main::Chip;
+use usb;
 
 pub struct Hotel {
     mpu: cortexm3::mpu::MPU,
@@ -27,11 +28,18 @@ impl Chip for Hotel {
 
     fn service_pending_interrupts(&mut self) {
         unsafe {
-            cortexm3::nvic::next_pending().map(|nvic_num| {
-                match nvic_num {
-                    _   => {}
+            loop {
+                match cortexm3::nvic::next_pending() {
+                    Some(nvic_num) => {
+                        match nvic_num {
+                            193 => usb::USB0.handle_interrupt(),
+                            _   => {}
+                        }
+                        cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
+                    },
+                    None => break
                 }
-            });
+            }
         }
     }
 
