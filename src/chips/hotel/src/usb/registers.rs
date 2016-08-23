@@ -10,8 +10,8 @@ pub struct Registers {
     pub interrupt_mask: VolatileCell<u32>,
     pub _grxstsr: VolatileCell<u32>,
     pub _grxstsp: VolatileCell<u32>,
-    pub _grxfsiz: VolatileCell<u32>,
-    pub _gnptxfdiz: VolatileCell<u32>,
+    pub receive_fifo_size: VolatileCell<u32>,
+    pub transmit_fifo_size: VolatileCell<u32>,
 
     _reserved: [u32; 3],
     //0x38
@@ -62,8 +62,8 @@ pub struct Registers {
 
     _reserved_5: [u32; 50],
     //0x900
-    pub in_endpoint: [InEndpoint; 16],
-    pub out_endpoint: [OutEndpoint; 16],
+    pub in_endpoints: [InEndpoint; 16],
+    pub out_endpoints: [OutEndpoint; 16],
     //0xd00
     _reserved6: [u32; 64],
     //0xe00
@@ -90,5 +90,10 @@ pub struct OutEndpoint {
     pub dma_address: VolatileCell<u32>,
     _reserved2: u32,
     pub buffer_address: VolatileCell<u32>
+}
+
+pub struct DMADescriptor {
+    pub flags: u32,
+    pub addr: usize
 }
 

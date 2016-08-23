@@ -30,6 +30,14 @@ pub unsafe fn clear_all_pending() {
     }
 }
 
+/// Enable all interrupts
+pub unsafe fn enable_all() {
+    let nvic: &Registers = &*BASE_ADDRESS;
+    for icer in nvic.iser.iter() {
+        icer.set(!0)
+    }
+}
+
 /// Disable all interrupts
 pub unsafe fn disable_all() {
     let nvic: &Registers = &*BASE_ADDRESS;

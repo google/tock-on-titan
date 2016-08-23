@@ -84,6 +84,8 @@ pub unsafe fn reset_handler() {
     timer.start();
     let start = timer.now();
 
+    hotel::usb::USB::new().init();
+
     {
         use hotel::pmu::*;
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();

@@ -33,7 +33,7 @@ impl Chip for Hotel {
                     Some(nvic_num) => {
                         match nvic_num {
                             193 => usb::USB0.handle_interrupt(),
-                            _   => {}
+                            _   => panic!("No handler for interrupt #{}", nvic_num)
                         }
                         cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
                     },
