@@ -1,4 +1,5 @@
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
+use core::cell::Cell;
 
 mod constants;
 mod registers;
@@ -16,10 +17,18 @@ impl<T> StaticRef<T> {
     }
 }
 
+#[derive(Clone,Copy,PartialEq,Eq)]
+enum USBState {
+	WaitingForSetupPacket,
+	DataStageIn,
+	NoDataStage,
+}
+
 pub struct USB {
     registers: StaticRef<Registers>,
     core_clock: Clock,
-    timer_clock: Clock
+    timer_clock: Clock,
+    state: Cell<USBState>
 }
 
 const BASE_ADDR: *const Registers = 0x40300000 as *const Registers;
@@ -34,6 +43,13 @@ impl<T> ::core::ops::Deref for StaticRef<T> {
 
 }
 
+static mut BUF: [[u8; 64]; 2] = [[0; 64]; 2];
+static mut DESC: [registers::DMADescriptor; 2] =
+    [registers::DMADescriptor {
+        flags: 0b11 << 30,
+        addr: 0
+    }; 2];
+
 impl USB {
 
     pub const unsafe fn new() -> USB {
@@ -42,7 +58,8 @@ impl USB {
             core_clock: Clock::new(PeripheralClock::Bank1(
                     PeripheralClock1::Usb0)),
             timer_clock: Clock::new(PeripheralClock::Bank1(
-                    PeripheralClock1::Usb0TimerHs))
+                    PeripheralClock1::Usb0TimerHs)),
+            state: Cell::new(USBState::WaitingForSetupPacket)
         }
     }
 
@@ -52,7 +69,8 @@ impl USB {
         let status = self.registers.interrupt_status.get();
 
         if status & USB_RESET != 0 {
-            println!("USB RESET");
+            println!("==> USB RESET");
+            self.state.set(USBState::WaitingForSetupPacket);
             // 1. Set the nak bit for all OUT endpoitns
             // TODO(alevy): do we actually need to do this for _all_ endpoints?
             //              or just those we intend to enable?
@@ -89,55 +107,140 @@ impl USB {
 
             // TODO(alevy): Flush TxFIFOs and RxFIFO
 
-            // 4. Reset device address field
+            // 4. Reset device address field (bits 10:4) of device config
             self.registers.device_config.set(
-                self.registers.device_config.get() & 0b11111110000);
+                self.registers.device_config.get() & !(0b1111111 << 4));
         }
 
         if status & ENUM_DONE != 0 {
-            static mut BUF0: [u8; 64] = [0; 64];
-            static mut DESC0: registers::DMADescriptor =
-                registers::DMADescriptor {
-                    flags: 0,
-                    addr: 0
-                };
-
-            let enum_speed = (self.registers.device_status.get() & 0b110) >> 1;
-            println!("ENUM DONE {:#x}", enum_speed);
+            println!("==> ENUM DONE");
             // MPS default set to 0 == 64 bytes
 
             // Setup descriptor for OUT endpoint 0
             unsafe {
-                DESC0.flags = 1 << 27 | 1 << 25 | 64;
-                DESC0.addr = BUF0.as_ptr() as usize;
+                DESC[0].flags = 1 << 27 | 1 << 25 | 64;
+                DESC[0].addr = BUF[0].as_ptr() as usize;
                 self.registers.out_endpoints[0].dma_address.set(
-                    &DESC0 as *const registers::DMADescriptor as u32);
+                    &DESC[0] as *const registers::DMADescriptor as u32);
             }
             // Enable OUT endpoint 0 and clear NAK bit
             self.registers.out_endpoints[0].control.set(1 << 31 | 1 << 26);
         }
 
         if status & EARLY_SUSPEND != 0 {
-            println!("EARLY SUSPEND");
+            println!("==> EARLY SUSPEND");
         }
 
         if status & USB_SUSPEND != 0 {
-            println!("USB_SUSPEND");
+            println!("==> USB_SUSPEND");
         }
 
         if self.registers.interrupt_mask.get() & status & SOF != 0 {
-            println!("SOF");
+            println!("==> SOF");
             self.registers.interrupt_mask.set(
                 self.registers.interrupt_mask.get() & !SOF);
         }
 
         if status & OEPINT != 0 {
-            println!("OEPINT");
-            self.registers.interrupt_mask.set(
-                self.registers.interrupt_mask.get() & !OEPINT);
+            println!("==> OEPINT");
+
+            let daint = self.registers.device_all_ep_interrupt.get();
+            if daint & 1 << 16 != 0 {
+                self.handle_ep0_out();
+            } else {
+                panic!("Unexpected!");
+            }
         }
 
         self.registers.interrupt_status.set(status);
+    }
+
+    fn handle_ep0_out(&self) {
+        print!("EP0: ");
+        let ep0 = &self.registers.out_endpoints[0];
+        let ep0_interrupts = ep0.interrupt.get();
+        ep0.interrupt.set(ep0_interrupts);
+
+        let transfer_type = decode_table_10_7(ep0_interrupts);
+
+        let flags = unsafe { ::core::intrinsics::volatile_load(&DESC[0].flags) };
+        let setup_ready = flags & (1 << 24) != 0; // Setup Ready bit
+
+        match self.state.get() {
+            USBState::WaitingForSetupPacket => {
+                if transfer_type == TableCase::A ||
+                                    transfer_type == TableCase::C {
+                    if setup_ready {
+                        println!("Setup packet read");
+                        self.handle_setup(transfer_type);
+                    } else {
+                        panic!("Unhandled USB event {:#x}", ep0_interrupts);
+                    }
+                }
+            },
+            USBState::DataStageIn => {
+                // TODO
+            },
+            USBState::NoDataStage => {
+                //TODO
+            }
+        }
+    }
+
+    fn handle_setup(&self, transfer_type: TableCase) {
+        let buf = unsafe { BUF[0] };
+
+        let bm_request_type = buf[0];
+        let b_request = buf[1];
+        let w_value = buf[2] as u16 | ((buf[3] as u16) << 8);
+        // wIndex
+        let w_length = buf[6] as u16 | ((buf[7] as u16) << 8);
+
+        let data_direction = (bm_request_type & 0x80) >> 7;
+        let req_type = (bm_request_type & 0x60) >> 5;
+        let recipient = bm_request_type & 0x1f;
+
+        if req_type == 0 && recipient == 0 { // Standard device request
+            if data_direction == 1 { // Device-to-host
+                // TODO
+            } else if w_length > 0 { // Host-to-device
+                // TODO
+            } else { // No data stage
+                match b_request {
+                    5 /* Set Address */ => {
+                        // Even though USB wants the address to be set after the
+                        // IN packet handshake, the hardware knows to wait, so
+                        // we should just set it now.
+                        println!("\tSetAddress: {}", w_value);
+                        let dcfg = self.registers.device_config.get();
+                        self.registers.device_config.set((dcfg & !(0x7f << 4)) |
+                            (((w_value & 0x7f) as u32) << 4));
+                    },
+                    9 /* Set configuration */ => {
+                        // TODO
+                    },
+                    7 /* Set descriptor */ => {
+                        // TODO
+                    },
+                    3 /* Set feature */ => {
+                        // TODO
+                    }
+                    _ => {}
+                }
+                self.expect_status_phase_in(transfer_type);
+            }
+        } else if recipient == 1 { // Interface
+            // TODO
+        }
+    }
+
+    fn expect_status_phase_in(&self, transfer_type: TableCase) {
+        self.state.set(USBState::NoDataStage);
+
+        // 1. Expect a zero-length in for the status phase
+        // 2. Flush fifos
+        // 3. Set EP0 in DMA
+        // etc...
     }
 
     pub fn init(&self) {
@@ -205,7 +308,7 @@ impl USB {
         // The datasheet says to unmask OTG and Mode Mismatch interrupts, but
         // we don't support anything but device mode for now, so let's skip
         // handling that
-        // 
+        //
         // If we're right, then
         // `self.registers.interrupt_status.get() & 1 == 0`
         //
@@ -213,6 +316,11 @@ impl USB {
         //=== Done with core initialization ==//
 
         //===  Begin Device Initialization  ==//
+
+        // Clear the Soft Disconnect bit to allow the core to issue a connect.
+        self.registers.device_control.set(
+            self.registers.device_control.get() | 1 << 1);
+
 
         self.registers.device_config.set(
             0b11       | // Device Speed: USB 1.1 Full speed (48Mhz)
@@ -238,6 +346,29 @@ impl USB {
         //
         self.registers.interrupt_mask.set(
             SOF | EARLY_SUSPEND | USB_SUSPEND | USB_RESET | ENUM_DONE | OEPINT);
+    }
+}
+
+#[derive(Copy,Clone,PartialEq,Eq)]
+enum TableCase {
+    A, B, C, D, E
+}
+
+fn decode_table_10_7(device_out_int: u32) -> TableCase {
+    if device_out_int & (1 << 0) != 0 { // XferCompl
+        if device_out_int & (1 << 3) != 0 { // Setup
+            TableCase::C
+        } else if device_out_int & (1 << 5) != 0 { // StsPhseRcvd
+            TableCase::E
+        } else {
+            TableCase::A
+        }
+    } else {
+        if device_out_int & (1 << 3) != 0 { // Setup
+            TableCase::B
+        } else {
+            TableCase::D
+        }
     }
 }
 

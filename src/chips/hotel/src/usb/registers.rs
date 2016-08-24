@@ -1,5 +1,6 @@
 use common::volatile_cell::VolatileCell;
 
+#[repr(C)]
 pub struct Registers {
     pub otg_control: VolatileCell<u32>,
     pub otg_interrupt: VolatileCell<u32>,
@@ -70,6 +71,7 @@ pub struct Registers {
     pub power_clock_gating_control: VolatileCell<u32>
 }
 
+#[repr(C)]
 pub struct InEndpoint {
     pub control: VolatileCell<u32>,
     _reserved0: u32,
@@ -81,6 +83,7 @@ pub struct InEndpoint {
     pub buffer_address: VolatileCell<u32>
 }
 
+#[repr(C)]
 pub struct OutEndpoint {
     pub control: VolatileCell<u32>,
     _reserved0: u32,
@@ -92,6 +95,8 @@ pub struct OutEndpoint {
     pub buffer_address: VolatileCell<u32>
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
 pub struct DMADescriptor {
     pub flags: u32,
     pub addr: usize
