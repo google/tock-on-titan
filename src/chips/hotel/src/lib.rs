@@ -109,6 +109,7 @@ pub unsafe fn init() {
 
     cortexm3::nvic::disable_all();
     cortexm3::nvic::clear_all_pending();
+    cortexm3::nvic::enable_all();
 }
 
 unsafe extern "C" fn hard_fault_handler() {

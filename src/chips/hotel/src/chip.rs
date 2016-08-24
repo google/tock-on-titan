@@ -36,6 +36,7 @@ impl Chip for Hotel {
                             _   => panic!("No handler for interrupt #{}", nvic_num)
                         }
                         cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
+                        cortexm3::nvic::Nvic::new(nvic_num).enable();
                     },
                     None => break
                 }
