@@ -84,7 +84,7 @@ pub unsafe fn reset_handler() {
     timer.start();
     let start = timer.now();
 
-    hotel::usb::USB::new().init();
+    hotel::usb::USB0.init();
 
     {
         use hotel::pmu::*;

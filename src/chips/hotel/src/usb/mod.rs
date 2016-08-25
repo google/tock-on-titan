@@ -17,6 +17,7 @@ impl<T> StaticRef<T> {
     }
 }
 
+/// Encodes the current state of the USB driver's state machine
 #[derive(Clone,Copy,PartialEq,Eq)]
 enum USBState {
 	WaitingForSetupPacket,
@@ -24,6 +25,10 @@ enum USBState {
 	NoDataStage,
 }
 
+/// USB driver for the Synopsis controller
+///
+/// The driver operates as a device in Scatter-Gather DMA mode. It performs the
+/// initial handshake with the host on endpoint 0.
 pub struct USB {
     registers: StaticRef<Registers>,
     core_clock: Clock,
@@ -31,8 +36,10 @@ pub struct USB {
     state: Cell<USBState>
 }
 
+/// Hardware base address of the singleton USB controller
 const BASE_ADDR: *const Registers = 0x40300000 as *const Registers;
 
+/// USB driver 0
 pub static mut USB0: USB = unsafe { USB::new() };
 
 impl<T> ::core::ops::Deref for StaticRef<T> {
@@ -52,7 +59,14 @@ static mut DESC: [registers::DMADescriptor; 2] =
 
 impl USB {
 
-    pub const unsafe fn new() -> USB {
+    /// Creates a new value referencing the single USB driver.
+    ///
+    /// ## Safety
+    ///
+    /// Callers must ensure this is only called once for every program
+    /// execution. Creating multiple instances will result in conflicting
+    /// handling of events and can lead to undefined behavior.
+    const unsafe fn new() -> USB {
         USB {
             registers: StaticRef::new(BASE_ADDR),
             core_clock: Clock::new(PeripheralClock::Bank1(
@@ -63,6 +77,16 @@ impl USB {
         }
     }
 
+    /// Interrupt handler
+    ///
+    /// The Chip should call this from its `service_pending_interrupts` routine
+    /// when an interrupt is received on the USB nvic line.
+    ///
+    /// Directly handles events related to device initialization, connection and
+    /// disconnection, as well as control transfers on endpoint 0. Other events
+    /// are passed to clients delegated for particular endpoints or interfaces.
+    ///
+    /// TODO(alevy): implement what this comment promises
     pub fn handle_interrupt(&self) {
         // Save current interrupt status snapshot so can clear only those at the
         // end
@@ -155,13 +179,14 @@ impl USB {
         self.registers.interrupt_status.set(status);
     }
 
+    /// Handle all endpoint 0 OUT events
     fn handle_ep0_out(&self) {
         print!("EP0: ");
         let ep0 = &self.registers.out_endpoints[0];
         let ep0_interrupts = ep0.interrupt.get();
         ep0.interrupt.set(ep0_interrupts);
 
-        let transfer_type = decode_table_10_7(ep0_interrupts);
+        let transfer_type = TableCase::decode_interrupt(ep0_interrupts);
 
         let flags = unsafe { ::core::intrinsics::volatile_load(&DESC[0].flags) };
         let setup_ready = flags & (1 << 24) != 0; // Setup Ready bit
@@ -187,6 +212,10 @@ impl USB {
         }
     }
 
+    /// Handle SETUP packets to endpoint 0
+    ///
+    /// `transfer_type` is the `TableCase` found by inspecting endpoint-0's
+    /// interrupt register.
     fn handle_setup(&self, transfer_type: TableCase) {
         let buf = unsafe { BUF[0] };
 
@@ -237,10 +266,26 @@ impl USB {
     fn expect_status_phase_in(&self, transfer_type: TableCase) {
         self.state.set(USBState::NoDataStage);
 
+        self.flush_tx_fifo()
         // 1. Expect a zero-length in for the status phase
         // 2. Flush fifos
         // 3. Set EP0 in DMA
         // etc...
+    }
+
+    /// Flush endpoint 0's TX FIFO
+    ///
+    /// # Safety
+    ///
+    /// Only call this when  transaction is not underway and data from this FIFO
+    /// is not being copied.
+    fn flush_tx_fifo(&self) {
+        self.registers.reset.set(
+            0 << 6 | // TxFIFO number: 0
+            1 << 5); // TxFFlsh
+
+        // Wait for TxFFlsh to clear
+        while self.registers.reset.get() & 1 << 5 != 0 {}
     }
 
     pub fn init(&self) {
@@ -349,25 +394,64 @@ impl USB {
     }
 }
 
+/// Combinations of OUT endpoint interrupts for control transfers
+///
+/// Encodes the cases in from Table 10.7 in the Programming Guide (pages
+/// 279-230).
 #[derive(Copy,Clone,PartialEq,Eq)]
-enum TableCase {
-    A, B, C, D, E
+pub enum TableCase {
+    /// Case A
+    ///
+    /// * StsPhseRcvd: 0
+    /// * SetUp: 0
+    /// * XferCompl: 1
+    A,
+    /// Case B
+    ///
+    /// * StsPhseRcvd: 0
+    /// * SetUp: 1
+    /// * XferCompl: 0
+    B,
+    /// Case C
+    ///
+    /// * StsPhseRcvd: 0
+    /// * SetUp: 1
+    /// * XferCompl: 1
+    C,
+    /// Case D
+    ///
+    /// * StsPhseRcvd: 1
+    /// * SetUp: 0
+    /// * XferCompl: 0
+    D,
+    /// Case E
+    ///
+    /// * StsPhseRcvd: 1
+    /// * SetUp: 0
+    /// * XferCompl: 1
+    E
 }
 
-fn decode_table_10_7(device_out_int: u32) -> TableCase {
-    if device_out_int & (1 << 0) != 0 { // XferCompl
-        if device_out_int & (1 << 3) != 0 { // Setup
-            TableCase::C
-        } else if device_out_int & (1 << 5) != 0 { // StsPhseRcvd
-            TableCase::E
+impl TableCase {
+    /// Decodes a value from the OUT endpoint interrupt register.
+    ///
+    /// Only properly decodes values with the combinations shown in the
+    /// programming guide.
+    pub fn decode_interrupt(device_out_int: u32) -> TableCase {
+        if device_out_int & (1 << 0) != 0 { // XferCompl
+            if device_out_int & (1 << 3) != 0 { // Setup
+                TableCase::C
+            } else if device_out_int & (1 << 5) != 0 { // StsPhseRcvd
+                TableCase::E
+            } else {
+                TableCase::A
+            }
         } else {
-            TableCase::A
-        }
-    } else {
-        if device_out_int & (1 << 3) != 0 { // Setup
-            TableCase::B
-        } else {
-            TableCase::D
+            if device_out_int & (1 << 3) != 0 { // Setup
+                TableCase::B
+            } else {
+                TableCase::D
+            }
         }
     }
 }
