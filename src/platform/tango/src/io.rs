@@ -1,5 +1,6 @@
-use hotel;
+
 use core::fmt::*;
+use hotel;
 
 pub struct Writer;
 
@@ -8,7 +9,7 @@ impl Write for Writer {
         unsafe {
             let uart = &hotel::uart::UART0;
 
-            static mut initialized: bool  = false;
+            static mut initialized: bool = false;
             if !initialized {
                 initialized = true;
 
@@ -30,8 +31,7 @@ impl Write for Writer {
 #[cfg(not(test))]
 #[lang="panic_fmt"]
 #[no_mangle]
-pub unsafe extern fn rust_begin_unwind(args: Arguments,
-    file: &'static str, line: u32) -> ! {
+pub unsafe extern "C" fn rust_begin_unwind(args: Arguments, file: &'static str, line: u32) -> ! {
 
     let mut writer = Writer;
     let _ = writer.write_fmt(format_args!("Kernel panic at {}:{}:\r\n\t\"", file, line));

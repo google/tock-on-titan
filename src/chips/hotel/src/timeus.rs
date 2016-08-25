@@ -1,11 +1,12 @@
-use core::mem;
+
 use common::volatile_cell::VolatileCell;
+use core::mem;
 
 #[repr(u32)]
 #[derive(PartialEq, Eq)]
 pub enum Enable {
     Disabled = 0,
-    Enabled = 1
+    Enabled = 1,
 }
 
 #[repr(C, packed)]
@@ -51,7 +52,7 @@ pub struct Counter {
 
     /// The current value of the divider. When this register reaches `divider`,
     /// `current_value` is incremented.
-    pub current_divider_value: VolatileCell<u32>
+    pub current_divider_value: VolatileCell<u32>,
 }
 
 #[repr(C, packed)]
@@ -77,14 +78,14 @@ pub struct Registers {
     _reserved: [u8; 240],
 
     /// Registers for each of the four counters
-    pub counters: [Counter; 4]
+    pub counters: [Counter; 4],
 }
 
 const BASE_REGISTERS: *const Registers = 0x40670000 as *const Registers;
 
 pub struct Timeus {
     regs: &'static Registers,
-    idx: usize
+    idx: usize,
 }
 
 impl Timeus {
@@ -96,7 +97,7 @@ impl Timeus {
     pub unsafe fn new(idx: usize) -> Timeus {
         Timeus {
             regs: mem::transmute(BASE_REGISTERS),
-            idx: idx
+            idx: idx,
         }
     }
 
@@ -116,4 +117,3 @@ impl Timeus {
         &self.regs.counters[self.idx]
     }
 }
-

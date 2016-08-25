@@ -1,4 +1,5 @@
 #[no_mangle]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 203] =
     [ None, // CRYPTO0_BREAK_INT,
       None, // CRYPTO0_DMEM_PTRS_OVERFLOW_INT

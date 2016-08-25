@@ -1,9 +1,9 @@
-///! Cortex-M3 NVIC
+//! Cortex-M3 NVIC
 
 use common::volatile_cell::VolatileCell;
 
 #[repr(C, packed)]
-// Registers for the NVIC. Each 
+// Registers for the NVIC. Each
 struct Registers {
     // Interrupt set-enable
     iser: [VolatileCell<u32>; 8],
@@ -15,8 +15,7 @@ struct Registers {
     ispr: [VolatileCell<u32>; 8],
     _reserved3: [VolatileCell<u32>; 24],
     // Interrupt clear-pending (and read pending state)
-    icpr: [VolatileCell<u32>; 8]
-
+    icpr: [VolatileCell<u32>; 8],
 }
 
 // NVIC base address
@@ -64,7 +63,6 @@ pub unsafe fn next_pending() -> Option<u32> {
 pub struct Nvic(u32);
 
 impl Nvic {
-
     /// Creates a new `Nvic`
     ///
     /// Marked unsafe because only chip/platform configuration code should be
@@ -97,4 +95,3 @@ impl Nvic {
         nvic.icpr[idx / 32].set(1 << (self.0 & 31));
     }
 }
-

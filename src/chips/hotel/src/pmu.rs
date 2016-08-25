@@ -166,7 +166,7 @@ pub enum PeripheralClock0 {
     Sps0,
     Sps0TimerHs,
     Swdp0,
-    Temp0
+    Temp0,
 }
 
 #[derive(Clone,Copy)]
@@ -186,13 +186,13 @@ pub enum PeripheralClock1 {
     Xo0,
     Xo0Timer,
     PeripheralMasterMatrix,
-    PeripheralMatrix
+    PeripheralMatrix,
 }
 
 #[derive(Clone,Copy)]
 pub enum PeripheralClock {
     Bank0(PeripheralClock0),
-    Bank1(PeripheralClock1)
+    Bank1(PeripheralClock1),
 }
 
 /// Wrapper struct around `PeripheralClock` that can only be created by.
@@ -200,7 +200,7 @@ pub enum PeripheralClock {
 #[derive(Clone,Copy)]
 pub struct Clock {
     // It's important that this field is private!
-    clock: PeripheralClock
+    clock: PeripheralClock,
 }
 
 impl Clock {
@@ -213,7 +213,7 @@ impl Clock {
         match self.clock {
             PeripheralClock::Bank0(clock) => {
                 pmu.peripheral_clocks0_enable.set(1 << (clock as u32));
-            },
+            }
             PeripheralClock::Bank1(clock) => {
                 pmu.peripheral_clocks1_enable.set(1 << (clock as u32));
             }
@@ -225,11 +225,10 @@ impl Clock {
         match self.clock {
             PeripheralClock::Bank0(clock) => {
                 pmu.peripheral_clocks0_disable.set(1 << (clock as u32));
-            },
+            }
             PeripheralClock::Bank1(clock) => {
                 pmu.peripheral_clocks1_disable.set(1 << (clock as u32));
             }
         }
     }
 }
-

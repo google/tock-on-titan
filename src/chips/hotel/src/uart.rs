@@ -6,7 +6,7 @@
 //! FIFO transmit and receive buffer.
 //!
 //! # Examples
-//! 
+//!
 //! Before using the UART you must configure the TX and/or RX pins and set the
 //! baud rate:w
 //!
@@ -33,9 +33,9 @@
 //! TODO
 //!
 
-use cortexm3::nvic::Nvic;
 use common::take_cell::TakeCell;
 use common::volatile_cell::VolatileCell;
+use cortexm3::nvic::Nvic;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 /// Registers for the UART controller
@@ -49,24 +49,21 @@ struct Registers {
     state: VolatileCell<u32>,
     clear_state: VolatileCell<u32>,
     interrupt_state: VolatileCell<u32>,
-    clear_interrupt_state: VolatileCell<u32>
+    clear_interrupt_state: VolatileCell<u32>,
 }
 
 const UART0_BASE: *mut Registers = 0x40600000 as *mut Registers;
 const UART1_BASE: *mut Registers = 0x40610000 as *mut Registers;
 const UART2_BASE: *mut Registers = 0x40620000 as *mut Registers;
 
-pub static mut UART0: UART = unsafe {
-    UART::new(UART0_BASE, PeripheralClock1::Uart0Timer, Nvic::new(177))
-};
+pub static mut UART0: UART =
+    unsafe { UART::new(UART0_BASE, PeripheralClock1::Uart0Timer, Nvic::new(177)) };
 
-pub static mut UART1: UART = unsafe {
-    UART::new(UART1_BASE, PeripheralClock1::Uart1Timer, Nvic::new(184))
-};
+pub static mut UART1: UART =
+    unsafe { UART::new(UART1_BASE, PeripheralClock1::Uart1Timer, Nvic::new(184)) };
 
-pub static mut UART2: UART = unsafe {
-    UART::new(UART2_BASE, PeripheralClock1::Uart2Timer, Nvic::new(191))
-};
+pub static mut UART2: UART =
+    unsafe { UART::new(UART2_BASE, PeripheralClock1::Uart2Timer, Nvic::new(191)) };
 
 /// Wrapper type that helps store either a mutable or immutable slice.
 ///
@@ -74,13 +71,13 @@ pub static mut UART2: UART = unsafe {
 /// but when we return it in a callback, the client cares.
 enum EitherBytes {
     Immutable(&'static [u8]),
-    Mutable(&'static mut [u8])
+    Mutable(&'static mut [u8]),
 }
 
 /// A resumable buffer that tracks the last written index
 struct Buffer {
     bytes: EitherBytes,
-    cursor: usize
+    cursor: usize,
 }
 
 /// A UART channel
@@ -90,17 +87,16 @@ pub struct UART {
     regs: *mut Registers,
     clock: Clock,
     buffer: TakeCell<Buffer>,
-    nvic: Nvic
+    nvic: Nvic,
 }
 
 impl UART {
-    const unsafe fn new(uart: *mut Registers,
-                            clock: PeripheralClock1, nvic: Nvic) -> UART {
+    const unsafe fn new(uart: *mut Registers, clock: PeripheralClock1, nvic: Nvic) -> UART {
         UART {
             regs: uart,
             clock: Clock::new(PeripheralClock::Bank1(clock)),
             buffer: TakeCell::empty(),
-            nvic: nvic
+            nvic: nvic,
         }
     }
 
@@ -188,23 +184,25 @@ impl UART {
 
         // If there is no current buffer, just return zero. Probably shouldn't
         // happen though.
-        let nwritten = self.buffer.map(|buffer| {
-            let init_cursor = buffer.cursor;
+        let nwritten = self.buffer
+            .map(|buffer| {
+                let init_cursor = buffer.cursor;
 
-            let bytes: &[u8] = match buffer.bytes {
-                EitherBytes::Immutable(ref b) => b,
-                EitherBytes::Mutable(ref b) => &**b
-            };
+                let bytes: &[u8] = match buffer.bytes {
+                    EitherBytes::Immutable(ref b) => b,
+                    EitherBytes::Mutable(ref b) => &**b,
+                };
 
-            for b in bytes[buffer.cursor..].iter() {
-                if regs.state.get() & 1 == 1 {
-                    break; // TX Buffer full, we'll continue later
+                for b in bytes[buffer.cursor..].iter() {
+                    if regs.state.get() & 1 == 1 {
+                        break; // TX Buffer full, we'll continue later
+                    }
+                    buffer.cursor += 1;
+                    regs.write_data.set(*b as u32);
                 }
-                buffer.cursor += 1;
-                regs.write_data.set(*b as u32);
-            }
-            buffer.cursor - init_cursor
-        }).unwrap_or(0);
+                buffer.cursor - init_cursor
+            })
+            .unwrap_or(0);
 
         if nwritten > 0 {
             // if we wrote anything, we're gonna want to get notified when the
@@ -252,7 +250,10 @@ impl UART {
     /// the client from loosing mutable access.
     ///
     pub fn send_mut_bytes(&self, bytes: &'static mut [u8]) {
-        self.buffer.replace(Buffer{bytes: EitherBytes::Mutable(bytes), cursor: 0});
+        self.buffer.replace(Buffer {
+            bytes: EitherBytes::Mutable(bytes),
+            cursor: 0,
+        });
         self.send_remaining_bytes();
     }
 
@@ -263,7 +264,10 @@ impl UART {
     /// to modify it again. If you do so, there will be no way to get it back
     /// mutably from the callback. Instead, use `send_mut_bytes`.
     pub fn send_bytes(&self, bytes: &'static [u8]) {
-        self.buffer.replace(Buffer{bytes: EitherBytes::Immutable(bytes), cursor: 0});
+        self.buffer.replace(Buffer {
+            bytes: EitherBytes::Immutable(bytes),
+            cursor: 0,
+        });
         self.send_remaining_bytes();
     }
 }
@@ -272,4 +276,3 @@ impl UART {
 interrupt_handler!(uart0_handler, 177);
 interrupt_handler!(uart1_handler, 184);
 interrupt_handler!(uart2_handler, 191);
-
