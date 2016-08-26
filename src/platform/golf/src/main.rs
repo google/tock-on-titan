@@ -3,6 +3,8 @@
 #![no_main]
 #![feature(lang_items)]
 
+#[macro_use(static_init)]
+extern crate common;
 extern crate drivers;
 extern crate hotel;
 extern crate hil;
@@ -55,20 +57,6 @@ pub struct Golf {
     gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
 }
 
-macro_rules! static_init {
-   ($V:ident : $T:ty = $e:expr) => {
-        let $V : &mut $T = {
-            use core::mem::transmute;
-            // Waiting out for size_of to be available at compile-time to avoid
-            // hardcoding an abitrary large size...
-            static mut BUF : [u8; 1024] = [0; 1024];
-            let mut tmp : &mut $T = transmute(&mut BUF);
-            *tmp = $e;
-            tmp
-        };
-   }
-}
-
 #[no_mangle]
 pub unsafe fn reset_handler() {
     hotel::init();
@@ -91,12 +79,17 @@ pub unsafe fn reset_handler() {
         pinmux.diob0.select.set(hotel::pinmux::Function::Gpio0Gpio0);
     }
 
-    static_init!(gpio_pins: [&'static hotel::gpio::GPIOPin; 1] = [&hotel::gpio::PORT0.pins[0]]);
+    let gpio_pins = static_init!(
+        [&'static hotel::gpio::GPIOPin; 1],
+        [&hotel::gpio::PORT0.pins[0]],
+        4);
 
-    static_init!(gpio: drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin> =
-                     drivers::gpio::GPIO::new(gpio_pins));
+    let gpio = static_init!(
+        drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+        drivers::gpio::GPIO::new(gpio_pins),
+        20);
 
-    static_init!(platform: Golf = Golf { gpio: gpio });
+    let platform = static_init!(Golf, Golf { gpio: gpio }, 4);
 
     let end = timer.now();
 
