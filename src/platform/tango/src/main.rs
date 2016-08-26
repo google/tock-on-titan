@@ -84,7 +84,10 @@ pub unsafe fn reset_handler() {
     timer.start();
     let start = timer.now();
 
-    hotel::usb::USB0.init();
+    hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
+                          &mut hotel::usb::OUT_BUFFERS,
+                          &mut hotel::usb::IN_DESCRIPTORS,
+                          &mut hotel::usb::IN_BUFFERS);
 
     {
         use hotel::pmu::*;
@@ -112,7 +115,7 @@ pub unsafe fn reset_handler() {
     chip.mpu().enable_mpu();
 
 
-    main::main(platform, &mut chip, load_processes());
+    main::main(platform, &mut chip, &mut []); //load_processes());
 }
 
 impl Platform for Tango {

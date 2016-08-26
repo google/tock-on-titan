@@ -96,7 +96,7 @@ pub struct OutEndpoint {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct DMADescriptor {
     pub flags: u32,
     pub addr: usize
