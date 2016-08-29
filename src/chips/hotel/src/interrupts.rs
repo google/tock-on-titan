@@ -175,10 +175,10 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 203] =
       None, // TRNG0_INTR_READ_EMPTY_INT
       None, // UART0_RXBINT
       None, // UART0_RXFINT
-      None, // UART0_RXINT
+      Some(::uart::uart0_rx_handler), // UART0_RXINT
       None, // UART0_RXOVINT
       None, // UART0_RXTOINT
-      Some(::uart::uart0_handler), // UART0_TXINT
+      Some(::uart::uart0_tx_handler), // UART0_TXINT
       None, // UART0_TXOVINT
       None, // UART1_RXBINT
       None, // UART1_RXFINT

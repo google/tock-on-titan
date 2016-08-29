@@ -1,5 +1,6 @@
 use cortexm3;
 use main::Chip;
+use uart;
 
 pub struct Hotel {
     mpu: cortexm3::mpu::MPU,
@@ -27,8 +28,14 @@ impl Chip for Hotel {
         unsafe {
             cortexm3::nvic::next_pending().map(|nvic_num| {
                 match nvic_num {
-                    _ => {}
+                    174 => uart::UART0.handle_rx_interrupt(),
+                    177 => uart::UART0.handle_tx_interrupt(),
+                    184 => uart::UART1.handle_tx_interrupt(),
+                    191 => uart::UART2.handle_tx_interrupt(),
+                    _ => panic!("Unexected ISR {}", nvic_num)
                 }
+                cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
+                cortexm3::nvic::Nvic::new(nvic_num).enable();
             });
         }
     }
