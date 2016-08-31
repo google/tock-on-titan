@@ -88,7 +88,8 @@ pub unsafe fn reset_handler() {
                           &mut hotel::usb::OUT_BUFFERS,
                           &mut hotel::usb::IN_DESCRIPTORS,
                           &mut hotel::usb::IN_BUFFERS,
-                          hotel::usb::PHY::A);
+                          hotel::usb::PHY::A,
+                          None, Some(0x0011), Some(0x7788));
 
     {
         use hotel::pmu::*;
