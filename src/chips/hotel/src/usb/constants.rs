@@ -11,7 +11,7 @@ pub const GINNAKEFF: u32     = 1 << 6;
 
 const MAX_CONTROL_ENDPOINTS: u16 = 3;
 const MAX_NORMAL_ENDPOINTS: u16  = 16;
-const MAX_PACKET_SIZE: u16        = 64;
+pub const MAX_PACKET_SIZE: u16        = 64;
 //const FIFO_RAM_DEPTH: u16        = 1024;
 
 pub const RX_FIFO_SIZE: u16 = (4 * MAX_CONTROL_ENDPOINTS + 6) +
@@ -19,3 +19,4 @@ pub const RX_FIFO_SIZE: u16 = (4 * MAX_CONTROL_ENDPOINTS + 6) +
                               (2 * MAX_NORMAL_ENDPOINTS) + 1;
 pub const TX_FIFO_SIZE: u16 = 2 * MAX_PACKET_SIZE / 4;
 // const ENDPOINT_STATUS_SIZE = 4 * MAX_NORMAL_ENDPOINTS * 2;
+
