@@ -1,5 +1,6 @@
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 use core::cell::Cell;
+use core::ops::Deref;
 use common::take_cell::TakeCell;
 
 mod constants;
@@ -10,13 +11,36 @@ use self::registers::Registers;
 
 pub use self::registers::DMADescriptor;
 
+/// A pointer to statically allocated mutable data such as memory mapped I/O
+/// registers.
+///
+/// This is a simple wrapper around a raw pointer that encapsulates an unsafe
+/// dereference in a safe manner. It serve the role of creating a `&'static T`
+/// given a raw address and acts similarly to `extern` definitions, except
+/// `StaticRef` is subject to module and crate bounderies, while `extern`
+/// definitions can be imported anywhere.
+///
+/// TODO(alevy): move into `common` crate or replace with other mechanism.
 struct StaticRef<T> {
     ptr: *const T
 }
 
 impl<T> StaticRef<T> {
+    /// Create a new `StaticRef` from a raw pointer
+    ///
+    /// ## Safety
+    ///
+    /// Callers must pass in a reference to statically allocated memory which
+    /// does not overlap with other values.
     pub const unsafe fn new(ptr: *const T) -> StaticRef<T> {
         StaticRef { ptr: ptr }
+    }
+}
+
+impl<T> Deref for StaticRef<T> {
+    type Target = T;
+    fn deref(&self) -> &'static T {
+        unsafe { &*self.ptr }
     }
 }
 
@@ -30,20 +54,69 @@ enum USBState {
 
 /// USB driver for the Synopsis controller
 ///
-/// The driver operates as a device in Scatter-Gather DMA mode. It performs the
+/// The driver operates as a device in Scatter-Gather DMA mode and performs the
 /// initial handshake with the host on endpoint 0.
+///
+/// Scatter-gather mode operates using lists of descriptors which point to
+/// memory buffers. Each buffer can hold up to 64 bytes, so a transfer larger
+/// than 64 bytes involves multiple descriptors in sequence.
+///
+/// For endpoint 0, the driver configures two OUT descriptors and 4 IN
+/// descriptors.
+///
+/// Four IN descriptors allows responses up to 256 bytes (64 * 4), which is
+/// important for returning the configuration descriptor as one big blob.
+///
+/// We never expect to receive OUT packets larger than 64 bytes (the maximum
+/// each descriptor can handle), but we use two so we can receive the next
+/// packet while processing the previous one.
 pub struct USB {
     registers: StaticRef<Registers>,
+
     core_clock: Clock,
     timer_clock: Clock,
-    state: Cell<USBState>,
-    ep0_out_descriptors: TakeCell<&'static mut [DMADescriptor; 2]>,
-    ep0_out_buffers: Cell<Option<&'static [[u8; 64]; 2]>>,
 
-    ep0_in_descriptors: TakeCell<&'static mut [DMADescriptor; 4]>,
-    ep0_in_buffers: TakeCell<&'static mut [u8; 64 * 4]>,
+    /// Current state of the driver
+    state: Cell<USBState>,
+
+    /// Endpoint 0 OUT descriptors
+    ///
+    /// ## Invariants
+    /// The `TakeCell` is never empty after a call to `init`.
+    ep0_out_descriptors: TakeCell<&'static mut [DMADescriptor; 2]>,
+    /// Endpoint 0 OUT buffers
+    ///
+    /// ## Invariants
+    /// The `TakeCell` is never empty after a call to `init`.
+    ep0_out_buffers: Cell<Option<&'static [[u8; 64]; 2]>>,
+    /// Tracks the index in `ep0_out_descriptors` of the descriptor that will
+    /// receive the next packet.
+    ///
+    /// ## Invariants
+    /// Always less than the length of `ep0_out_descriptors` (2).
     next_out_idx: Cell<usize>,
-    cur_out_idx: Cell<usize>
+    /// Tracks the index in `ep0_out_descriptors` of the descriptor that
+    /// received the most recent packet.
+    ///
+    /// ## Invariants
+    /// Always less than the length of `ep0_out_descriptors` (2).
+    cur_out_idx: Cell<usize>,
+
+    /// Endpoint 0 IN descriptors
+    ///
+    /// ## Invariants
+    /// The `TakeCell` is never empty after a call to `init`.
+    ep0_in_descriptors: TakeCell<&'static mut [DMADescriptor; 4]>,
+    /// Endpoint 0 IN buffer
+    ///
+    /// `ep0_in_descriptors` point into the middle of this buffer but we copy
+    /// into it as one big blob. This allows us to send large data (up to 256
+    /// bytes) in one step by simply copying all the data into the buffer and
+    /// configuring up to four descriptors.
+    ///
+    /// ## Invariants
+    /// The `TakeCell` is never empty after a call to `init`.
+    ep0_in_buffers: TakeCell<&'static mut [u8; 64 * 4]>,
 }
 
 /// Hardware base address of the singleton USB controller
@@ -52,30 +125,25 @@ const BASE_ADDR: *const Registers = 0x40300000 as *const Registers;
 /// USB driver 0
 pub static mut USB0: USB = unsafe { USB::new() };
 
-impl<T> ::core::ops::Deref for StaticRef<T> {
-    type Target = T;
-    fn deref(&self) -> &'static T {
-        unsafe { &*self.ptr }
-    }
-
-}
-
+/// OUT descriptors to pass into `USB#init`.
 pub static mut OUT_DESCRIPTORS: [DMADescriptor; 2] =
     [DMADescriptor {
         flags: 0b11 << 30,
         addr: 0
     }; 2];
+/// OUT buffers to pass into `USB#init`.
 pub static mut OUT_BUFFERS: [[u8; 64]; 2] = [[0; 64]; 2];
 
+/// IN descriptors to pass into `USB#init`.
 pub static mut IN_DESCRIPTORS: [DMADescriptor; 4] =
     [DMADescriptor {
         flags: 0b11 << 30,
         addr: 0
     }; 4];
+/// IN buffer to pass into `USB#init`.
 pub static mut IN_BUFFERS: [u8; 64*4] = [0; 64 * 4];
 
 impl USB {
-
     /// Creates a new value referencing the single USB driver.
     ///
     /// ## Safety
@@ -100,14 +168,23 @@ impl USB {
         }
     }
 
+    /// Sets up EP0 OUT to receive a setup packet from the host.
+    ///
+    /// The SETUP packet is less than 64 bytes, so we only need one descriptor.
+    /// Sets the Last and Interrupt-on-completion bits and max size to 64 bytes.
+    ///
+    /// In preparation for a SETUP packet we only want to receive interrupts for
+    /// OUT, not IN.
     fn expect_setup_packet(&self) {
         self.state.set(USBState::WaitingForSetupPacket);
         self.ep0_out_descriptors.map(|descs| {
             descs[self.next_out_idx.get()].flags = 1 << 27 | 1 << 25 | 64;
         });
 
+        // EP0 OUT interrupts on
         self.registers.device_all_ep_interrupt_mask.set(
             self.registers.device_all_ep_interrupt_mask.get() | (1 << 16));
+        // EP0 IN interrupts off
         self.registers.device_all_ep_interrupt_mask.set(
             self.registers.device_all_ep_interrupt_mask.get() & !1);
 
@@ -115,6 +192,8 @@ impl USB {
         self.registers.out_endpoints[0].control.set(1 << 31 | 1 << 26);
     }
 
+    /// Call when a full packet has been received on EP0 OUT.
+    /// Swaps the descriptors.
     fn got_rx_packet(&self) {
         self.ep0_out_descriptors.map(|descs| {
             let mut noi = self.next_out_idx.get();
@@ -126,7 +205,11 @@ impl USB {
         });
     }
 
-    fn usb_init_endpoints(&self) {
+    /// Initialize descriptors for endpoint 0 IN and OUT
+    ///
+    /// Reset the endpoint 0 descriptors to a clean state and prepares for a
+    /// SETUP packet from the host.
+    fn init_descriptors(&self) {
         // Setup descriptor for OUT endpoint 0
         self.ep0_out_buffers.get().map(|bufs| {
             self.ep0_out_descriptors.map(|descs| {
@@ -156,13 +239,14 @@ impl USB {
         self.expect_setup_packet();
     }
 
-    fn usb_reset(&self) {
+    /// Reset the device in response to a USB RESET
+    fn reset(&self) {
         self.state.set(USBState::WaitingForSetupPacket);
         // Reset device address field (bits 10:4) of device config
         self.registers.device_config.set(
             self.registers.device_config.get() & !(0b1111111 << 4));
 
-        self.usb_init_endpoints();
+        self.init_descriptors();
     }
 
     /// Interrupt handler
@@ -182,7 +266,7 @@ impl USB {
 
         if status & USB_RESET != 0 {
             //println!("==> USB Reset");
-            self.usb_reset();
+            self.reset();
         }
 
         if status & ENUM_DONE != 0 {
@@ -351,6 +435,7 @@ impl USB {
         });
     }
 
+    /// Setup endpoint 0 for a status phase with no data phase.
     fn expect_status_phase_in(&self, transfer_type: TableCase) {
         self.state.set(USBState::NoDataStage);
 
@@ -424,6 +509,13 @@ impl USB {
         while self.registers.reset.get() & 1 << 5 != 0 {}
     }
 
+    /// Initialize hardware data fifos
+    // The constants matter for correct operation and are dependent on settings
+    // in the coreConsultant. If the value is too large, the transmit_fifo_size
+    // register will end up being 0, which is too small to transfer anything.
+    //
+    // In our case, I'm not sure what the maximum size is, but `TX_FIFO_SIZE` of
+    // 32 work and 512 is too large.
     fn setup_data_fifos(&self) {
         // 3. Set up data FIFO RAM
         self.registers.receive_fifo_size.set(RX_FIFO_SIZE as u32 & 0xffff);
@@ -441,6 +533,8 @@ impl USB {
 
     }
 
+    /// Perform a soft reset on the USB core. May timeout if the reset takes too
+    /// long.
     fn soft_reset(&self) {
         self.registers.reset.set(1);
 
@@ -464,11 +558,16 @@ impl USB {
 
     }
 
+    /// Initialize the USB driver in device mode.
+    ///
+    /// Once complete, the driver will begin communicating with a connected
+    /// host.
     pub fn init(&self,
                 out_descriptors: &'static mut [DMADescriptor; 2],
                 out_buffers: &'static mut [[u8; 64]; 2],
                 in_descriptors: &'static mut [DMADescriptor; 4],
-                in_buffers: &'static mut [u8; 64 * 4]) {
+                in_buffers: &'static mut [u8; 64 * 4],
+                phy: PHY) {
         self.ep0_out_descriptors.replace(out_descriptors);
         self.ep0_out_buffers.set(Some(out_buffers));
         self.ep0_in_descriptors.replace(in_descriptors);
@@ -505,9 +604,13 @@ impl USB {
         self.registers.device_in_ep_interrupt_mask.set(0);
         self.registers.device_out_ep_interrupt_mask.set(0);
 
+        let sel_phy = match phy {
+            PHY::A => 0b100,
+            PHY::B => 0b101,
+        };
         // Select PHY A
         self.registers.gpio.set((1 << 15 | // WRITE mode
-                                0b100 << 4 | // Select PHY A & Set PHY active
+                                sel_phy << 4 | // Select PHY A & Set PHY active
                                 0) << 16); // CUSTOM_CFG Register
 
         // Configure the chip
@@ -631,6 +734,11 @@ impl USB {
             self.registers.device_control.get() & !(1 << 1));
 
     }
+}
+
+/// Which physical connection to use
+pub enum PHY {
+    A, B
 }
 
 /// Combinations of OUT endpoint interrupts for control transfers
