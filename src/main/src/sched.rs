@@ -6,14 +6,13 @@ use syscall;
 
 pub unsafe fn do_process<P: Platform, C: Chip>(platform: &mut P, chip: &mut C, process: &mut Process,
                   appid: ::AppId) {
-    let systick = chip.systick();
-    systick.reset();
-    systick.set_timer(10000);
-    systick.enable(true);
+    chip.systick().reset();
+    chip.systick().set_timer(10000);
+    chip.systick().enable(true);
 
     loop {
-        if chip.has_pending_interrupts() ||
-                systick.overflowed() || systick.value() <= 500 {
+        chip.service_pending_interrupts();
+        if chip.systick().overflowed() || chip.systick().value() <= 500 {
             break;
         }
 
@@ -27,9 +26,14 @@ pub unsafe fn do_process<P: Platform, C: Chip>(platform: &mut P, chip: &mut C, p
                 // Text segment read/execute (no write)
                 chip.mpu().set_mpu(
                     1, text_start as u32, text_len as u32, true, 0b111);
-                systick.enable(true);
+
+                chip.service_pending_interrupts();
+
+                chip.systick().enable(true);
                 process.switch_to();
-                systick.enable(false);
+                chip.systick().enable(false);
+
+                chip.service_pending_interrupts();
             }
             process::State::Waiting => {
                 match process.callbacks.dequeue() {
@@ -121,5 +125,5 @@ pub unsafe fn do_process<P: Platform, C: Chip>(platform: &mut P, chip: &mut C, p
             _ => {}
         }
     }
-    systick.reset();
+    chip.systick().reset();
 }
