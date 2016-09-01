@@ -117,7 +117,7 @@ pub unsafe fn reset_handler() {
     chip.mpu().enable_mpu();
 
 
-    main::main(platform, &mut chip, &mut []); //load_processes());
+    main::main(platform, &mut chip, load_processes());
 }
 
 impl Platform for Tango {
