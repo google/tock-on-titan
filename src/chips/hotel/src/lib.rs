@@ -41,7 +41,7 @@ unsafe extern "C" fn unhandled_interrupt() {
     panic!("Unhandled Interrupt. ISR {} is active.", interrupt_number);
 }
 
-extern {
+extern "C" {
     // _estack is not really a function, but it makes the types work
     // You should never actually invoke it!!
     fn _estack();
@@ -54,15 +54,16 @@ extern {
 
     fn reset_handler();
 
-    static mut _ero : u32;
-    static mut _sdata : u32;
-    static mut _edata : u32;
-    static mut _sbss : u32;
-    static mut _ebss : u32;
+    static mut _ero: u32;
+    static mut _sdata: u32;
+    static mut _edata: u32;
+    static mut _sbss: u32;
+    static mut _ebss: u32;
 }
 
 #[link_section=".vectors"]
 #[no_mangle]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub static ISR_VECTOR: [Option<unsafe extern fn()>; 16] = [
     /* Stack top */     Option::Some(_estack),
     /* Reset */         Option::Some(reset_handler),
@@ -81,14 +82,14 @@ pub static ISR_VECTOR: [Option<unsafe extern fn()>; 16] = [
 
 #[link_section=".irqs"]
 #[no_mangle]
-pub static IRQS: [unsafe extern fn(); 203] = [generic_isr; 203];
+pub static IRQS: [unsafe extern "C" fn(); 203] = [generic_isr; 203];
 
 pub unsafe fn init() {
     // Relocate data segment.
     // Assumes data starts right after text segment as specified by the linker
     // file.
-    let mut pdest  = &mut _sdata as *mut u32;
-    let pend  = &mut _edata as *mut u32;
+    let mut pdest = &mut _sdata as *mut u32;
+    let pend = &mut _edata as *mut u32;
     let mut psrc = &_ero as *const u32;
 
     if psrc != pdest {
@@ -165,4 +166,3 @@ unsafe extern "C" fn hard_fault_handler() {
            stacked_r12, stacked_lr, stacked_pc, stacked_prs,
            faulting_stack as u32, shcsr, cfsr, hfsr);
 }
-

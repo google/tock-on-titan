@@ -1,6 +1,7 @@
 use unhandled_interrupt;
 
 #[no_mangle]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub static INTERRUPT_TABLE: [unsafe extern fn(); 203] =
     [ unhandled_interrupt, // CRYPTO0_BREAK_INT,
       unhandled_interrupt, // CRYPTO0_DMEM_PTRS_OVERFLOW_INT

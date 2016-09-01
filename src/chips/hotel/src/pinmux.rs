@@ -2,25 +2,43 @@ use common::volatile_cell::VolatileCell;
 
 pub struct Pin {
     pub select: VolatileCell<Function>,
-    pub control: VolatileCell<u32>
+    pub control: VolatileCell<u32>,
 }
 
 pub struct Registers {
-    pub diom0: Pin, pub diom1: Pin, pub diom2: Pin,
-    pub diom3: Pin, pub diom4: Pin,
+    pub diom0: Pin,
+    pub diom1: Pin,
+    pub diom2: Pin,
+    pub diom3: Pin,
+    pub diom4: Pin,
 
-    pub dioa0: Pin, pub dioa1: Pin, pub dioa2: Pin,
-    pub dioa3: Pin, pub dioa4: Pin, pub dioa5: Pin,
-    pub dioa6: Pin, pub dioa7: Pin, pub dioa8: Pin,
-    pub dioa9: Pin, pub dioa10: Pin, pub dioa11: Pin,
-    pub dioa12: Pin, pub dioa13: Pin, pub dioa14: Pin,
+    pub dioa0: Pin,
+    pub dioa1: Pin,
+    pub dioa2: Pin,
+    pub dioa3: Pin,
+    pub dioa4: Pin,
+    pub dioa5: Pin,
+    pub dioa6: Pin,
+    pub dioa7: Pin,
+    pub dioa8: Pin,
+    pub dioa9: Pin,
+    pub dioa10: Pin,
+    pub dioa11: Pin,
+    pub dioa12: Pin,
+    pub dioa13: Pin,
+    pub dioa14: Pin,
 
-    pub diob0: Pin, pub diob1: Pin, pub diob2: Pin,
-    pub diob3: Pin, pub diob4: Pin, pub diob5: Pin,
-    pub diob6: Pin, pub diob7: Pin
+    pub diob0: Pin,
+    pub diob1: Pin,
+    pub diob2: Pin,
+    pub diob3: Pin,
+    pub diob4: Pin,
+    pub diob5: Pin,
+    pub diob6: Pin,
+    pub diob7: Pin,
 }
 
-pub const PINMUX : *mut Registers = 0x40060000 as *mut Registers;
+pub const PINMUX: *mut Registers = 0x40060000 as *mut Registers;
 
 #[repr(u32)]
 pub enum Function {
@@ -43,12 +61,12 @@ pub enum Function {
     Gpio0Gpio15 = 16,
     Gpio1Gpio0 = 17,
     Gpio1Gpio1 = 18,
-    Gpio1Gpio2	= 19,
-    Gpio1Gpio3	= 20,
-    Gpio1Gpio4	= 21,
-    Gpio1Gpio5	= 22,
-    Gpio1Gpio6	= 23,
-    Gpio1Gpio7	= 24,
+    Gpio1Gpio2 = 19,
+    Gpio1Gpio3 = 20,
+    Gpio1Gpio4 = 21,
+    Gpio1Gpio5 = 22,
+    Gpio1Gpio6 = 23,
+    Gpio1Gpio7 = 24,
     Gpio1Gpio8 = 25,
     Gpio1Gpio9 = 26,
     Gpio1Gpio10 = 27,
@@ -73,8 +91,8 @@ pub enum Function {
     PmuTestbus6 = 46,
     PmuTestbus7 = 47,
     Rtc0RtcClkTest = 48,
-    Spi1Spiclk	= 49,
-    Spi1Spicsb	= 50,
+    Spi1Spiclk = 49,
+    Spi1Spicsb = 50,
     Spi1Spimiso = 51,
     Spi1Spimosi = 52,
     Sps0Testbus0 = 53,
@@ -111,9 +129,9 @@ pub enum Function {
     Usb0ExtRxDpi = 84,
     Usb0ExtRxRcv = 85,
     Usb0ExtSuspendb = 86,
-    Usb0ExtTxDmo	= 87,
-    Usb0ExtTxDpo	= 88,
-    Usb0ExtTxOeb	= 89,
+    Usb0ExtTxDmo = 87,
+    Usb0ExtTxDpo = 88,
+    Usb0ExtTxOeb = 89,
     Volt0TstNegGlitchDet = 90,
     Volt0TstPosGlitchDet = 91,
     Xo0Testbus0 = 92,
@@ -123,6 +141,5 @@ pub enum Function {
     Xo0Testbus4 = 96,
     Xo0Testbus5 = 97,
     Xo0testbus6 = 98,
-    Xo0Testbus7 = 99
+    Xo0Testbus7 = 99,
 }
-

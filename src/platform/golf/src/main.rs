@@ -3,6 +3,8 @@
 #![no_main]
 #![feature(lang_items)]
 
+#[macro_use(static_init)]
+extern crate common;
 extern crate drivers;
 extern crate hotel;
 extern crate hil;
@@ -14,9 +16,9 @@ pub mod io;
 use main::{Chip, MPU, Platform};
 
 unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'static>>] {
-    extern {
+    extern "C" {
         /// Beginning of the ROM region containing app images.
-        static _sapps : u8;
+        static _sapps: u8;
     }
 
     const NUM_PROCS: usize = 2;
@@ -52,21 +54,7 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
 }
 
 pub struct Golf {
-    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>
-}
-
-macro_rules! static_init {
-   ($V:ident : $T:ty = $e:expr) => {
-        let $V : &mut $T = {
-            use core::mem::transmute;
-            // Waiting out for size_of to be available at compile-time to avoid
-            // hardcoding an abitrary large size...
-            static mut BUF : [u8; 1024] = [0; 1024];
-            let mut tmp : &mut $T = transmute(&mut BUF);
-            *tmp = $e;
-            tmp
-        };
-   }
+    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
 }
 
 #[no_mangle]
@@ -91,16 +79,17 @@ pub unsafe fn reset_handler() {
         pinmux.diob0.select.set(hotel::pinmux::Function::Gpio0Gpio0);
     }
 
-    static_init!(gpio_pins : [&'static hotel::gpio::GPIOPin; 1] =
-        [ &hotel::gpio::PORT0.pins[0] ]
-    );
+    let gpio_pins = static_init!(
+        [&'static hotel::gpio::GPIOPin; 1],
+        [&hotel::gpio::PORT0.pins[0]],
+        4);
 
-    static_init!(gpio : drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin> =
-                 drivers::gpio::GPIO::new(gpio_pins));
+    let gpio = static_init!(
+        drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+        drivers::gpio::GPIO::new(gpio_pins),
+        20);
 
-    static_init!(platform : Golf = Golf {
-        gpio: gpio
-    });
+    let platform = static_init!(Golf, Golf { gpio: gpio }, 4);
 
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
@@ -111,7 +100,8 @@ pub unsafe fn reset_handler() {
 
     let end = timer.now();
 
-    println!("Hello from Rust! Initialization took {} tics.", end.wrapping_sub(start));
+    println!("Hello from Rust! Initialization took {} tics.",
+             end.wrapping_sub(start));
 
     let mut chip = hotel::chip::Hotel::new();
     chip.mpu().enable_mpu();
@@ -121,12 +111,12 @@ pub unsafe fn reset_handler() {
 }
 
 impl Platform for Golf {
-    fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R where
-            F: FnOnce(Option<&main::Driver>) -> R {
+    fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R
+        where F: FnOnce(Option<&main::Driver>) -> R
+    {
         match driver_num {
             1 => f(Some(self.gpio)),
-            _ => f(None)
+            _ => f(None),
         }
     }
 }
-
