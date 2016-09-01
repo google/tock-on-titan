@@ -26,18 +26,13 @@ impl Chip for Hotel {
 
     fn service_pending_interrupts(&mut self) {
         unsafe {
-            loop {
-                match cortexm3::nvic::next_pending() {
-                    Some(nvic_num) => {
-                        match nvic_num {
-                            193 => usb::USB0.handle_interrupt(),
-                            _   => panic!("No handler for interrupt #{}", nvic_num)
-                        }
-                        cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
-                        cortexm3::nvic::Nvic::new(nvic_num).enable();
-                    },
-                    None => break
+            while let Some(nvic_num) = cortexm3::nvic::next_pending() {
+                match nvic_num {
+                    193 => usb::USB0.handle_interrupt(),
+                    _   => panic!("No handler for interrupt #{}", nvic_num)
                 }
+                cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
+                cortexm3::nvic::Nvic::new(nvic_num).enable();
             }
         }
     }
