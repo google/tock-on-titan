@@ -102,6 +102,13 @@ pub unsafe fn reset_handler() {
         gpio: gpio
     });
 
+    hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
+                          &mut hotel::usb::OUT_BUFFERS,
+                          &mut hotel::usb::IN_DESCRIPTORS,
+                          &mut hotel::usb::IN_BUFFERS,
+                          hotel::usb::PHY::A,
+                          None, Some(0x0011), Some(0x7788));
+
     let end = timer.now();
 
     println!("Hello from Rust! Initialization took {} tics.", end.wrapping_sub(start));
