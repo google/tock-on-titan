@@ -295,11 +295,11 @@ impl UART {
     pub fn handle_rx_interrupt(&self) {
         let regs = unsafe { &*self.regs };
 
+        regs.clear_interrupt_state.set(2);
         self.client.map(|client| {
-            regs.clear_interrupt_state.set(2);
             while regs.state.get() & 1 << 7 == 0 { // While RX FIFO not empty
                 let b = regs.read_data.get() as u8;
-                    client.read_done(b);
+                client.read_done(b);
             }
         });
     }

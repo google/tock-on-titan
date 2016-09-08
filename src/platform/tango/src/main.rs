@@ -78,6 +78,10 @@ pub unsafe fn reset_handler() {
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
         let pinmux = &mut *hotel::pinmux::PINMUX;
         pinmux.diob0.select.set(hotel::pinmux::Function::Gpio0Gpio0);
+
+        pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
+        pinmux.dioa11.control.set(1 << 2 | 1 << 4);
+        pinmux.uart0_rx.select.set(hotel::pinmux::SelectablePin::Dioa11);
     }
 
     let console = static_init!(
