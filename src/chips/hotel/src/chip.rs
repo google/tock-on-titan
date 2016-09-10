@@ -34,7 +34,7 @@ impl Chip for Hotel {
                     184 => uart::UART1.handle_tx_interrupt(),
                     188 => uart::UART2.handle_rx_interrupt(),
                     191 => uart::UART2.handle_tx_interrupt(),
-                    _ => panic!("Unexected ISR {}", nvic_num)
+                    _ => panic!("Unexected ISR {}", nvic_num),
                 }
                 cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
                 cortexm3::nvic::Nvic::new(nvic_num).enable();

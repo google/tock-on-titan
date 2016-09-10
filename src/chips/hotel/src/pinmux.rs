@@ -6,7 +6,7 @@ pub struct Pin {
 }
 
 pub struct Peripheral {
-    pub select: VolatileCell<SelectablePin>
+    pub select: VolatileCell<SelectablePin>,
 }
 
 pub struct Registers {

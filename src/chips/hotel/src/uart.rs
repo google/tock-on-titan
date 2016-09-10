@@ -35,9 +35,8 @@
 
 use common::take_cell::TakeCell;
 use common::volatile_cell::VolatileCell;
-use pmu::{Clock, PeripheralClock, PeripheralClock1};
-
 use hil;
+use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 /// Registers for the UART controller
 #[allow(dead_code)]
@@ -57,20 +56,17 @@ const UART0_BASE: *mut Registers = 0x40600000 as *mut Registers;
 const UART1_BASE: *mut Registers = 0x40610000 as *mut Registers;
 const UART2_BASE: *mut Registers = 0x40620000 as *mut Registers;
 
-pub static mut UART0: UART =
-    unsafe { UART::new(UART0_BASE, PeripheralClock1::Uart0Timer) };
+pub static mut UART0: UART = unsafe { UART::new(UART0_BASE, PeripheralClock1::Uart0Timer) };
 
-pub static mut UART1: UART =
-    unsafe { UART::new(UART1_BASE, PeripheralClock1::Uart1Timer) };
+pub static mut UART1: UART = unsafe { UART::new(UART1_BASE, PeripheralClock1::Uart1Timer) };
 
-pub static mut UART2: UART =
-    unsafe { UART::new(UART2_BASE, PeripheralClock1::Uart2Timer) };
+pub static mut UART2: UART = unsafe { UART::new(UART2_BASE, PeripheralClock1::Uart2Timer) };
 
 /// A resumable buffer that tracks the last written index
 struct Buffer {
     bytes: &'static mut [u8],
     cursor: usize,
-    limit: usize
+    limit: usize,
 }
 
 /// A UART channel
@@ -89,7 +85,7 @@ impl UART {
             regs: uart,
             clock: Clock::new(PeripheralClock::Bank1(clock)),
             buffer: TakeCell::empty(),
-            client: TakeCell::empty()
+            client: TakeCell::empty(),
         }
     }
 
@@ -280,7 +276,8 @@ impl UART {
 
         regs.clear_interrupt_state.set(2);
         self.client.map(|client| {
-            while regs.state.get() & 1 << 7 == 0 { // While RX FIFO not empty
+            while regs.state.get() & 1 << 7 == 0 {
+                // While RX FIFO not empty
                 let b = regs.read_data.get() as u8;
                 client.read_done(b);
             }
