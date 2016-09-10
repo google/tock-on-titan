@@ -57,6 +57,7 @@ pub struct Golf {
     console: &'static drivers::console::Console<'static, hotel::uart::UART>,
     gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
     timer: &'static drivers::timer::TimerDriver<'static, hotel::timels::Timels>,
+    digest: &'static drivers::digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
 }
 
 #[no_mangle]
@@ -119,11 +120,19 @@ pub unsafe fn reset_handler() {
         12);
     hotel::timels::Timels0.set_client(timer);
 
+    let digest = static_init!(
+        drivers::digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
+        drivers::digest::DigestDriver::new(
+                &mut hotel::crypto::sha::KEYMGR0_SHA,
+                main::Container::create()),
+        20);
+
     let platform = static_init!(Golf, Golf {
         console: console,
         gpio: gpio,
         timer: timer,
-    }, 12);
+        digest: digest,
+    }, 16);
 
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
@@ -153,6 +162,7 @@ impl Platform for Golf {
         match driver_num {
             0 => f(Some(self.console)),
             1 => f(Some(self.gpio)),
+            2 => f(Some(self.digest)),
             3 => f(Some(self.timer)),
             _ => f(None),
         }

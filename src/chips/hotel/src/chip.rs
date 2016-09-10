@@ -31,8 +31,12 @@ impl Chip for Hotel {
         unsafe {
             while let Some(nvic_num) = cortexm3::nvic::next_pending() {
                 match nvic_num {
+                    110 => (), // KEYMGR0_DSHA_INT, currently polled
+                    111 => (), // KEYMGR0_SHA_WFIFO_FULL
+
                     159 => timels::Timels0.handle_interrupt(),
                     160 => timels::Timels1.handle_interrupt(),
+
                     174 => uart::UART0.handle_rx_interrupt(),
                     177 => uart::UART0.handle_tx_interrupt(),
                     181 => uart::UART1.handle_rx_interrupt(),
