@@ -1,3 +1,4 @@
+use core::ops::{BitAnd, BitOr};
 use common::volatile_cell::VolatileCell;
 
 #[repr(C)]
@@ -98,7 +99,57 @@ pub struct OutEndpoint {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct DMADescriptor {
-    pub flags: u32,
+    pub flags: DescFlag,
     pub addr: usize
+}
+
+/// Status quadlet for a DMA descriptor
+///
+/// The status quadlet is a 32-bit flag register in the DMA descriptor that
+/// reflects the status of the descriptor. It can mark whether the Host/DMA is
+/// ready to transmit/receive this descriptor and describes how large the buffer
+/// is.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DescFlag(pub u32);
+
+impl BitOr for DescFlag {
+    type Output = Self;
+    fn bitor(self, rhs: DescFlag) -> DescFlag {
+        DescFlag(self.0 | rhs.0)
+    }
+}
+
+impl BitAnd for DescFlag {
+    type Output = Self;
+    fn bitand(self, rhs: DescFlag) -> DescFlag {
+        DescFlag(self.0 & rhs.0)
+    }
+}
+
+impl DescFlag {
+    /// This descriptor is the last in a transmission
+    pub const LAST: DescFlag = DescFlag(1 << 27);
+    /// This descriptor describes a short transfer
+    pub const SHORT: DescFlag = DescFlag(1 << 26);
+    /// Generate an interrupt on completion
+    pub const IOC: DescFlag = DescFlag(1 << 25);
+    /// Indicates that a setup packet has been received
+    pub const SETUP_READY: DescFlag = DescFlag(1 << 24);
+
+    /// Host Ready status
+    pub const HOST_READY: DescFlag = DescFlag(0b00 << 30);
+    /// DMA Busy status
+    pub const DMA_BUSY: DescFlag = DescFlag(0b01 << 30);
+    /// DMA Ready status
+    pub const DMA_DONE: DescFlag = DescFlag(0b10 << 30);
+    /// Host Busy status
+    pub const HOST_BUSY: DescFlag = DescFlag(0b11 << 30);
+
+    /// Set the number of bytes to transmit
+    pub const fn bytes(self, bytes: u16) -> DescFlag {
+        DescFlag(self.0 | bytes as u32)
+    }
+
 }
 

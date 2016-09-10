@@ -9,7 +9,7 @@ mod serialize;
 mod types;
 
 use self::constants::*;
-use self::registers::Registers;
+use self::registers::{DescFlag, Registers};
 use self::types::{SetupRequest, DeviceDescriptor, ConfigurationDescriptor};
 
 pub use self::registers::DMADescriptor;
@@ -137,7 +137,7 @@ pub static mut USB0: USB = unsafe { USB::new() };
 /// OUT descriptors to pass into `USB#init`.
 pub static mut OUT_DESCRIPTORS: [DMADescriptor; 2] =
     [DMADescriptor {
-        flags: 0b11 << 30,
+        flags: DescFlag::HOST_BUSY,
         addr: 0
     }; 2];
 /// OUT buffers to pass into `USB#init`.
@@ -146,7 +146,7 @@ pub static mut OUT_BUFFERS: [[u8; 64]; 2] = [[0; 64]; 2];
 /// IN descriptors to pass into `USB#init`.
 pub static mut IN_DESCRIPTORS: [DMADescriptor; 4] =
     [DMADescriptor {
-        flags: 0b11 << 30,
+        flags: DescFlag::HOST_BUSY,
         addr: 0
     }; 4];
 /// IN buffer to pass into `USB#init`.
@@ -191,7 +191,8 @@ impl USB {
     fn expect_setup_packet(&self) {
         self.state.set(USBState::WaitingForSetupPacket);
         self.ep0_out_descriptors.map(|descs| {
-            descs[self.next_out_idx.get()].flags = 1 << 27 | 1 << 25 | 64;
+            descs[self.next_out_idx.get()].flags =
+                (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
         });
 
         // EP0 OUT interrupts on
@@ -208,7 +209,7 @@ impl USB {
     fn stall_both_fifos(&self) {
         self.state.set(USBState::WaitingForSetupPacket);
         self.ep0_out_descriptors.map(|descs| {
-            descs[self.next_out_idx.get()].flags = 1 << 27 | 1 << 25 | 64;
+            descs[self.next_out_idx.get()].flags = (DescFlag::LAST | DescFlag::IOC).bytes(64);
         });
 
         // EP0 OUT interrupts on
@@ -246,7 +247,7 @@ impl USB {
         self.ep0_out_buffers.get().map(|bufs| {
             self.ep0_out_descriptors.map(|descs| {
                 for (desc, buf) in descs.iter_mut().zip(bufs.iter()) {
-                    desc.flags = 0b11 << 30;
+                    desc.flags = DescFlag::HOST_BUSY;
                     desc.addr = buf.as_ptr() as usize;
                 }
                 self.next_out_idx.set(0);
@@ -259,7 +260,7 @@ impl USB {
         self.ep0_in_buffers.map(|buf| {
             self.ep0_in_descriptors.map(|descs| {
                 for (i, desc) in descs.iter_mut().enumerate() {
-                    desc.flags = 0b11 << 30;
+                    desc.flags = DescFlag::HOST_BUSY;
                     desc.addr = buf.as_ptr() as usize + i * 64;
                 }
                 self.registers.in_endpoints[0].dma_address.set(
@@ -365,7 +366,7 @@ impl USB {
 
         let flags = self.ep0_out_descriptors.map(|descs|
                             descs[self.cur_out_idx.get()].flags).unwrap();
-        let setup_ready = flags & (1 << 24) != 0; // Setup Ready bit
+        let setup_ready = flags & DescFlag::SETUP_READY == DescFlag::SETUP_READY;
 
         match self.state.get() {
             USBState::WaitingForSetupPacket => {
@@ -484,8 +485,9 @@ impl USB {
 
                         len = ::core::cmp::min(len, req.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
-                            descs[0].flags = len as u32 |
-                                1 << 26 | 1 << 27 | 1 << 25;
+                            descs[0].flags = (DescFlag::HOST_BUSY | DescFlag::LAST |
+                                              DescFlag::SHORT | DescFlag::IOC).bytes(len as u16);
+                                
                         });
                         self.expect_data_phase_in(transfer_type);
                     },
@@ -496,8 +498,8 @@ impl USB {
 
                         len = ::core::cmp::min(len, req.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
-                            descs[0].flags = len as u32 |
-                                1 << 26 | 1 << 27 | 1 << 25;
+                            descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
+                                              DescFlag::SHORT | DescFlag::IOC).bytes(len as u16);
                         });
                         self.expect_data_phase_in(transfer_type);
                     },
@@ -516,8 +518,9 @@ impl USB {
 
                 len = ::core::cmp::min(len, req.w_length as usize);
                 self.ep0_in_descriptors.map(|descs| {
-                    descs[0].flags = len as u32 |
-                        1 << 26 | 1 << 27 | 1 << 25;
+                    descs[0].flags =
+                        (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::SHORT |
+                         DescFlag::IOC).bytes(len as u16);
                 });
                 self.expect_data_phase_in(transfer_type);
             }
@@ -576,7 +579,8 @@ impl USB {
 
 
             self.ep0_out_descriptors.map(|descs| {
-                descs[self.next_out_idx.get()].flags = 1 << 27 | 1 << 25 | 64;
+                descs[self.next_out_idx.get()].flags =
+                    (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
             });
 
             if transfer_type == TableCase::C && false {
@@ -601,7 +605,7 @@ impl USB {
             self.ep0_in_buffers.map(|buf| {
                 descs[0].addr = buf.as_ptr() as usize; // Address doesn't matter since length is zero
             });
-            descs[0].flags = 1 << 27 | 1 << 26 | 1 << 25 | 0;
+            descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::SHORT | DescFlag::IOC).bytes(0);
 
             // 2. Flush fifos
             self.flush_tx_fifo(0);
@@ -618,7 +622,8 @@ impl USB {
 
 
             self.ep0_out_descriptors.map(|descs| {
-                descs[self.next_out_idx.get()].flags = 1 << 27 | 1 << 25 | 64;
+                descs[self.next_out_idx.get()].flags =
+                    (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
             });
 
             if transfer_type == TableCase::C && false {
