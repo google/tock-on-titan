@@ -66,18 +66,9 @@ pub static mut UART1: UART =
 pub static mut UART2: UART =
     unsafe { UART::new(UART2_BASE, PeripheralClock1::Uart2Timer) };
 
-/// Wrapper type that helps store either a mutable or immutable slice.
-///
-/// We don't care if a client buffer is mutable when writing out the the UART,
-/// but when we return it in a callback, the client cares.
-enum EitherBytes {
-    Immutable(&'static [u8]),
-    Mutable(&'static mut [u8]),
-}
-
 /// A resumable buffer that tracks the last written index
 struct Buffer {
-    bytes: EitherBytes,
+    bytes: &'static mut [u8],
     cursor: usize,
     limit: usize
 }
@@ -148,7 +139,7 @@ impl UART {
 
     /// Disable reception on the UART
     ///
-    /// Side-effect: turns the clock off if RX is also disabled.
+    /// Side-effect: turns the clock off if TX is also disabled.
     pub fn disable_rx(&self) {
         let regs = unsafe { &*self.regs };
 
@@ -222,10 +213,7 @@ impl UART {
             .map(|buffer| {
                 let init_cursor = buffer.cursor;
 
-                let bytes: &[u8] = match buffer.bytes {
-                    EitherBytes::Immutable(ref b) => b,
-                    EitherBytes::Mutable(ref b) => &**b,
-                };
+                let bytes: &[u8] = buffer.bytes;
 
                 for b in bytes[buffer.cursor..buffer.limit].iter() {
                     if regs.state.get() & 1 == 1 {
@@ -268,12 +256,7 @@ impl UART {
         if self.send_remaining_bytes() == 0 {
             self.client.map(|client| {
                 self.buffer.take().map(move |buffer| {
-                    match buffer.bytes {
-                        EitherBytes::Mutable(bytes) => {
-                            client.write_done(bytes)
-                        },
-                        _ => {}
-                    }
+                    client.write_done(buffer.bytes);
                 });
             });
         }
@@ -315,24 +298,9 @@ impl UART {
     pub fn send_mut_bytes(&self, bytes: &'static mut [u8]) {
         let len = bytes.len();
         self.buffer.replace(Buffer {
-            bytes: EitherBytes::Mutable(bytes),
+            bytes: bytes,
             cursor: 0,
             limit: len,
-        });
-        self.send_remaining_bytes();
-    }
-
-    /// Asynchronously send an _immutable_ slice of bytes over the UART
-    ///
-    /// The client is notified of completion through the client's callback. Do
-    /// not pass in a byte slice that is actually mutable, unless you don't need
-    /// to modify it again. If you do so, there will be no way to get it back
-    /// mutably from the callback. Instead, use `send_mut_bytes`.
-    pub fn send_bytes(&self, bytes: &'static [u8]) {
-        self.buffer.replace(Buffer {
-            bytes: EitherBytes::Immutable(bytes),
-            cursor: 0,
-            limit: bytes.len()
         });
         self.send_remaining_bytes();
     }
@@ -378,7 +346,7 @@ impl hil::uart::UART for UART {
 
     fn send_bytes(&self, bytes: &'static mut [u8], len: usize) {
         self.buffer.replace(Buffer {
-            bytes: EitherBytes::Mutable(bytes),
+            bytes: bytes,
             cursor: 0,
             limit: len,
         });

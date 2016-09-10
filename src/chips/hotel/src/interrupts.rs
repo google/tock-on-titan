@@ -181,18 +181,18 @@ pub static INTERRUPT_TABLE: [Option<unsafe extern fn()>; 203] =
       Some(::uart::uart0_tx_handler), // UART0_TXINT
       None, // UART0_TXOVINT
       None, // UART1_RXBINT
-      None, // UART1_RXFINT
+      Some(::uart::uart1_rx_handler), // UART1_RXINT
       None, // UART1_RXINT
       None, // UART1_RXOVINT
       None, // UART1_RXTOINT
-      None, // UART1_TXINT
+      Some(::uart::uart1_tx_handler), // UART1_TXINT
       None, // UART1_TXOVINT
       None, // UART2_RXBINT
       None, // UART2_RXFINT
-      None, // UART2_RXINT
+      Some(::uart::uart2_rx_handler), // UART2_RXINT
       None, // UART2_RXOVINT
       None, // UART2_RXTOINT
-      None, // UART2_TXINT
+      Some(::uart::uart2_tx_handler), // UART2_TXINT
       None, // UART2_TXOVINT
       None, // USB0_USBINTR
       None, // WATCHDOG0_WDOGINT
