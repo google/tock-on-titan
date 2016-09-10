@@ -1,7 +1,7 @@
 use core::nonzero::NonZero;
 use process;
 
-#[derive(Clone,Copy)]
+#[derive(Clone,Copy,Eq,PartialEq)]
 pub struct AppId {
     idx: usize,
 }
