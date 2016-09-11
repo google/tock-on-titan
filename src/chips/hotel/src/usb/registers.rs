@@ -74,7 +74,7 @@ pub struct Registers {
 
 #[repr(C)]
 pub struct InEndpoint {
-    pub control: VolatileCell<u32>,
+    pub control: VolatileCell<EpCtl>,
     _reserved0: u32,
     pub interrupt: VolatileCell<u32>,
     _reserved1: u32,
@@ -86,7 +86,7 @@ pub struct InEndpoint {
 
 #[repr(C)]
 pub struct OutEndpoint {
-    pub control: VolatileCell<u32>,
+    pub control: VolatileCell<EpCtl>,
     _reserved0: u32,
     pub interrupt: VolatileCell<u32>,
     _reserved1: u32,
@@ -94,6 +94,32 @@ pub struct OutEndpoint {
     pub dma_address: VolatileCell<u32>,
     _reserved2: u32,
     pub buffer_address: VolatileCell<u32>
+}
+
+/// In/Out Endpoint Control flags
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct EpCtl(pub u32);
+
+impl EpCtl {
+    /// Enable the endpoint
+    pub const ENABLE: EpCtl = EpCtl(1 << 31);
+    /// Clear endpoint NAK
+    pub const CNAK: EpCtl = EpCtl(1 << 26);
+}
+
+impl BitOr for EpCtl {
+    type Output = Self;
+    fn bitor(self, rhs: EpCtl) -> EpCtl {
+        EpCtl(self.0 | rhs.0)
+    }
+}
+
+impl BitAnd for EpCtl {
+    type Output = Self;
+    fn bitand(self, rhs: EpCtl) -> EpCtl {
+        EpCtl(self.0 & rhs.0)
+    }
 }
 
 #[repr(C)]

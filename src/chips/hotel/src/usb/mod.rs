@@ -9,7 +9,7 @@ mod serialize;
 mod types;
 
 use self::constants::*;
-use self::registers::{DescFlag, Registers};
+use self::registers::{EpCtl, DescFlag, Registers};
 use self::types::{SetupRequest, DeviceDescriptor, ConfigurationDescriptor};
 
 pub use self::registers::DMADescriptor;
@@ -203,7 +203,7 @@ impl USB {
             self.registers.device_all_ep_interrupt_mask.get() & !1);
 
         // Enable OUT endpoint 0 and clear NAK bit
-        self.registers.out_endpoints[0].control.set(1 << 31 | 1 << 26);
+        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
     }
 
     fn stall_both_fifos(&self) {
@@ -220,9 +220,9 @@ impl USB {
             self.registers.device_all_ep_interrupt_mask.get() & !1);
 
         // Enable OUT endpoint 0 and clear NAK bit
-        self.registers.out_endpoints[0].control.set(1 << 31 | 1 << 21);
+        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
         self.flush_tx_fifo(0);
-        self.registers.in_endpoints[0].control.set(1 << 31 | 1 << 21);
+        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
     }
 
     /// Call when a full packet has been received on EP0 OUT.
@@ -385,14 +385,14 @@ impl USB {
             },
             USBState::DataStageIn => {
                 if inter_in  && ep_in_interrupts & 1 != 0 {
-                    self.registers.in_endpoints[0].control.set(1 << 31);
+                    self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                 }
 
                 if inter_out {
                     if transfer_type == TableCase::B {
                         // IN detected
-                        self.registers.in_endpoints[0].control.set(1 << 31 | 1 << 26);
-                        self.registers.out_endpoints[0].control.set(1 << 31 | 1 << 26);
+                        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+                        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
                     } else if transfer_type == TableCase::A ||
                                     transfer_type == TableCase::C {
                         if setup_ready {
@@ -405,14 +405,14 @@ impl USB {
             },
             USBState::NoDataStage => {
                 if inter_in  && ep_in_interrupts & 1 != 0 {
-                    self.registers.in_endpoints[0].control.set(1 << 31);
+                    self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                 }
 
                 if inter_out {
                     if transfer_type == TableCase::B {
                         // IN detected
-                        self.registers.in_endpoints[0].control.set(1 << 31 | 1 << 26);
-                        self.registers.out_endpoints[0].control.set(1 << 31 | 1 << 26);
+                        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+                        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
                     } else if transfer_type == TableCase::A ||
                                     transfer_type == TableCase::C {
                         if setup_ready {
@@ -572,9 +572,9 @@ impl USB {
                 &descs[0] as *const DMADescriptor as u32);
 
             if transfer_type == TableCase::C && false {
-                self.registers.in_endpoints[0].control.set(1 << 31 | 1 << 26);
+                self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
             } else {
-                self.registers.in_endpoints[0].control.set(1 << 31);
+                self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
             }
 
 
@@ -584,9 +584,9 @@ impl USB {
             });
 
             if transfer_type == TableCase::C && false {
-                self.registers.out_endpoints[0].control.set(1 << 31 | 1 << 26);
+                self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
             } else {
-                self.registers.out_endpoints[0].control.set(1 << 31);
+                self.registers.out_endpoints[0].control.set(EpCtl::ENABLE);
             }
 
             self.registers.device_all_ep_interrupt_mask.set(
@@ -615,9 +615,9 @@ impl USB {
                 &descs[0] as *const DMADescriptor as u32);
 
             if transfer_type == TableCase::C && false {
-                self.registers.in_endpoints[0].control.set(1 << 31 | 1 << 26);
+                self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
             } else {
-                self.registers.in_endpoints[0].control.set(1 << 31);
+                self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
             }
 
 
@@ -627,9 +627,9 @@ impl USB {
             });
 
             if transfer_type == TableCase::C && false {
-                self.registers.out_endpoints[0].control.set(1 << 31 | 1 << 26);
+                self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
             } else {
-                self.registers.out_endpoints[0].control.set(1 << 31);
+                self.registers.out_endpoints[0].control.set(EpCtl::ENABLE);
             }
 
             self.registers.device_all_ep_interrupt_mask.set(
