@@ -55,6 +55,7 @@ dependencies = [
  "hil 0.1.0",
  "main 0.1.0",
  "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "support 0.1.0",
 ]
 
 [[package]]
