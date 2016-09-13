@@ -1,5 +1,6 @@
 use cortexm3;
 use main::Chip;
+use gpio;
 use uart;
 
 pub struct Hotel {
@@ -34,6 +35,11 @@ impl Chip for Hotel {
                     184 => uart::UART1.handle_tx_interrupt(),
                     188 => uart::UART2.handle_rx_interrupt(),
                     191 => uart::UART2.handle_tx_interrupt(),
+
+                    pin @ 65 ... 80 => {
+                        gpio::PORT0.pins[(pin - 65) as usize].handle_interrupt();
+                    },
+                    81 => { /* GPIO Combined interrupt... why does this remain asserted? */ },
                     _ => panic!("Unexected ISR {}", nvic_num),
                 }
                 cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
