@@ -55,7 +55,7 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
 
 pub struct Golf {
     console: &'static drivers::console::Console<'static, hotel::uart::UART>,
-    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
 }
 
 #[no_mangle]
@@ -79,6 +79,10 @@ pub unsafe fn reset_handler() {
         let pinmux = &mut *hotel::pinmux::PINMUX;
         pinmux.diob0.select.set(hotel::pinmux::Function::Gpio0Gpio0);
 
+        pinmux.gpio0_gpio1.select.set(hotel::pinmux::SelectablePin::Dioa8);
+        pinmux.dioa8.select.set(hotel::pinmux::Function::Gpio0Gpio1);
+        pinmux.dioa8.control.set(1 << 2 | 1 << 4);
+
         pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
         pinmux.dioa11.control.set(1 << 2 | 1 << 4);
         pinmux.uart0_rx.select.set(hotel::pinmux::SelectablePin::Dioa11);
@@ -94,14 +98,17 @@ pub unsafe fn reset_handler() {
     console.initialize();
 
     let gpio_pins = static_init!(
-        [&'static hotel::gpio::GPIOPin; 1],
-        [&hotel::gpio::PORT0.pins[0]],
-        4);
+        [&'static hotel::gpio::Pin; 2],
+        [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]],
+        8);
 
     let gpio = static_init!(
-        drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+        drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
         drivers::gpio::GPIO::new(gpio_pins),
         20);
+    for pin in gpio_pins.iter() {
+        pin.set_client(gpio)
+    }
 
     let platform = static_init!(Golf, Golf {
         console: console,
