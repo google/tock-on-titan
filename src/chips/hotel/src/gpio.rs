@@ -1,6 +1,6 @@
-use core::cell::Cell;
-use common::volatile_cell::VolatileCell;
+
 use common::take_cell::TakeCell;
+use common::volatile_cell::VolatileCell;use core::cell::Cell;
 use core::mem::transmute;
 use hil::gpio::{Client, GPIOPin, InputMode, InterruptMode};
 
@@ -17,7 +17,7 @@ pub struct PortRegisters {
     pub interrupt_type_clear: VolatileCell<u32>,
     pub interrupt_pol_set: VolatileCell<u32>,
     pub interrupt_pol_clear: VolatileCell<u32>,
-    pub interrupt_status: VolatileCell<u32>
+    pub interrupt_status: VolatileCell<u32>,
 }
 
 pub const GPIO0_BASE: *mut PortRegisters = 0x40200000 as *mut PortRegisters;
@@ -88,8 +88,8 @@ pub enum PinNum {
 pub struct Pin {
     port: *mut PortRegisters,
     pin: PinNum,
-    client_data: Cell<usize>, 
-    change: Cell<bool>, 
+    client_data: Cell<usize>,
+    change: Cell<bool>,
     client: TakeCell<&'static Client>,
 }
 
@@ -185,11 +185,11 @@ impl GPIOPin for Pin {
             InterruptMode::RisingEdge => {
                 port.interrupt_pol_set.set(mask);
                 self.change.set(false);
-            },
+            }
             InterruptMode::FallingEdge => {
                 port.interrupt_pol_clear.set(mask);
                 self.change.set(false);
-            },
+            }
             InterruptMode::Change => {
                 self.change.set(true);
                 // Set the interrupt polarity based on whatever the current
@@ -211,4 +211,3 @@ impl GPIOPin for Pin {
         port.interrupt_disable.set(mask);
     }
 }
-
