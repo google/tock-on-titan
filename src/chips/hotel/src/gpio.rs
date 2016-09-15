@@ -21,6 +21,7 @@ pub struct PortRegisters {
 }
 
 pub const GPIO0_BASE: *mut PortRegisters = 0x40200000 as *mut PortRegisters;
+pub const GPIO1_BASE: *mut PortRegisters = 0x40210000 as *mut PortRegisters;
 
 pub struct Port {
     pub pins: [Pin; 16],
@@ -43,6 +44,25 @@ pub static mut PORT0: Port = Port {
            Pin::new(GPIO0_BASE, PinNum::P13),
            Pin::new(GPIO0_BASE, PinNum::P14),
            Pin::new(GPIO0_BASE, PinNum::P15)],
+};
+
+pub static mut PORT1: Port = Port {
+    pins: [Pin::new(GPIO1_BASE, PinNum::P0),
+           Pin::new(GPIO1_BASE, PinNum::P1),
+           Pin::new(GPIO1_BASE, PinNum::P2),
+           Pin::new(GPIO1_BASE, PinNum::P3),
+           Pin::new(GPIO1_BASE, PinNum::P4),
+           Pin::new(GPIO1_BASE, PinNum::P5),
+           Pin::new(GPIO1_BASE, PinNum::P6),
+           Pin::new(GPIO1_BASE, PinNum::P7),
+           Pin::new(GPIO1_BASE, PinNum::P8),
+           Pin::new(GPIO1_BASE, PinNum::P9),
+           Pin::new(GPIO1_BASE, PinNum::P10),
+           Pin::new(GPIO1_BASE, PinNum::P11),
+           Pin::new(GPIO1_BASE, PinNum::P12),
+           Pin::new(GPIO1_BASE, PinNum::P13),
+           Pin::new(GPIO1_BASE, PinNum::P14),
+           Pin::new(GPIO1_BASE, PinNum::P15)],
 };
 
 #[derive(Clone,Copy,Debug)]
