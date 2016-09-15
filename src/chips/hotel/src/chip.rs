@@ -40,6 +40,10 @@ impl Chip for Hotel {
                         gpio::PORT0.pins[(pin - 65) as usize].handle_interrupt();
                     },
                     81 => { /* GPIO Combined interrupt... why does this remain asserted? */ },
+                    pin @ 82 ... 97 => {
+                        gpio::PORT1.pins[(pin - 82) as usize].handle_interrupt();
+                    },
+                    98 => { /* GPIO Combined interrupt... why does this remain asserted? */ },
                     _ => panic!("Unexected ISR {}", nvic_num),
                 }
                 cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
