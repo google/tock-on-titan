@@ -90,6 +90,8 @@ impl Pin {
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         port.interrupt_status.set(mask);
 
+        // If our InterruptMode was `Change`, we need to flip the direction of
+        // the interrupt polarity.
         if self.change.get() {
             if port.interrupt_pol_set.get() & mask != 0 {
                 port.interrupt_pol_clear.set(mask);
@@ -151,6 +153,9 @@ impl GPIOPin for Pin {
         port.data_in.get() & (1 << (self.pin as u32)) != 0
     }
 
+    // `InterruptMode::Change` is not implemented in hardware, so we simulate it
+    // in software. This could lead to missing events if a toggle happens before
+    // we install the new events.
     fn enable_interrupt(&self, identifier: usize, mode: InterruptMode) {
         self.client_data.set(identifier);
 
@@ -167,6 +172,8 @@ impl GPIOPin for Pin {
             },
             InterruptMode::Change => {
                 self.change.set(true);
+                // Set the interrupt polarity based on whatever the current
+                // state of the pin is.
                 if self.read() {
                     port.interrupt_pol_clear.set(mask);
                 } else {
