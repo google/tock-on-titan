@@ -1,6 +1,7 @@
 
 use common::take_cell::TakeCell;
-use common::volatile_cell::VolatileCell;use core::cell::Cell;
+use common::volatile_cell::VolatileCell;
+use core::cell::Cell;
 use core::mem::transmute;
 use hil::gpio::{Client, GPIOPin, InputMode, InterruptMode};
 
