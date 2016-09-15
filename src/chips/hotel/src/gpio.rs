@@ -212,7 +212,3 @@ impl GPIOPin for Pin {
     }
 }
 
-interrupt_handler!(gpio0_combined_handler, 81);
-
-interrupt_handler!(gpio0_0_handler, 65);
-interrupt_handler!(gpio0_1_handler, 66);

@@ -351,10 +351,3 @@ impl hil::uart::UART for UART {
     }
 }
 
-
-interrupt_handler!(uart0_rx_handler, 174);
-interrupt_handler!(uart0_tx_handler, 177);
-interrupt_handler!(uart1_rx_handler, 181);
-interrupt_handler!(uart1_tx_handler, 184);
-interrupt_handler!(uart2_rx_handler, 188);
-interrupt_handler!(uart2_tx_handler, 191);

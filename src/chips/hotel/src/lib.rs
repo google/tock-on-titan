@@ -8,9 +8,6 @@ extern crate common;
 extern crate hil;
 extern crate main;
 
-#[macro_use]
-mod helpers;
-
 pub mod chip;
 pub mod gpio;
 pub mod pinmux;
