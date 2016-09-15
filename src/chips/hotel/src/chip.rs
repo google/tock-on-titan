@@ -1,6 +1,7 @@
 use cortexm3;
 use main::Chip;
 use gpio;
+use timels;
 use uart;
 
 pub struct Hotel {
@@ -29,6 +30,8 @@ impl Chip for Hotel {
         unsafe {
             cortexm3::nvic::next_pending().map(|nvic_num| {
                 match nvic_num {
+                    159 => timels::Timels0.handle_interrupt(),
+                    160 => timels::Timels1.handle_interrupt(),
                     174 => uart::UART0.handle_rx_interrupt(),
                     177 => uart::UART0.handle_tx_interrupt(),
                     181 => uart::UART1.handle_rx_interrupt(),
