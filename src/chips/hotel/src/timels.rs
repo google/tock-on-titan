@@ -1,7 +1,8 @@
-use core::cell::Cell;
+
 use common::take_cell::TakeCell;
 use common::volatile_cell::VolatileCell;
-use hil::alarm::{Alarm,AlarmClient,Frequency};
+use core::cell::Cell;
+use hil::alarm::{Alarm, AlarmClient, Frequency};
 
 const TIMELS0_BASE: *const Registers = 0x40540000 as *const Registers;
 const TIMELS1_BASE: *const Registers = 0x40540040 as *const Registers;
@@ -77,7 +78,7 @@ impl Alarm for Timels {
     fn set_alarm(&self, tics: u32) {
         let distance = tics.wrapping_sub(self.now.get());
         let regs = unsafe { &*self.registers };
-        regs.load.set(distance); 
+        regs.load.set(distance);
         regs.reload.set(distance);
         regs.interrupt_enable.set(1);
         regs.control.set(1);
@@ -98,4 +99,3 @@ impl Alarm for Timels {
         regs.reload.get()
     }
 }
-
