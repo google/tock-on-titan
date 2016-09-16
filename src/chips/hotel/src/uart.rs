@@ -350,4 +350,3 @@ impl hil::uart::UART for UART {
         self.send_remaining_bytes();
     }
 }
-
