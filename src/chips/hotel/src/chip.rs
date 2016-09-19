@@ -3,6 +3,7 @@ use gpio;
 use main::Chip;
 use timels;
 use uart;
+use usb;
 
 pub struct Hotel {
     mpu: cortexm3::mpu::MPU,
@@ -28,7 +29,7 @@ impl Chip for Hotel {
 
     fn service_pending_interrupts(&mut self) {
         unsafe {
-            cortexm3::nvic::next_pending().map(|nvic_num| {
+            while let Some(nvic_num) = cortexm3::nvic::next_pending() {
                 match nvic_num {
                     159 => timels::Timels0.handle_interrupt(),
                     160 => timels::Timels1.handle_interrupt(),
@@ -38,6 +39,8 @@ impl Chip for Hotel {
                     184 => uart::UART1.handle_tx_interrupt(),
                     188 => uart::UART2.handle_rx_interrupt(),
                     191 => uart::UART2.handle_tx_interrupt(),
+
+                    193 => usb::USB0.handle_interrupt(),
 
                     pin @ 65...80 => {
                         gpio::PORT0.pins[(pin - 65) as usize].handle_interrupt();
@@ -55,7 +58,7 @@ impl Chip for Hotel {
                 }
                 cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
                 cortexm3::nvic::Nvic::new(nvic_num).enable();
-            });
+            }
         }
     }
 
