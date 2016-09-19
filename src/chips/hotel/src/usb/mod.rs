@@ -233,9 +233,7 @@ impl USB {
             self.cur_out_idx.set(noi);
             noi = (noi + 1) % descs.len();
             self.next_out_idx.set(noi);
-            self.registers.out_endpoints[0]
-                .dma_address
-                .set(&descs[noi] as *const DMADescriptor as u32);
+            self.registers.out_endpoints[0].dma_address.set(&descs[noi]);
         });
     }
 
@@ -252,9 +250,7 @@ impl USB {
                     desc.addr = buf.as_ptr() as usize;
                 }
                 self.next_out_idx.set(0);
-                self.registers.out_endpoints[0]
-                    .dma_address
-                    .set(&descs[0] as *const DMADescriptor as u32);
+                self.registers.out_endpoints[0].dma_address.set(&descs[0]);
             });
         });
 
@@ -265,9 +261,7 @@ impl USB {
                     desc.flags = DescFlag::HOST_BUSY;
                     desc.addr = buf.as_ptr() as usize + i * 64;
                 }
-                self.registers.in_endpoints[0]
-                    .dma_address
-                    .set(&descs[0] as *const DMADescriptor as u32);
+                self.registers.in_endpoints[0].dma_address.set(&descs[0]);
             });
         });
 
@@ -568,9 +562,7 @@ impl USB {
             self.flush_tx_fifo(0);
 
             // 3. Set EP0 in DMA
-            self.registers.in_endpoints[0]
-                .dma_address
-                .set(&descs[0] as *const DMADescriptor as u32);
+            self.registers.in_endpoints[0].dma_address.set(&descs[0]);
 
             if transfer_type == TableCase::C && false {
                 self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
@@ -614,9 +606,7 @@ impl USB {
             self.flush_tx_fifo(0);
 
             // 3. Set EP0 in DMA
-            self.registers.in_endpoints[0]
-                .dma_address
-                .set(&descs[0] as *const DMADescriptor as u32);
+            self.registers.in_endpoints[0].dma_address.set(&descs[0]);
 
             if transfer_type == TableCase::C && false {
                 self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);

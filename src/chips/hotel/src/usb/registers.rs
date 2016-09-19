@@ -78,8 +78,9 @@ pub struct InEndpoint {
     _reserved0: u32,
     pub interrupt: VolatileCell<u32>,
     _reserved1: u32,
-    pub transfer_size: VolatileCell<u32>,
-    pub dma_address: VolatileCell<u32>,
+    // We use scatter-gather mode so transfer-size isn't used
+    _transfer_size: VolatileCell<u32>,
+    pub dma_address: VolatileCell<&'static DMADescriptor>,
     pub tx_fifo_status: VolatileCell<u32>,
     pub buffer_address: VolatileCell<u32>,
 }
@@ -90,8 +91,8 @@ pub struct OutEndpoint {
     _reserved0: u32,
     pub interrupt: VolatileCell<u32>,
     _reserved1: u32,
-    pub transfer_size: VolatileCell<u32>,
-    pub dma_address: VolatileCell<u32>,
+    _transfer_size: VolatileCell<u32>,
+    pub dma_address: VolatileCell<&'static DMADescriptor>,
     _reserved2: u32,
     pub buffer_address: VolatileCell<u32>,
 }
@@ -177,3 +178,4 @@ impl DescFlag {
         DescFlag(self.0 | bytes as u32)
     }
 }
+
