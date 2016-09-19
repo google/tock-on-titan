@@ -1,4 +1,3 @@
-
 use common::volatile_cell::VolatileCell;
 use core::mem;
 
