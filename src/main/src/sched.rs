@@ -1,4 +1,3 @@
-
 use common::Queue;
 use platform::{Chip, Platform, MPU, SysTick};
 use process;
@@ -25,8 +24,7 @@ pub unsafe fn do_process<P: Platform, C: Chip>(platform: &mut P,
                 // Data segment read/write/execute
                 chip.mpu().set_mpu(0, data_start as u32, data_len as u32, true, 0b011);
                 // Text segment read/execute (no write)
-                chip.mpu().set_mpu(
-                    1, text_start as u32, text_len as u32, true, 0b111);
+                chip.mpu().set_mpu(1, text_start as u32, text_len as u32, true, 0b111);
 
                 chip.service_pending_interrupts();
 

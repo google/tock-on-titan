@@ -178,4 +178,3 @@ impl DescFlag {
         DescFlag(self.0 | bytes as u32)
     }
 }
-

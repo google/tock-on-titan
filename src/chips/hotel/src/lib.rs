@@ -132,20 +132,20 @@ unsafe extern "C" fn hard_fault_handler() {
         :
         );
 
-    let stacked_r0  :u32 = *offset(faulting_stack, 0);
-    let stacked_r1  :u32 = *offset(faulting_stack, 1);
-    let stacked_r2  :u32 = *offset(faulting_stack, 2);
-    let stacked_r3  :u32 = *offset(faulting_stack, 3);
-    let stacked_r12 :u32 = *offset(faulting_stack, 4);
-    let stacked_lr  :u32 = *offset(faulting_stack, 5);
-    let stacked_pc  :u32 = *offset(faulting_stack, 6);
-    let stacked_prs :u32 = *offset(faulting_stack, 7);
+    let stacked_r0: u32 = *offset(faulting_stack, 0);
+    let stacked_r1: u32 = *offset(faulting_stack, 1);
+    let stacked_r2: u32 = *offset(faulting_stack, 2);
+    let stacked_r3: u32 = *offset(faulting_stack, 3);
+    let stacked_r12: u32 = *offset(faulting_stack, 4);
+    let stacked_lr: u32 = *offset(faulting_stack, 5);
+    let stacked_pc: u32 = *offset(faulting_stack, 6);
+    let stacked_prs: u32 = *offset(faulting_stack, 7);
 
     let mode_str = if kernel_stack { "Kernel" } else { "Process" };
 
-    let shcsr : u32 = core::intrinsics::volatile_load(0xE000ED24 as *const u32);
-    let cfsr : u32 = core::intrinsics::volatile_load(0xE000ED28 as *const u32);
-    let hfsr : u32 = core::intrinsics::volatile_load(0xE000ED2C as *const u32);
+    let shcsr: u32 = core::intrinsics::volatile_load(0xE000ED24 as *const u32);
+    let cfsr: u32 = core::intrinsics::volatile_load(0xE000ED28 as *const u32);
+    let hfsr: u32 = core::intrinsics::volatile_load(0xE000ED2C as *const u32);
 
     panic!("{} HardFault.\n\
            \tr0  0x{:x}\n\

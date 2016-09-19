@@ -56,7 +56,7 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
 pub struct Golf {
     console: &'static drivers::console::Console<'static, hotel::uart::UART>,
     gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
-    timer: &'static drivers::timer::TimerDriver<'static, hotel::timels::Timels>
+    timer: &'static drivers::timer::TimerDriver<'static, hotel::timels::Timels>,
 }
 
 #[no_mangle]
@@ -130,7 +130,9 @@ pub unsafe fn reset_handler() {
                           &mut hotel::usb::IN_DESCRIPTORS,
                           &mut hotel::usb::IN_BUFFERS,
                           hotel::usb::PHY::A,
-                          None, Some(0x0011), Some(0x7788));
+                          None,
+                          Some(0x0011),
+                          Some(0x7788));
 
     let end = timerhs.now();
 

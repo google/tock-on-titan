@@ -1,4 +1,3 @@
-
 use common::take_cell::TakeCell;
 use common::volatile_cell::VolatileCell;
 use core::cell::Cell;

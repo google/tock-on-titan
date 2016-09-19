@@ -1,7 +1,7 @@
 use core::fmt::*;
+use pinmux;
 
 use uart;
-use pinmux;
 
 pub struct Writer;
 
@@ -10,7 +10,7 @@ impl Write for Writer {
         unsafe {
             let uart = &uart::UART0;
 
-            static mut initialized: bool  = false;
+            static mut initialized: bool = false;
             if !initialized {
                 initialized = true;
 

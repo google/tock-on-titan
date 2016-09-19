@@ -1,4 +1,3 @@
-
 use core::cell::Cell;
 use core::cmp;
 use dma::DMAChannel;
