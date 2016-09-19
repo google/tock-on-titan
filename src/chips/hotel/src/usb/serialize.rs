@@ -1,5 +1,5 @@
-use core::mem::{transmute, size_of};
 use core::intrinsics::copy_nonoverlapping;
+use core::mem::{transmute, size_of};
 
 pub unsafe trait Serialize: Sized {
     fn serialize(&self, buffer: &mut [u8]) -> usize {
@@ -26,4 +26,3 @@ unsafe impl Serialize for i16 {}
 unsafe impl Serialize for i32 {}
 unsafe impl Serialize for i64 {}
 unsafe impl Serialize for isize {}
-

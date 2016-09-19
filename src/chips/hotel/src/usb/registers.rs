@@ -1,5 +1,5 @@
-use core::ops::{BitAnd, BitOr};
 use common::volatile_cell::VolatileCell;
+use core::ops::{BitAnd, BitOr};
 
 #[repr(C)]
 pub struct Registers {
@@ -16,7 +16,7 @@ pub struct Registers {
     pub transmit_fifo_size: VolatileCell<u32>,
 
     _reserved: [u32; 3],
-    //0x38
+    // 0x38
     /// The `gpio` register is a portal to a set of custom 8-bit registers.
     ///
     /// Logically it is split into a GP_OUT part and a GP_IN part. Writing to a
@@ -56,20 +56,20 @@ pub struct Registers {
     pub device_all_ep_interrupt_mask: VolatileCell<u32>,
 
     _reserved_4: [u32; 2],
-    //0x828
+    // 0x828
     pub device_vbus_discharge_time: VolatileCell<u32>,
     pub device_vbus_pulsing_time: VolatileCell<u32>,
     pub device_threshold_control: VolatileCell<u32>,
     pub device_in_ep_fifo_empty_interrupt_mask: VolatileCell<u32>,
 
     _reserved_5: [u32; 50],
-    //0x900
+    // 0x900
     pub in_endpoints: [InEndpoint; 16],
     pub out_endpoints: [OutEndpoint; 16],
-    //0xd00
+    // 0xd00
     _reserved6: [u32; 64],
-    //0xe00
-    pub power_clock_gating_control: VolatileCell<u32>
+    // 0xe00
+    pub power_clock_gating_control: VolatileCell<u32>,
 }
 
 #[repr(C)]
@@ -81,7 +81,7 @@ pub struct InEndpoint {
     pub transfer_size: VolatileCell<u32>,
     pub dma_address: VolatileCell<u32>,
     pub tx_fifo_status: VolatileCell<u32>,
-    pub buffer_address: VolatileCell<u32>
+    pub buffer_address: VolatileCell<u32>,
 }
 
 #[repr(C)]
@@ -93,7 +93,7 @@ pub struct OutEndpoint {
     pub transfer_size: VolatileCell<u32>,
     pub dma_address: VolatileCell<u32>,
     _reserved2: u32,
-    pub buffer_address: VolatileCell<u32>
+    pub buffer_address: VolatileCell<u32>,
 }
 
 /// In/Out Endpoint Control flags
@@ -126,7 +126,7 @@ impl BitAnd for EpCtl {
 #[derive(Clone, Copy, Debug)]
 pub struct DMADescriptor {
     pub flags: DescFlag,
-    pub addr: usize
+    pub addr: usize,
 }
 
 /// Status quadlet for a DMA descriptor
@@ -176,6 +176,4 @@ impl DescFlag {
     pub const fn bytes(self, bytes: u16) -> DescFlag {
         DescFlag(self.0 | bytes as u32)
     }
-
 }
-

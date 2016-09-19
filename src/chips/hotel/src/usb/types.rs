@@ -15,20 +15,20 @@ pub struct DeviceDescriptor {
     pub i_manufacturer: u8,
     pub i_product: u8,
     pub i_serial_number: u8,
-    pub b_num_configurations: u8
+    pub b_num_configurations: u8,
 }
 
 unsafe impl Serialize for DeviceDescriptor {}
 
 pub struct ConfigurationDescriptor {
-	pub b_length: u8,
-	pub b_descriptor_type: u8,
-	pub w_total_length: u16,
-	pub b_num_interfaces: u8,
-	pub b_configuration_value: u8,
-	pub i_configuration: u8,
-	pub bm_attributes: u8,
-	pub b_max_power: u8
+    pub b_length: u8,
+    pub b_descriptor_type: u8,
+    pub w_total_length: u16,
+    pub b_num_interfaces: u8,
+    pub b_configuration_value: u8,
+    pub i_configuration: u8,
+    pub bm_attributes: u8,
+    pub b_max_power: u8,
 }
 
 impl ConfigurationDescriptor {
@@ -45,7 +45,7 @@ impl ConfigurationDescriptor {
             b_configuration_value: 1,
             i_configuration: 0,
             bm_attributes: 0b11000000,
-            b_max_power: 50
+            b_max_power: 50,
         }
     }
 }
@@ -68,7 +68,7 @@ pub enum SetupRequestType {
     SetConfiguration = 9,
     GetInterface = 10,
     SetInterface = 11,
-    SynchFrame = 12
+    SynchFrame = 12,
 }
 
 pub struct SetupRequest {
@@ -81,9 +81,7 @@ pub struct SetupRequest {
 
 impl SetupRequest {
     pub fn parse(buf: &[u8; 64]) -> &SetupRequest {
-        unsafe {
-            ::core::mem::transmute(buf.as_ptr())
-        }
+        unsafe { ::core::mem::transmute(buf.as_ptr()) }
     }
 
     pub fn data_direction(&self) -> u8 {
@@ -98,4 +96,3 @@ impl SetupRequest {
         self.bm_request_type & 0x1f
     }
 }
-
