@@ -56,22 +56,24 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
 pub struct Golf {
     console: &'static drivers::console::Console<'static, hotel::uart::UART>,
     gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
+    timer: &'static drivers::timer::TimerDriver<'static, hotel::timels::Timels>
 }
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
     hotel::init();
 
-    let timer = {
+    let timerhs = {
         use hotel::pmu::*;
         use hotel::timeus::Timeus;
         Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeUs0Timer)).enable();
+        Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeLs0)).enable();
         let timer = Timeus::new(0);
         timer
     };
 
-    timer.start();
-    let start = timer.now();
+    timerhs.start();
+    let start = timerhs.now();
 
     {
         use hotel::pmu::*;
@@ -110,10 +112,18 @@ pub unsafe fn reset_handler() {
         pin.set_client(gpio)
     }
 
+    let timer = static_init!(
+        drivers::timer::TimerDriver<'static, hotel::timels::Timels>,
+        drivers::timer::TimerDriver::new(
+            &hotel::timels::Timels0, main::container::Container::create()),
+        12);
+    hotel::timels::Timels0.set_client(timer);
+
     let platform = static_init!(Golf, Golf {
         console: console,
-        gpio: gpio
-    }, 8);
+        gpio: gpio,
+        timer: timer,
+    }, 12);
 
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
@@ -122,7 +132,7 @@ pub unsafe fn reset_handler() {
                           hotel::usb::PHY::A,
                           None, Some(0x0011), Some(0x7788));
 
-    let end = timer.now();
+    let end = timerhs.now();
 
     println!("Hello from Rust! Initialization took {} tics.",
              end.wrapping_sub(start));
@@ -141,6 +151,7 @@ impl Platform for Golf {
         match driver_num {
             0 => f(Some(self.console)),
             1 => f(Some(self.gpio)),
+            3 => f(Some(self.timer)),
             _ => f(None),
         }
     }

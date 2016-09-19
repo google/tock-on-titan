@@ -16,6 +16,7 @@ pub mod chip;
 pub mod gpio;
 pub mod pinmux;
 pub mod pmu;
+pub mod timels;
 pub mod timeus;
 pub mod uart;
 pub mod usb;
