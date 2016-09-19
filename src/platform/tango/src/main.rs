@@ -1,4 +1,4 @@
-#![crate_name = "tango"]
+#![crate_name = "golf"]
 #![no_std]
 #![no_main]
 #![feature(lang_items)]
@@ -53,38 +53,37 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
     &mut processes
 }
 
-pub struct Tango {
+pub struct Golf {
     console: &'static drivers::console::Console<'static, hotel::uart::UART>,
-    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
+    timer: &'static drivers::timer::TimerDriver<'static, hotel::timels::Timels>
 }
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
     hotel::init();
 
-    let timer = {
+    let timerhs = {
         use hotel::pmu::*;
         use hotel::timeus::Timeus;
         Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeUs0Timer)).enable();
+        Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeLs0)).enable();
         let timer = Timeus::new(0);
         timer
     };
 
-    timer.start();
-    let start = timer.now();
-
-    hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
-                          &mut hotel::usb::OUT_BUFFERS,
-                          &mut hotel::usb::IN_DESCRIPTORS,
-                          &mut hotel::usb::IN_BUFFERS,
-                          hotel::usb::PHY::A,
-                          None, Some(0x0011), Some(0x7788));
+    timerhs.start();
+    let start = timerhs.now();
 
     {
         use hotel::pmu::*;
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
         let pinmux = &mut *hotel::pinmux::PINMUX;
         pinmux.diob0.select.set(hotel::pinmux::Function::Gpio0Gpio0);
+
+        pinmux.gpio0_gpio1.select.set(hotel::pinmux::SelectablePin::Dioa8);
+        pinmux.dioa8.select.set(hotel::pinmux::Function::Gpio0Gpio1);
+        pinmux.dioa8.control.set(1 << 2 | 1 << 4);
 
         pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
         pinmux.dioa11.control.set(1 << 2 | 1 << 4);
@@ -101,21 +100,39 @@ pub unsafe fn reset_handler() {
     console.initialize();
 
     let gpio_pins = static_init!(
-        [&'static hotel::gpio::GPIOPin; 1],
-        [&hotel::gpio::PORT0.pins[0]],
-        4);
+        [&'static hotel::gpio::Pin; 2],
+        [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]],
+        8);
 
     let gpio = static_init!(
-        drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+        drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
         drivers::gpio::GPIO::new(gpio_pins),
         20);
+    for pin in gpio_pins.iter() {
+        pin.set_client(gpio)
+    }
 
-    let platform = static_init!(Tango, Tango {
+    let timer = static_init!(
+        drivers::timer::TimerDriver<'static, hotel::timels::Timels>,
+        drivers::timer::TimerDriver::new(
+            &hotel::timels::Timels0, main::container::Container::create()),
+        12);
+    hotel::timels::Timels0.set_client(timer);
+
+    let platform = static_init!(Golf, Golf {
         console: console,
-        gpio: gpio
-    }, 8);
+        gpio: gpio,
+        timer: timer,
+    }, 12);
 
-    let end = timer.now();
+    hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
+                          &mut hotel::usb::OUT_BUFFERS,
+                          &mut hotel::usb::IN_DESCRIPTORS,
+                          &mut hotel::usb::IN_BUFFERS,
+                          hotel::usb::PHY::A,
+                          None, Some(0x0011), Some(0x7788));
+
+    let end = timerhs.now();
 
     println!("Hello from Rust! Initialization took {} tics.",
              end.wrapping_sub(start));
@@ -127,13 +144,14 @@ pub unsafe fn reset_handler() {
     main::main(platform, &mut chip, load_processes());
 }
 
-impl Platform for Tango {
+impl Platform for Golf {
     fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R
         where F: FnOnce(Option<&main::Driver>) -> R
     {
         match driver_num {
             0 => f(Some(self.console)),
             1 => f(Some(self.gpio)),
+            3 => f(Some(self.timer)),
             _ => f(None),
         }
     }
