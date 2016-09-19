@@ -976,4 +976,3 @@ impl TableCase {
     }
 }
 
-interrupt_handler!(usb_handler, 193);

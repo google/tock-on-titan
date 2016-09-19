@@ -54,7 +54,8 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
 }
 
 pub struct Golf {
-    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+    console: &'static drivers::console::Console<'static, hotel::uart::UART>,
+    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
 }
 
 #[no_mangle]
@@ -77,19 +78,42 @@ pub unsafe fn reset_handler() {
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
         let pinmux = &mut *hotel::pinmux::PINMUX;
         pinmux.diob0.select.set(hotel::pinmux::Function::Gpio0Gpio0);
+
+        pinmux.gpio0_gpio1.select.set(hotel::pinmux::SelectablePin::Dioa8);
+        pinmux.dioa8.select.set(hotel::pinmux::Function::Gpio0Gpio1);
+        pinmux.dioa8.control.set(1 << 2 | 1 << 4);
+
+        pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
+        pinmux.dioa11.control.set(1 << 2 | 1 << 4);
+        pinmux.uart0_rx.select.set(hotel::pinmux::SelectablePin::Dioa11);
     }
 
+    let console = static_init!(
+        drivers::console::Console<'static, hotel::uart::UART>,
+        drivers::console::Console::new(&hotel::uart::UART0,
+                                       &mut drivers::console::WRITE_BUF,
+                                       main::container::Container::create()),
+        24);
+    hotel::uart::UART0.set_client(console);
+    console.initialize();
+
     let gpio_pins = static_init!(
-        [&'static hotel::gpio::GPIOPin; 1],
-        [&hotel::gpio::PORT0.pins[0]],
-        4);
+        [&'static hotel::gpio::Pin; 2],
+        [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]],
+        8);
 
     let gpio = static_init!(
-        drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+        drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
         drivers::gpio::GPIO::new(gpio_pins),
         20);
+    for pin in gpio_pins.iter() {
+        pin.set_client(gpio)
+    }
 
-    let platform = static_init!(Golf, Golf { gpio: gpio }, 4);
+    let platform = static_init!(Golf, Golf {
+        console: console,
+        gpio: gpio
+    }, 8);
 
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
@@ -115,6 +139,7 @@ impl Platform for Golf {
         where F: FnOnce(Option<&main::Driver>) -> R
     {
         match driver_num {
+            0 => f(Some(self.console)),
             1 => f(Some(self.gpio)),
             _ => f(None),
         }

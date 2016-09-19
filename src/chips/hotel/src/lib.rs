@@ -10,8 +10,6 @@ extern crate main;
 extern crate support;
 
 #[macro_use]
-mod helpers;
-#[macro_use]
 pub mod io;
 
 pub mod chip;

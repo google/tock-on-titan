@@ -54,6 +54,7 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
 }
 
 pub struct Tango {
+    console: &'static drivers::console::Console<'static, hotel::uart::UART>,
     gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
 }
 
@@ -84,7 +85,20 @@ pub unsafe fn reset_handler() {
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
         let pinmux = &mut *hotel::pinmux::PINMUX;
         pinmux.diob0.select.set(hotel::pinmux::Function::Gpio0Gpio0);
+
+        pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
+        pinmux.dioa11.control.set(1 << 2 | 1 << 4);
+        pinmux.uart0_rx.select.set(hotel::pinmux::SelectablePin::Dioa11);
     }
+
+    let console = static_init!(
+        drivers::console::Console<'static, hotel::uart::UART>,
+        drivers::console::Console::new(&hotel::uart::UART0,
+                                       &mut drivers::console::WRITE_BUF,
+                                       main::container::Container::create()),
+        24);
+    hotel::uart::UART0.set_client(console);
+    console.initialize();
 
     let gpio_pins = static_init!(
         [&'static hotel::gpio::GPIOPin; 1],
@@ -96,7 +110,10 @@ pub unsafe fn reset_handler() {
         drivers::gpio::GPIO::new(gpio_pins),
         20);
 
-    let platform = static_init!(Tango, Tango { gpio: gpio }, 4);
+    let platform = static_init!(Tango, Tango {
+        console: console,
+        gpio: gpio
+    }, 8);
 
     let end = timer.now();
 
@@ -115,6 +132,7 @@ impl Platform for Tango {
         where F: FnOnce(Option<&main::Driver>) -> R
     {
         match driver_num {
+            0 => f(Some(self.console)),
             1 => f(Some(self.gpio)),
             _ => f(None),
         }

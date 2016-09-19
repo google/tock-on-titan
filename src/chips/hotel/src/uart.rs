@@ -35,7 +35,7 @@
 
 use common::take_cell::TakeCell;
 use common::volatile_cell::VolatileCell;
-use cortexm3::nvic::Nvic;
+use hil;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 /// Registers for the UART controller
@@ -56,28 +56,17 @@ const UART0_BASE: *mut Registers = 0x40600000 as *mut Registers;
 const UART1_BASE: *mut Registers = 0x40610000 as *mut Registers;
 const UART2_BASE: *mut Registers = 0x40620000 as *mut Registers;
 
-pub static mut UART0: UART =
-    unsafe { UART::new(UART0_BASE, PeripheralClock1::Uart0Timer, Nvic::new(177)) };
+pub static mut UART0: UART = unsafe { UART::new(UART0_BASE, PeripheralClock1::Uart0Timer) };
 
-pub static mut UART1: UART =
-    unsafe { UART::new(UART1_BASE, PeripheralClock1::Uart1Timer, Nvic::new(184)) };
+pub static mut UART1: UART = unsafe { UART::new(UART1_BASE, PeripheralClock1::Uart1Timer) };
 
-pub static mut UART2: UART =
-    unsafe { UART::new(UART2_BASE, PeripheralClock1::Uart2Timer, Nvic::new(191)) };
-
-/// Wrapper type that helps store either a mutable or immutable slice.
-///
-/// We don't care if a client buffer is mutable when writing out the the UART,
-/// but when we return it in a callback, the client cares.
-enum EitherBytes {
-    Immutable(&'static [u8]),
-    Mutable(&'static mut [u8]),
-}
+pub static mut UART2: UART = unsafe { UART::new(UART2_BASE, PeripheralClock1::Uart2Timer) };
 
 /// A resumable buffer that tracks the last written index
 struct Buffer {
-    bytes: EitherBytes,
+    bytes: &'static mut [u8],
     cursor: usize,
+    limit: usize,
 }
 
 /// A UART channel
@@ -87,17 +76,21 @@ pub struct UART {
     regs: *mut Registers,
     clock: Clock,
     buffer: TakeCell<Buffer>,
-    nvic: Nvic,
+    client: TakeCell<&'static hil::uart::Client>,
 }
 
 impl UART {
-    const unsafe fn new(uart: *mut Registers, clock: PeripheralClock1, nvic: Nvic) -> UART {
+    const unsafe fn new(uart: *mut Registers, clock: PeripheralClock1) -> UART {
         UART {
             regs: uart,
             clock: Clock::new(PeripheralClock::Bank1(clock)),
             buffer: TakeCell::empty(),
-            nvic: nvic,
+            client: TakeCell::empty(),
         }
+    }
+
+    pub fn set_client(&self, client: &'static hil::uart::Client) {
+        self.client.put(Some(client));
     }
 
     /// Enables transmission on the UART
@@ -127,6 +120,36 @@ impl UART {
         }
     }
 
+    /// Enables reception on the UART
+    ///
+    /// Side-effect: ensures the clock is on.
+    pub fn enable_rx(&self) {
+        let regs = unsafe { &*self.regs };
+
+        self.clock.enable();
+
+        let ctrl = regs.control.get() | 0b10;
+        regs.control.set(ctrl);
+        regs.interrupt_control.set(regs.interrupt_control.get() | 2);
+    }
+
+    /// Disable reception on the UART
+    ///
+    /// Side-effect: turns the clock off if TX is also disabled.
+    pub fn disable_rx(&self) {
+        let regs = unsafe { &*self.regs };
+
+        let ctrl = regs.control.get() & !(0b10);
+        regs.control.set(ctrl);
+
+        if ctrl & 0b11 == 0 {
+            // Neither TX nor RX enabled anymore
+            self.clock.disable();
+        }
+        regs.interrupt_control.set(regs.interrupt_control.get() & !2);
+    }
+
+
     /// Prepare the UART for operation
     ///
     /// `baudrate` is specified in Hz (e.g. 9600, 115200).
@@ -143,7 +166,6 @@ impl UART {
 
         regs.clear_interrupt_state.set(!0);
         regs.state.set(!0);
-        self.nvic.enable();
     }
 
     /// Send an array of bytes synchronously over the UART
@@ -168,7 +190,6 @@ impl UART {
         }
 
         while regs.state.get() & (1 << 5 | 1 << 4) != 0b110000 {}
-        self.disable_tx();
     }
 
     // Call this function when there might be bytes left in the `buffer` to
@@ -188,12 +209,9 @@ impl UART {
             .map(|buffer| {
                 let init_cursor = buffer.cursor;
 
-                let bytes: &[u8] = match buffer.bytes {
-                    EitherBytes::Immutable(ref b) => b,
-                    EitherBytes::Mutable(ref b) => &**b,
-                };
+                let bytes: &[u8] = buffer.bytes;
 
-                for b in bytes[buffer.cursor..].iter() {
+                for b in bytes[buffer.cursor..buffer.limit].iter() {
                     if regs.state.get() & 1 == 1 {
                         break; // TX Buffer full, we'll continue later
                     }
@@ -205,10 +223,10 @@ impl UART {
             .unwrap_or(0);
 
         if nwritten > 0 {
-            // if we wrote anything, we're gonna want to get notified when the
-            // FIFO has room again. Technically we could be done here, but we
-            // want to get an interrupt anyway so we can return the buffer to
-            // the client from `handle_tx_interrupt`.
+            // if we wrote anything, we're gonna want to get notified when the FIFO has room again.
+            // Technically we could be done here if there is nothing left to send, but we want to
+            // get an interrupt anyway so we can return the buffer to the client from
+            // `handle_tx_interrupt`.
             regs.interrupt_control.set(regs.interrupt_control.get() | 1);
         }
 
@@ -216,12 +234,10 @@ impl UART {
 
     }
 
-    /// Called by the chip's following a TX interrupt.
+    /// Called by the chip following a TX interrupt.
     ///
-    /// This will clear the NVIC pending bit to mark that we've handled the
-    /// interrupt. Then, if there are bytes left in the buffer to send, write
-    /// another batch to the TX FIFO. Otherwise, return the buffer back to the
-    /// client (TODO: no client yet, so not yet implemented).
+    /// If there are bytes left in the buffer to send, write another batch to the TX FIFO.
+    /// Otherwise, return the buffer back to the client.
     ///
     /// # Invariants
     ///
@@ -234,11 +250,38 @@ impl UART {
 
         regs.clear_interrupt_state.set(1);
         if self.send_remaining_bytes() == 0 {
-            let _userbuf = self.buffer.take();
-            // Done sending, return buffer to client
+            self.client.map(|client| {
+                self.buffer.take().map(move |buffer| {
+                    client.write_done(buffer.bytes);
+                });
+            });
         }
-        self.nvic.clear_pending();
-        self.nvic.enable();
+    }
+
+    /// Called by the chip following a RX interrupt.
+    ///
+    /// This will clear the NVIC pending bit to mark that we've handled the
+    /// interrupt. Then, if there are bytes left in the buffer to send, write
+    /// another batch to the TX FIFO. Otherwise, return the buffer back to the
+    /// client (TODO: no client yet, so not yet implemented).
+    ///
+    /// # Invariants
+    ///
+    ///   * NVIC is disabled
+    ///
+    ///   * NVIC pending bit is high
+    ///
+    pub fn handle_rx_interrupt(&self) {
+        let regs = unsafe { &*self.regs };
+
+        regs.clear_interrupt_state.set(2);
+        self.client.map(|client| {
+            while regs.state.get() & 1 << 7 == 0 {
+                // While RX FIFO not empty
+                let b = regs.read_data.get() as u8;
+                client.read_done(b);
+            }
+        });
     }
 
     /// Asynchronously send a mutable slice of bytes over the UART
@@ -250,29 +293,60 @@ impl UART {
     /// the client from loosing mutable access.
     ///
     pub fn send_mut_bytes(&self, bytes: &'static mut [u8]) {
+        let len = bytes.len();
         self.buffer.replace(Buffer {
-            bytes: EitherBytes::Mutable(bytes),
+            bytes: bytes,
             cursor: 0,
-        });
-        self.send_remaining_bytes();
-    }
-
-    /// Asynchronously send an _immutable_ slice of bytes over the UART
-    ///
-    /// The client is notified of completion through the client's callback. Do
-    /// not pass in a byte slice that is actually mutable, unless you don't need
-    /// to modify it again. If you do so, there will be no way to get it back
-    /// mutably from the callback. Instead, use `send_mut_bytes`.
-    pub fn send_bytes(&self, bytes: &'static [u8]) {
-        self.buffer.replace(Buffer {
-            bytes: EitherBytes::Immutable(bytes),
-            cursor: 0,
+            limit: len,
         });
         self.send_remaining_bytes();
     }
 }
 
+impl hil::uart::UART for UART {
+    fn init(&mut self, params: hil::uart::UARTParams) {
+        self.config(params.baud_rate);
+        // TODO(alevy) can we handle other parameters?
+    }
 
-interrupt_handler!(uart0_handler, 177);
-interrupt_handler!(uart1_handler, 184);
-interrupt_handler!(uart2_handler, 191);
+    fn send_byte(&self, _byte: u8) {
+        unimplemented!();
+    }
+
+    fn read_byte(&self) -> u8 {
+        unimplemented!();
+    }
+
+    fn rx_ready(&self) -> bool {
+        unimplemented!();
+    }
+
+    fn tx_ready(&self) -> bool {
+        unimplemented!();
+    }
+
+    fn enable_rx(&self) {
+        UART::enable_rx(self);
+    }
+
+    fn disable_rx(&mut self) {
+        UART::disable_rx(self);
+    }
+
+    fn enable_tx(&self) {
+        UART::enable_tx(self);
+    }
+
+    fn disable_tx(&mut self) {
+        UART::disable_tx(self);
+    }
+
+    fn send_bytes(&self, bytes: &'static mut [u8], len: usize) {
+        self.buffer.replace(Buffer {
+            bytes: bytes,
+            cursor: 0,
+            limit: len,
+        });
+        self.send_remaining_bytes();
+    }
+}

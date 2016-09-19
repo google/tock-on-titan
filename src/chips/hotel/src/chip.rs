@@ -1,5 +1,7 @@
 use cortexm3;
+use gpio;
 use main::Chip;
+use uart;
 use usb;
 
 pub struct Hotel {
@@ -28,8 +30,28 @@ impl Chip for Hotel {
         unsafe {
             while let Some(nvic_num) = cortexm3::nvic::next_pending() {
                 match nvic_num {
+                    174 => uart::UART0.handle_rx_interrupt(),
+                    177 => uart::UART0.handle_tx_interrupt(),
+                    181 => uart::UART1.handle_rx_interrupt(),
+                    184 => uart::UART1.handle_tx_interrupt(),
+                    188 => uart::UART2.handle_rx_interrupt(),
+                    191 => uart::UART2.handle_tx_interrupt(),
+
                     193 => usb::USB0.handle_interrupt(),
-                    _   => panic!("No handler for interrupt #{}", nvic_num)
+
+                    pin @ 65...80 => {
+                        gpio::PORT0.pins[(pin - 65) as usize].handle_interrupt();
+                    }
+                    81 => {
+                        // GPIO Combined interrupt... why does this remain asserted?
+                    }
+                    pin @ 82...97 => {
+                        gpio::PORT1.pins[(pin - 82) as usize].handle_interrupt();
+                    }
+                    98 => {
+                        // GPIO Combined interrupt... why does this remain asserted?
+                    }
+                    _ => panic!("Unexected ISR {}", nvic_num),
                 }
                 cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
                 cortexm3::nvic::Nvic::new(nvic_num).enable();
