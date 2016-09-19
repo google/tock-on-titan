@@ -485,7 +485,7 @@ impl USB {
 
                         len = ::core::cmp::min(len, req.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
-                            descs[0].flags = (DescFlag::HOST_BUSY | DescFlag::LAST |
+                            descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
                                               DescFlag::SHORT | DescFlag::IOC).bytes(len as u16);
                                 
                         });
