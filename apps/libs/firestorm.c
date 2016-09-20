@@ -4,8 +4,10 @@
 #include <firestorm.h>
 #include <tock.h>
 
+enum { MAX_BUFFER_SIZE = 48 };
+
 typedef struct putstr_data {
-  char* buf;
+  char buf[MAX_BUFFER_SIZE];
   int len;
   bool called;
   struct putstr_data* next;
@@ -31,28 +33,33 @@ static void putstr_cb(
 }
 
 void putnstr(const char *str, size_t len) {
-  putstr_data_t* data = (putstr_data_t*)malloc(sizeof(putstr_data_t));
+  putstr_data_t data;
 
-  data->len = len;
-  data->called = false;
-  data->buf = (char*)malloc(len * sizeof(char));
-  strncpy(data->buf, str, len);
-  data->next = NULL;
+  while (len > 0) {
+    size_t piece_len = len;
+    if (len > MAX_BUFFER_SIZE) {
+      piece_len = MAX_BUFFER_SIZE;
+    }
+    data.len = piece_len;
+    data.called = false;
+    memcpy(data.buf, str, piece_len);
+    data.next = NULL;
 
-  if (putstr_tail == NULL) {
-    // Invariant, if tail is NULL, head is also NULL
-    putstr_head = data;
-    putstr_tail = data;
-    putnstr_async(data->buf, data->len, putstr_cb, NULL);
-  } else {
-    putstr_tail->next = data;
-    putstr_tail = data;
+    if (putstr_tail == NULL) {
+      // Invariant, if tail is NULL, head is also NULL
+      putstr_head = &data;
+      putstr_tail = &data;
+      putnstr_async(data.buf, data.len, putstr_cb, NULL);
+    } else {
+      putstr_tail->next = &data;
+      putstr_tail = &data;
+    }
+
+    wait_for(&data.called);
+
+    str += piece_len;
+    len -= piece_len;
   }
-
-  wait_for(&data->called);
-
-  free(data->buf);
-  free(data);
 }
 
 void putnstr_async(const char *str, size_t len, subscribe_cb cb, void* userdata) {
