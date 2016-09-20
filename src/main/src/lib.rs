@@ -23,6 +23,7 @@ pub use driver::Driver;
 pub use mem::{AppSlice, AppPtr, Private, Shared};
 pub use platform::{Chip, MPU, Platform, SysTick};
 pub use process::{Process, State};
+pub use syscall::SyscallError;
 
 pub fn main<P: Platform, C: Chip>(platform: &mut P,
                                   chip: &mut C,

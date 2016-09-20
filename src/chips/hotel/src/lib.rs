@@ -13,6 +13,7 @@ extern crate support;
 pub mod io;
 
 pub mod chip;
+pub mod crypto;
 pub mod gpio;
 pub mod pinmux;
 pub mod pmu;

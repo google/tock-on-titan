@@ -6,14 +6,15 @@
 extern crate common;
 extern crate main;
 
-pub mod led;
+pub mod adc;
 pub mod alarm;
+pub mod digest;
 pub mod gpio;
 pub mod i2c;
+pub mod led;
 pub mod spi_master;
 pub mod timer;
 pub mod uart;
-pub mod adc;
 
 pub trait Controller {
     type Config;

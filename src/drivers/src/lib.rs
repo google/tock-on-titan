@@ -8,6 +8,7 @@ extern crate hil;
 extern crate main;
 
 pub mod console;
+pub mod digest;
 pub mod gpio;
 pub mod isl29035;
 pub mod nrf51822_serialization;
