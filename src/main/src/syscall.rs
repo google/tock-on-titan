@@ -20,6 +20,8 @@ pub enum SyscallError {
     NotImplemented = 5,
     /// The resource is currently busy.
     ResourceBusy = 6,
+    /// Internal error in the kernel. This indicates a bug and that the kernel might be unstable.
+    InternalError = 7,
 }
 
 impl From<SyscallError> for isize {
