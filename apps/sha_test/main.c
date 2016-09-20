@@ -2,6 +2,7 @@
 #include <gpio.h>
 #include <digest.h>
 #include <string.h>
+#include <stdio.h>
 
 // TODO: Kernel bug? can't `allow` const data
 static /*const*/ char input_data[] = "Hello World!\n";
@@ -59,25 +60,39 @@ static void busy_delay_ms(int duration)
         }
 }
 
+static void print_buffer(const uint8_t* buf, size_t len) {
+  for (size_t i = 0; i < len; ++i) {
+    printf("%02x", buf[i]);
+  }
+}
+
 int main(void) {
   gpio_enable_output(LED_0);
   gpio_set(LED_0);
 
   int mode = DIGEST_MODE_SHA1;
 
+  printf("Hashing \"%s\"\n", input_data);
+
   memset(hash_output, 0, sizeof(hash_output));
   int ret = tock_digest_hash_easy(input_data, strlen(input_data),
                                   hash_output, sizeof(hash_output), mode);
   if (ret < 0) goto error;
 
-  int result = memcmp(hash_output,
-      mode == DIGEST_MODE_SHA1 ? sha1_sum  : sha256_sum,
-      mode == DIGEST_MODE_SHA1 ? (160 / 8) : (256 / 8));
+  size_t hash_size = mode == DIGEST_MODE_SHA1 ? (160 / 8) : (256 / 8);
+  const uint8_t* reference_hash = mode == DIGEST_MODE_SHA1 ? sha1_sum  : sha256_sum;
 
+  printf("Result:   ");
+  print_buffer(hash_output, hash_size);
+  printf("\n");
+  printf("Expected: ");
+  print_buffer(reference_hash, hash_size);
+  printf("\n");
+
+  int result = memcmp(hash_output, reference_hash, hash_size);
   gpio_clear(LED_0);
+
   while (1) {
-    gpio_toggle(LED_0);
-    busy_delay_ms(50);
     if (result != 0) {
       gpio_toggle(LED_0);
       busy_delay_ms(250);
@@ -86,6 +101,8 @@ int main(void) {
   return 0;
 
 error:
+  printf("Error: %d\n", ret);
+  gpio_clear(LED_0);
   while (1) {
     gpio_toggle(LED_0);
     busy_delay_ms(1000);
