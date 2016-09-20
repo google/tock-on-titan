@@ -125,7 +125,7 @@ pub unsafe fn reset_handler() {
         drivers::digest::DigestDriver::new(
                 &mut hotel::crypto::sha::KEYMGR0_SHA,
                 main::Container::create()),
-        20);
+        16);
 
     let platform = static_init!(Golf, Golf {
         console: console,

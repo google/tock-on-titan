@@ -1,4 +1,5 @@
-use core::cell::{RefCell, Cell};
+use common::take_cell::TakeCell;
+use core::cell::Cell;
 use hil::digest::{DigestEngine, DigestMode};
 use main::{AppId, AppSlice, Container, Driver, Shared, SyscallError};
 
@@ -20,7 +21,7 @@ impl Default for AppData {
 }
 
 pub struct DigestDriver<'a, E: DigestEngine + 'a> {
-    engine: RefCell<&'a mut E>,
+    engine: TakeCell<&'a mut E>,
     apps: Container<AppData>,
     current_user: Cell<Option<AppId>>,
 }
@@ -28,7 +29,7 @@ pub struct DigestDriver<'a, E: DigestEngine + 'a> {
 impl<'a, E: DigestEngine + 'a> DigestDriver<'a, E> {
     pub fn new(engine: &'a mut E, container: Container<AppData>) -> DigestDriver<'a, E> {
         DigestDriver {
-            engine: RefCell::new(engine),
+            engine: TakeCell::new(engine),
             apps: container,
             current_user: Cell::new(None),
         }
@@ -53,11 +54,13 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                                 _ => return Err(SyscallError::InvalidArgument),
                             };
 
-                            try!(self.engine.borrow_mut().initialize(digest_mode));
+                            try!(try!(self.engine
+                                .map(|engine| engine.initialize(digest_mode))
+                                .ok_or(SyscallError::InternalError)));
 
                             Ok(0)
                         })
-                        .unwrap_or(Err(SyscallError::Unknown))
+                        .unwrap_or(Err(SyscallError::InternalError))
                 }
                 // Feed data from input buffer (arg: number of bytes)
                 1 => {
@@ -79,13 +82,13 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                                 return Err(SyscallError::OutOfRange);
                             }
 
-                            try!(self.engine
-                                .borrow_mut()
-                                .update(&input_buffer.as_ref()[..input_len]));
+                            try!(try!(self.engine
+                                .map(|engine| engine.update(&input_buffer.as_ref()[..input_len]))
+                                .ok_or(SyscallError::InternalError)));
 
                             Ok(0)
                         })
-                        .unwrap_or(Err(SyscallError::Unknown))
+                        .unwrap_or(Err(SyscallError::InternalError))
                 }
                 // Finalize hash and output to output buffer (arg: unused)
                 2 => {
@@ -102,11 +105,13 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                                 None => return Err(SyscallError::InvalidState),
                             };
 
-                            try!(self.engine.borrow_mut().finalize(output_buffer.as_mut()));
+                            try!(try!(self.engine
+                                .map(|engine| engine.finalize(output_buffer.as_mut()))
+                                .ok_or(SyscallError::InternalError)));
 
                             Ok(0)
                         })
-                        .unwrap_or(Err(SyscallError::Unknown))
+                        .unwrap_or(Err(SyscallError::InternalError))
                 }
                 _ => Err(SyscallError::NotImplemented),
             }
@@ -122,7 +127,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                             app_data.input_buffer = Some(slice);
                             Ok(0)
                         })
-                        .unwrap_or(Err(SyscallError::Unknown))
+                        .unwrap_or(Err(SyscallError::InternalError))
                 }
                 1 => {
                     // Hash output buffer
@@ -131,7 +136,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                             app_data.output_buffer = Some(slice);
                             Ok(0)
                         })
-                        .unwrap_or(Err(SyscallError::Unknown))
+                        .unwrap_or(Err(SyscallError::InternalError))
                 }
                 _ => Err(SyscallError::NotImplemented),
             }
