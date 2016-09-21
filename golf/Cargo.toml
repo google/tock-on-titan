@@ -13,6 +13,6 @@ lto = true
 
 [dependencies]
 rust-libcore = "*"
-capsules = { git = "https://github.com/helena-project/tock" }
+capsules = { path = "../tock/capsules" }
 hotel = { path = "../hotel" }
-kernel = { git = "https://github.com/helena-project/tock" }
+kernel = { path = "../tock/kernel" }
