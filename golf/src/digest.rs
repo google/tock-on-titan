@@ -1,7 +1,7 @@
-use common::take_cell::TakeCell;
+use kernel::common::take_cell::TakeCell;
 use core::cell::Cell;
-use hil::digest::{DigestEngine, DigestMode};
-use main::{AppId, AppSlice, Container, Driver, Shared, SyscallError};
+use hotel::hil::digest::{DigestEngine, DigestMode, SyscallError};
+use kernel::{AppId, AppSlice, Container, Driver, Shared};
 
 /// Per-application driver data.
 pub struct AppData {
@@ -66,8 +66,9 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                 1 => {
                     self.apps
                         .enter(caller_id, |app_data, _| {
-                            if self.current_user.get() != Some(caller_id) {
-                                return Err(SyscallError::InvalidState);
+                            match self.current_user.get() {
+                                Some(cur) if cur.idx() == caller_id.idx() => {},
+                                _ => { return Err(SyscallError::InvalidState); }
                             }
 
                             let app_data: &mut AppData = app_data;
@@ -94,8 +95,9 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                 2 => {
                     self.apps
                         .enter(caller_id, |app_data, _| {
-                            if self.current_user.get() != Some(caller_id) {
-                                return Err(SyscallError::InvalidState);
+                            match self.current_user.get() {
+                                Some(cur) if cur.idx() == caller_id.idx() => {},
+                                _ => { return Err(SyscallError::InvalidState); }
                             }
 
                             let app_data: &mut AppData = app_data;

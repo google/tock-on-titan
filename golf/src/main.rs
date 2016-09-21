@@ -1,21 +1,19 @@
-#![crate_name = "golf"]
 #![no_std]
 #![no_main]
 #![feature(lang_items)]
 
-#[macro_use(static_init)]
-extern crate common;
-extern crate drivers;
+extern crate capsules;
 extern crate hotel;
-extern crate hil;
-extern crate main;
+#[macro_use(static_init)]
+extern crate kernel;
 
+pub mod digest;
 #[macro_use]
 pub mod io;
 
-use main::{Chip, MPU, Platform};
+use kernel::{Chip, MPU, Platform};
 
-unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'static>>] {
+unsafe fn load_processes() -> &'static mut [Option<kernel::process::Process<'static>>] {
     extern "C" {
         /// Beginning of the ROM region containing app images.
         static _sapps: u8;
@@ -26,7 +24,7 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
     #[link_section = ".app_memory"]
     static mut MEMORIES: [[u8; 8192]; NUM_PROCS] = [[0; 8192]; NUM_PROCS];
 
-    static mut processes: [Option<main::process::Process<'static>>; NUM_PROCS] = [None, None];
+    static mut processes: [Option<kernel::process::Process<'static>>; NUM_PROCS] = [None, None];
 
     let mut addr = &_sapps as *const u8;
     for i in 0..NUM_PROCS {
@@ -40,7 +38,7 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
 
         let process = &mut processes[i];
         let memory = &mut MEMORIES[i];
-        *process = Some(main::process::Process::create(addr, total_size, memory));
+        *process = Some(kernel::process::Process::create(addr, total_size, memory));
         // TODO: panic if loading failed?
 
         addr = addr.offset(total_size as isize);
@@ -54,10 +52,10 @@ unsafe fn load_processes() -> &'static mut [Option<main::process::Process<'stati
 }
 
 pub struct Golf {
-    console: &'static drivers::console::Console<'static, hotel::uart::UART>,
-    gpio: &'static drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
-    timer: &'static drivers::timer::TimerDriver<'static, hotel::timels::Timels>,
-    digest: &'static drivers::digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
+    console: &'static capsules::console::Console<'static, hotel::uart::UART>,
+    gpio: &'static capsules::gpio::GPIO<'static, hotel::gpio::Pin>,
+    timer: &'static capsules::timer::TimerDriver<'static, hotel::timels::Timels>,
+    digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
 }
 
 #[no_mangle]
@@ -92,10 +90,10 @@ pub unsafe fn reset_handler() {
     }
 
     let console = static_init!(
-        drivers::console::Console<'static, hotel::uart::UART>,
-        drivers::console::Console::new(&hotel::uart::UART0,
-                                       &mut drivers::console::WRITE_BUF,
-                                       main::container::Container::create()),
+        capsules::console::Console<'static, hotel::uart::UART>,
+        capsules::console::Console::new(&hotel::uart::UART0,
+                                       &mut capsules::console::WRITE_BUF,
+                                       kernel::container::Container::create()),
         24);
     hotel::uart::UART0.set_client(console);
     console.initialize();
@@ -106,25 +104,25 @@ pub unsafe fn reset_handler() {
         8);
 
     let gpio = static_init!(
-        drivers::gpio::GPIO<'static, hotel::gpio::Pin>,
-        drivers::gpio::GPIO::new(gpio_pins),
+        capsules::gpio::GPIO<'static, hotel::gpio::Pin>,
+        capsules::gpio::GPIO::new(gpio_pins),
         20);
     for pin in gpio_pins.iter() {
         pin.set_client(gpio)
     }
 
     let timer = static_init!(
-        drivers::timer::TimerDriver<'static, hotel::timels::Timels>,
-        drivers::timer::TimerDriver::new(
-            &hotel::timels::Timels0, main::container::Container::create()),
+        capsules::timer::TimerDriver<'static, hotel::timels::Timels>,
+        capsules::timer::TimerDriver::new(
+            &hotel::timels::Timels0, kernel::container::Container::create()),
         12);
     hotel::timels::Timels0.set_client(timer);
 
     let digest = static_init!(
-        drivers::digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
-        drivers::digest::DigestDriver::new(
+        digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
+        digest::DigestDriver::new(
                 &mut hotel::crypto::sha::KEYMGR0_SHA,
-                main::Container::create()),
+                kernel::Container::create()),
         16);
 
     let platform = static_init!(Golf, Golf {
@@ -152,12 +150,12 @@ pub unsafe fn reset_handler() {
     chip.mpu().enable_mpu();
 
 
-    main::main(platform, &mut chip, load_processes());
+    kernel::main(platform, &mut chip, load_processes());
 }
 
 impl Platform for Golf {
     fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R
-        where F: FnOnce(Option<&main::Driver>) -> R
+        where F: FnOnce(Option<&kernel::Driver>) -> R
     {
         match driver_num {
             0 => f(Some(self.console)),

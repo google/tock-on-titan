@@ -2,19 +2,18 @@
 name = "tango"
 version = "0.1.0"
 dependencies = [
- "common 0.1.0",
- "drivers 0.1.0",
- "hil 0.1.0",
+ "capsules 0.1.0 (git+https://github.com/helena-project/tock)",
  "hotel 0.1.0",
- "main 0.1.0",
+ "kernel 0.1.0 (git+https://github.com/helena-project/tock)",
  "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "support 0.1.0",
 ]
 
 [[package]]
-name = "common"
+name = "capsules"
 version = "0.1.0"
+source = "git+https://github.com/helena-project/tock#02de9a808ef8a177e8609c71ae6e1071275bafbd"
 dependencies = [
+ "kernel 0.1.0 (git+https://github.com/helena-project/tock)",
  "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -22,27 +21,7 @@ dependencies = [
 name = "cortexm3"
 version = "0.1.0"
 dependencies = [
- "common 0.1.0",
- "main 0.1.0",
- "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "drivers"
-version = "0.1.0"
-dependencies = [
- "common 0.1.0",
- "hil 0.1.0",
- "main 0.1.0",
- "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "hil"
-version = "0.1.0"
-dependencies = [
- "common 0.1.0",
- "main 0.1.0",
+ "kernel 0.1.0 (git+https://github.com/helena-project/tock)",
  "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -50,32 +29,21 @@ dependencies = [
 name = "hotel"
 version = "0.1.0"
 dependencies = [
- "common 0.1.0",
  "cortexm3 0.1.0",
- "hil 0.1.0",
- "main 0.1.0",
+ "kernel 0.1.0 (git+https://github.com/helena-project/tock)",
  "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "support 0.1.0",
 ]
 
 [[package]]
-name = "main"
+name = "kernel"
 version = "0.1.0"
+source = "git+https://github.com/helena-project/tock#02de9a808ef8a177e8609c71ae6e1071275bafbd"
 dependencies = [
- "common 0.1.0",
  "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "support 0.1.0",
 ]
 
 [[package]]
 name = "rust-libcore"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "support"
-version = "0.1.0"
-dependencies = [
- "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 

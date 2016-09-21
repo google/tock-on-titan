@@ -13,9 +13,6 @@ lto = true
 
 [dependencies]
 rust-libcore = "*"
-common = { path = "../../common" }
-drivers = { path = "../../drivers" }
-hil = { path = "../../hil" }
-hotel = { path = "../../chips/hotel" }
-main = { path = "../../main" }
-support = { path = "../../support" }
+capsules = { git = "https://github.com/helena-project/tock" }
+hotel = { path = "../hotel" }
+kernel = { git = "https://github.com/helena-project/tock" }
