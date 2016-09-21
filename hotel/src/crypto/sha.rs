@@ -1,4 +1,4 @@
-use common::volatile_cell::VolatileCell;
+use kernel::common::volatile_cell::VolatileCell;
 use core::mem;
 use hil::digest::{DigestEngine, DigestMode, DigestError};
 use super::KEYMGR0_BASE_ADDRESS;

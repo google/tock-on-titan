@@ -1,5 +1,5 @@
-use common::volatile_cell::VolatileCell;
-use main;
+use kernel::common::volatile_cell::VolatileCell;
+use kernel;
 
 pub struct SysTick {
     control: VolatileCell<u32>,
@@ -19,7 +19,7 @@ impl SysTick {
     }
 }
 
-impl main::SysTick for SysTick {
+impl kernel::SysTick for SysTick {
     fn set_timer(&self, us: u32) {
         let tenms = self.calibration.get() & 0xffffff;
         let reload = tenms * us / 10000;

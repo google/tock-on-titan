@@ -33,9 +33,9 @@
 //! TODO
 //!
 
-use common::take_cell::TakeCell;
-use common::volatile_cell::VolatileCell;
-use hil;
+use kernel::common::take_cell::TakeCell;
+use kernel::common::volatile_cell::VolatileCell;
+use kernel::hil;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 /// Registers for the UART controller

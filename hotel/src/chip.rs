@@ -1,6 +1,6 @@
 use cortexm3;
 use gpio;
-use main::Chip;
+use kernel::Chip;
 use timels;
 use uart;
 use usb;

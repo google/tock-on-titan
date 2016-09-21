@@ -1,5 +1,5 @@
-use common::volatile_cell::VolatileCell;
-use main;
+use kernel::common::volatile_cell::VolatileCell;
+use kernel;
 
 /// Indicates whether the MPU is present and, if so, how many regions it
 /// supports.
@@ -78,7 +78,7 @@ impl MPU {
     }
 }
 
-impl main::MPU for MPU {
+impl kernel::MPU for MPU {
     fn enable_mpu(&self) {
         let regs = unsafe { &*self.0 };
         regs.control.set(0b101);

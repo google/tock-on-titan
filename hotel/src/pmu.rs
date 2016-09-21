@@ -27,7 +27,7 @@
 //!     * Designed for 1.8-3.6V
 //!
 
-use common::volatile_cell::VolatileCell;
+use kernel::common::volatile_cell::VolatileCell;
 use core::mem::transmute;
 
 /// Registers for the Power Management Unit (PMU)

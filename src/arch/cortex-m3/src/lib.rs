@@ -3,8 +3,7 @@
 #![feature(asm,const_fn,naked_functions)]
 #![no_std]
 
-extern crate common;
-extern crate main;
+extern crate kernel;
 
 pub mod mpu;
 pub mod nvic;

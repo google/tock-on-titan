@@ -1,6 +1,6 @@
 //! Cortex-M3 NVIC
 
-use common::volatile_cell::VolatileCell;
+use kernel::common::volatile_cell::VolatileCell;
 
 #[repr(C, packed)]
 // Registers for the NVIC. Each

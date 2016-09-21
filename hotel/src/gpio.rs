@@ -1,8 +1,8 @@
-use common::take_cell::TakeCell;
-use common::volatile_cell::VolatileCell;
+use kernel::common::take_cell::TakeCell;
+use kernel::common::volatile_cell::VolatileCell;
 use core::cell::Cell;
 use core::mem::transmute;
-use hil::gpio::{Client, GPIOPin, InputMode, InterruptMode};
+use kernel::hil::gpio::{Client, GPIOPin, InputMode, InterruptMode};
 
 pub struct PortRegisters {
     pub data_in: VolatileCell<u32>,

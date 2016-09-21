@@ -1,4 +1,4 @@
-use common::volatile_cell::VolatileCell;
+use kernel::common::volatile_cell::VolatileCell;
 use core::ops::{BitAnd, BitOr};
 
 #[repr(C)]

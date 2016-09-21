@@ -5,5 +5,4 @@ authors = ["Amit Levy <amit@amitlevy.com>"]
 
 [dependencies]
 rust-libcore = "*"
-common = { path = "../../common" }
-main = { path = "../../main" }
+kernel = { git = "https://github.com/helena-project/tock" }

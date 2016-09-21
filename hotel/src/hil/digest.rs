@@ -1,4 +1,4 @@
-use main::SyscallError;
+//use main::SyscallError;
 
 #[derive(Copy, Clone)]
 pub enum DigestMode {
@@ -26,7 +26,7 @@ pub enum DigestError {
     BufferTooSmall(usize),
 }
 
-impl From<DigestError> for SyscallError {
+/*impl From<DigestError> for SyscallError {
     fn from(e: DigestError) -> Self {
         match e {
             DigestError::EngineNotSupported => SyscallError::NotImplemented,
@@ -34,7 +34,7 @@ impl From<DigestError> for SyscallError {
             DigestError::BufferTooSmall(_) => SyscallError::OutOfRange,
         }
     }
-}
+}*/
 
 pub trait DigestEngine {
     /// Initializes the digest engine for the given mode.

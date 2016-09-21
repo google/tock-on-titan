@@ -4,10 +4,7 @@
 #![feature(asm,associated_consts,core_intrinsics,const_fn)]
 
 extern crate cortexm3;
-extern crate common;
-extern crate hil;
-extern crate main;
-extern crate support;
+extern crate kernel;
 
 #[macro_use]
 pub mod io;
@@ -15,6 +12,7 @@ pub mod io;
 pub mod chip;
 pub mod crypto;
 pub mod gpio;
+pub mod hil;
 pub mod pinmux;
 pub mod pmu;
 pub mod timels;

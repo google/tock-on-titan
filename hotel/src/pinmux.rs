@@ -1,4 +1,4 @@
-use common::volatile_cell::VolatileCell;
+use kernel::common::volatile_cell::VolatileCell;
 
 pub struct Pin {
     pub select: VolatileCell<Function>,

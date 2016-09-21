@@ -1,4 +1,4 @@
-use common::take_cell::TakeCell;
+use kernel::common::take_cell::TakeCell;
 use core::cell::Cell;
 use core::ops::Deref;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
@@ -872,7 +872,7 @@ impl USB {
         // Power on programming done
         self.registers.device_control.set(self.registers.device_control.get() | 1 << 11);
         for _ in 0..10000 {
-            ::support::nop();
+            ::kernel::support::nop();
         }
         self.registers.device_control.set(self.registers.device_control.get() & !(1 << 11));
 
