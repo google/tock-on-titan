@@ -1,8 +1,9 @@
 #include <firestorm.h>
 #include <gpio.h>
-#include <digest.h>
 #include <string.h>
 #include <stdio.h>
+
+#include "digest.h"
 
 // TODO: Kernel bug? can't `allow` const data
 static /*const*/ char input_data[] = "Hello World!\n";
