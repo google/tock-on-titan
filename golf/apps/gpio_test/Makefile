@@ -1,7 +1,7 @@
 CURRENT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 TOCK_ARCH ?= cortex-m3
-TOCK_BASE_DIR = $(CURRENT_DIR)/../../tock/userland
+TOCK_BASE_DIR = $(CURRENT_DIR)/../../../tock/userland
 BUILDDIR ?= $(CURRENT_DIR)/build/$(TOCK_ARCH)
 
 C_SRCS   := $(wildcard *.c)

@@ -1,5 +1,5 @@
 MEMORY {
-        rom (rx): ORIGIN = 0x44400 LENGTH = 60K
+        rom (rx): ORIGIN = 0x44400 LENGTH = 256K
         ram (w):  ORIGIN = 0x10000 LENGTH = 64K
 }
 __stack_size__ = DEFINED(__stack_size__) ? __stack_size__ : 0x1000;
@@ -9,11 +9,14 @@ SECTIONS {
     KEEP(*(.irqs))
     *(.text)
     *(.ARM.extab* .gnu.linkonce.armextab.*)
+  } > rom
 
-    . = ALIGN(8K);
+  .apps 0x54000 :
+  {
     _sapps = .;
     KEEP(*(.app.*))
     LONG(0) /* Marks the end of the app list with a sentinel value. */
+    . = 64K;
   } > rom
 
   /* .ARM.exidx is sorted, so has to go in its own output section.  */
