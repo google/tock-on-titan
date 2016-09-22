@@ -39,8 +39,7 @@ pub unsafe extern "C" fn systick_handler() {
 
 #[no_mangle]
 #[naked]
-/// All ISRs are caught by this handler which indirects to a custom handler by
-/// indexing into `INTERRUPT_TABLE` based on the ISR number.
+/// All ISRs are caught by this handler
 pub unsafe extern "C" fn generic_isr() {
     asm!("
     /* Skip saving process state if not coming from user-space */
@@ -52,6 +51,13 @@ pub unsafe extern "C" fn generic_isr() {
     /* Push non-hardware-stacked registers onto Process stack */
     /* r0 points to user stack (see to_kernel) */
     stmdb r0, {r4-r11}
+
+    /* Set thread mode to privileged */
+    mov r0, #0
+    msr CONTROL, r0
+
+    movw LR, #0xFFF9
+    movt LR, #0xFFFF
 _ggeneric_isr_no_stacking:
     /* Find the ISR number by looking at the low byte of the IPSR registers */
     mrs r0, IPSR
@@ -59,23 +65,22 @@ _ggeneric_isr_no_stacking:
     /* ISRs start at 16, so substract 16 to get zero-indexed */
     sub r0, #16
 
-    /* INTERRUPT_TABLE contains function pointers, which are word sized, so
-     * multiply by 4 (the word size) */
-    lsl r0, r0, #2
+    /* r1 = NVIC.ICER[r0 / 32] */
+    mov r1, #0xe180
+    movt r1, #0xe000
+    lsr r2, r0, #5
+    mov r3, #4
+    mul r2, r3
+    add r1, r2
 
-    ldr r1, =INTERRUPT_TABLE
-    ldr r0, [r1, r0]
+    /* r2 = 1 << (r0 & 31) */
+    mov r2, #1
+    mov r3, #31
+    and r3, r0
+    lsl r2, r2, r3
 
-    push {lr}
-    blx r0
-    pop {lr}
-
-    /* Set thread mode to privileged */
-    mov r0, #0
-    msr CONTROL, r0
-
-    movw LR, #0xFFF9
-    movt LR, #0xFFFF");
+    /* *r1 = r2 */
+    str r2, [r1, #0]");
 }
 
 #[no_mangle]

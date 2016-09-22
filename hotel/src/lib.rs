@@ -20,8 +20,6 @@ pub mod timeus;
 pub mod uart;
 pub mod usb;
 
-pub mod interrupts;
-
 unsafe extern "C" fn unhandled_interrupt() {
     let mut interrupt_number: u32;
 
