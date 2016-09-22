@@ -1,7 +1,7 @@
 APP ?= blink
 TOCK_ARCH = cortex-m3
 
-all: target/target/release/golf-$(APP)-full
+all: target/target/release/golf-$(APP)
 
 .PHONY: target/target/release/golf
 target/target/release/golf:
