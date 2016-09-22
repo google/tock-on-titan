@@ -1,0 +1,11 @@
+[package]
+name = "hotel"
+version = "0.1.0"
+authors = ["Amit Levy <amit@amitlevy.com>"]
+
+build = "build.rs"
+
+[dependencies]
+rust-libcore = "*"
+kernel = { path = "../tock/kernel" }
+cortexm3 = { path = "../cortex-m3" }
