@@ -107,6 +107,8 @@ impl EpCtl {
     pub const ENABLE: EpCtl = EpCtl(1 << 31);
     /// Clear endpoint NAK
     pub const CNAK: EpCtl = EpCtl(1 << 26);
+    /// Stall endpoint
+    pub const STALL: EpCtl = EpCtl(1 << 21);
 }
 
 impl BitOr for EpCtl {

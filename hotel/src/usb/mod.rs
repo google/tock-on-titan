@@ -220,9 +220,9 @@ impl USB {
             .set(self.registers.device_all_ep_interrupt_mask.get() & !1);
 
         // Enable OUT endpoint 0 and clear NAK bit
-        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
         self.flush_tx_fifo(0);
-        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
     }
 
     /// Call when a full packet has been received on EP0 OUT.
