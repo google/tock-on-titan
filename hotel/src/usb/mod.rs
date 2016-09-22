@@ -1,6 +1,6 @@
-use kernel::common::take_cell::TakeCell;
 use core::cell::Cell;
 use core::ops::Deref;
+use kernel::common::take_cell::TakeCell;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 mod constants;

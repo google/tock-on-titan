@@ -1,5 +1,5 @@
-use kernel::common::volatile_cell::VolatileCell;
 use kernel;
+use kernel::common::volatile_cell::VolatileCell;
 
 /// Indicates whether the MPU is present and, if so, how many regions it
 /// supports.

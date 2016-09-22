@@ -1,5 +1,5 @@
-use kernel::common::volatile_cell::VolatileCell;
 use core::mem;
+use kernel::common::volatile_cell::VolatileCell;
 
 #[repr(u32)]
 #[derive(PartialEq, Eq)]

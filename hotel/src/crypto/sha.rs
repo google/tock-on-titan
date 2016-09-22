@@ -1,6 +1,6 @@
-use kernel::common::volatile_cell::VolatileCell;
 use core::mem;
 use hil::digest::{DigestEngine, DigestMode, DigestError};
+use kernel::common::volatile_cell::VolatileCell;
 use super::KEYMGR0_BASE_ADDRESS;
 
 #[repr(C)]
