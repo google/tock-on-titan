@@ -18,4 +18,5 @@ script:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
       find -path ./extern -prune -o -name '*.rs' -exec rustfmt --write-mode=diff {} +; fi
   - make -C golf
+  - make -C golf2
 
