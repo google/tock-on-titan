@@ -30,7 +30,7 @@ pub struct AesRegisters {
 
     _padding_010: [u8; 0x002c - 0x0010], // 0x002c
 
-    pub key: [VolatileCell<u8>; 8 * 4], // 0x002c
+    pub key: [VolatileCell<u32>; 8], // 0x002c
     pub key_start: VolatileCell<u32>, // 0x004c
     pub ctr: [VolatileCell<u32>; 4], // 0x0050
     pub rand_stall_ctl: VolatileCell<u32>, // 0x0060
