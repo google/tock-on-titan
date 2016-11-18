@@ -1,32 +1,7 @@
 use core::mem;
 use hil::digest::{DigestEngine, DigestMode, DigestError};
 use kernel::common::volatile_cell::VolatileCell;
-use super::KEYMGR0_BASE_ADDRESS;
-
-#[repr(C)]
-struct Registers {
-    cfg_msglen_lo: VolatileCell<u32>, // 0x400
-    cfg_msglen_hi: VolatileCell<u32>, // 0x404
-    cfg_en: VolatileCell<u32>, // 0x408
-    cfg_wr_en: VolatileCell<u32>, // 0x40C
-    trig: VolatileCell<u32>, // 0x410
-    _padding_414: [u8; 0x440 - 0x414], // 0x414
-    input_fifo: VolatileCell<u32>, // 0x440
-    sts_h: [VolatileCell<u32>; 8], // 0x444
-    key_w: [VolatileCell<u32>; 8], // 0x464
-    sts: VolatileCell<u32>, // 0x484
-    itcr: VolatileCell<u32>, // 0x488
-    itop: VolatileCell<u32>, // 0x48C
-    use_hidden_key: VolatileCell<u32>, // 0x490
-    use_cert: VolatileCell<u32>, // 0x494
-    cert_override: VolatileCell<u32>, // 0x498
-    rand_stall_ctl: VolatileCell<u32>, // 0x49C
-    execute_count_state: VolatileCell<u32>, // 0x4A0
-    execute_count_max: VolatileCell<u32>, // 0x4A4
-    cert_revoke_ctrl: [VolatileCell<u32>; 3], // 0x4A8
-}
-
-const KEYMGR0_SHA_REGS: *mut Registers = (KEYMGR0_BASE_ADDRESS + 0x400) as *mut Registers;
+use super::keymgr::{KEYMGR0_REGS, Registers};
 
 #[allow(unused)]
 enum ShaTrigMask {
@@ -63,11 +38,11 @@ impl ShaEngine {
     }
 }
 
-pub static mut KEYMGR0_SHA: ShaEngine = unsafe { ShaEngine::new(KEYMGR0_SHA_REGS) };
+pub static mut KEYMGR0_SHA: ShaEngine = unsafe { ShaEngine::new(KEYMGR0_REGS) };
 
 impl DigestEngine for ShaEngine {
     fn initialize(&mut self, mode: DigestMode) -> Result<(), DigestError> {
-        let regs = unsafe { &*self.regs };
+        let ref regs = unsafe { &*self.regs }.sha;
 
         // Compile-time check for DigestMode exhaustiveness
         match mode {
@@ -91,7 +66,7 @@ impl DigestEngine for ShaEngine {
     }
 
     fn update(&mut self, data: &[u8]) -> Result<usize, DigestError> {
-        let regs = unsafe { &*self.regs };
+        let ref regs = unsafe { &*self.regs }.sha;
 
         if self.current_mode.is_none() {
             return Err(DigestError::NotConfigured);
@@ -108,7 +83,7 @@ impl DigestEngine for ShaEngine {
     }
 
     fn finalize(&mut self, output: &mut [u8]) -> Result<usize, DigestError> {
-        let regs = unsafe { &*self.regs };
+        let ref regs = unsafe { &*self.regs }.sha;
 
         let expected_output_size = match self.current_mode {
             None => return Err(DigestError::NotConfigured),
