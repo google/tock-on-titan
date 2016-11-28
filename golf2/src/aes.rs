@@ -6,9 +6,6 @@ use kernel::{AppId, Callback, Driver, Container, Shared, AppSlice};
 
 #[derive(Default)]
 struct Callbacks {
-    wfifo_overflow: Option<Callback>,
-    rfifo_overflow: Option<Callback>,
-    rfifo_underflow: Option<Callback>,
     done_cipher: Option<Callback>,
     done_key_expansion: Option<Callback>,
     done_wipe_secrets: Option<Callback>,
@@ -40,11 +37,6 @@ impl<'a> AesDriver<'a> {
     fn setup(&self, caller_id: AppId, key_size: usize) -> Result<isize, SyscallError> {
         self.apps
             .enter(caller_id, |app_data, _| {
-                if self.current_user.get().is_some() {
-                    return Err(SyscallError::ResourceBusy);
-                }
-                self.current_user.set(Some(caller_id));
-
                 let key_size = match key_size {
                     0 => KeySize::KeySize128,
                     1 => KeySize::KeySize192,
@@ -56,6 +48,11 @@ impl<'a> AesDriver<'a> {
                     Some(ref slice) => slice,
                     None => return Err(SyscallError::InvalidArgument),
                 };
+
+                if self.current_user.get().is_some() {
+                    return Err(SyscallError::ResourceBusy);
+                }
+                self.current_user.set(Some(caller_id));
 
                 try!(self.device
                     .setup(key_size, key.as_ref())
@@ -71,7 +68,7 @@ impl<'a> AesDriver<'a> {
             .enter(caller_id, |_, _| {
                 match self.current_user.get() {
                     Some(cur) if cur.idx() == caller_id.idx() => {}
-                    _ => return Err(SyscallError::InvalidState),
+                    _ => return Err(SyscallError::ResourceBusy),
                 }
 
                 try!(self.device
@@ -145,31 +142,28 @@ impl<'a> AesDriver<'a> {
     }
 
     fn register(&self, interrupt: Interrupt, callback: Callback) -> isize {
-        let _ = self.apps.enter(callback.app_id(), |app_data, _| {
-            let ref mut cb = app_data.callbacks;
-            match interrupt {
-                Interrupt::WFIFOOverflow => cb.wfifo_overflow = Some(callback),
-                Interrupt::RFIFOOverflow => cb.rfifo_overflow = Some(callback),
-                Interrupt::RFIFOUnderflow => cb.rfifo_underflow = Some(callback),
-                Interrupt::DoneCipher => cb.done_cipher = Some(callback),
-                Interrupt::DoneKeyExpansion => cb.done_key_expansion = Some(callback),
-                Interrupt::DoneWipeSecrets => cb.done_wipe_secrets = Some(callback),
-            }
-        });
+        self.apps
+            .enter(callback.app_id(), |app_data, _| {
+                let ref mut cb = app_data.callbacks;
+                match interrupt {
+                    Interrupt::DoneCipher => cb.done_cipher = Some(callback),
+                    Interrupt::DoneKeyExpansion => cb.done_key_expansion = Some(callback),
+                    Interrupt::DoneWipeSecrets => cb.done_wipe_secrets = Some(callback),
+                    _ => return -1,
+                }
 
-        0
+                0
+            })
+            .unwrap_or(-1)
     }
 }
 
 impl<'a> Driver for AesDriver<'a> {
     fn subscribe(&self, subscribe_num: usize, callback: Callback) -> isize {
         match subscribe_num {
-            0 => self.register(Interrupt::WFIFOOverflow, callback),
-            1 => self.register(Interrupt::RFIFOOverflow, callback),
-            2 => self.register(Interrupt::RFIFOUnderflow, callback),
-            3 => self.register(Interrupt::DoneCipher, callback),
-            4 => self.register(Interrupt::DoneKeyExpansion, callback),
-            5 => self.register(Interrupt::DoneWipeSecrets, callback),
+            0 => self.register(Interrupt::DoneCipher, callback),
+            1 => self.register(Interrupt::DoneKeyExpansion, callback),
+            2 => self.register(Interrupt::DoneWipeSecrets, callback),
 
             _ => -1,
         }
@@ -242,27 +236,6 @@ impl<'a> AesClient for AesDriver<'a> {
         self.current_user.get().map(|current_user| {
             let _ = self.apps.enter(current_user, |app_data, _| {
                 app_data.callbacks.done_wipe_secrets.map(|mut cb| cb.schedule(0, 0, 0));
-            });
-        });
-    }
-    fn rfifo_overflow(&self) {
-        self.current_user.get().map(|current_user| {
-            let _ = self.apps.enter(current_user, |app_data, _| {
-                app_data.callbacks.rfifo_overflow.map(|mut cb| cb.schedule(0, 0, 0));
-            });
-        });
-    }
-    fn rfifo_underflow(&self) {
-        self.current_user.get().map(|current_user| {
-            let _ = self.apps.enter(current_user, |app_data, _| {
-                app_data.callbacks.rfifo_underflow.map(|mut cb| cb.schedule(0, 0, 0));
-            });
-        });
-    }
-    fn wfifo_overflow(&self) {
-        self.current_user.get().map(|current_user| {
-            let _ = self.apps.enter(current_user, |app_data, _| {
-                app_data.callbacks.wfifo_overflow.map(|mut cb| cb.schedule(0, 0, 0));
             });
         });
     }

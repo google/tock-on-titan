@@ -49,8 +49,8 @@ impl AesEngine {
         let flag = aes::Mode::Encrypt as u32;
         if encrypt {
             regs.ctrl.set(regs.ctrl.get() | flag);
-        } else if regs.ctrl.get() & flag != 0 {
-            regs.ctrl.set(regs.ctrl.get() ^ flag);
+        } else {
+            regs.ctrl.set(regs.ctrl.get() & !flag);
         }
 
         Ok(0)
@@ -87,20 +87,20 @@ impl AesEngine {
 
         let mut i = 0;
         while regs.rfifo_empty.get() == 0 {
-            if output.len() > i * 4 + 3 {
+            if output.len() > i + 3 {
                 let word = regs.rfifo_data.get();
-                output[i * 4 + 0] = (word >> 0) as u8;
-                output[i * 4 + 1] = (word >> 8) as u8;
-                output[i * 4 + 2] = (word >> 16) as u8;
-                output[i * 4 + 3] = (word >> 24) as u8;
-                i += 1;
+                output[i + 0] = (word >> 0) as u8;
+                output[i + 1] = (word >> 8) as u8;
+                output[i + 2] = (word >> 16) as u8;
+                output[i + 3] = (word >> 24) as u8;
+                i += 4;
             } else {
                 println!("Can't read any more data");
                 break;
             }
         }
 
-        Ok(i * 4)
+        Ok(i)
     }
 
     pub fn enable_all_interrupts(&self) {
@@ -138,12 +138,10 @@ impl AesEngine {
     pub fn handle_interrupt(&self, interrupt: u32) {
         if let ParsedInterrupt::Found(int) = interrupt.into() {
             self.client.get().map(|client| match int {
-                Interrupt::WFIFOOverflow => client.wfifo_overflow(),
-                Interrupt::RFIFOOverflow => client.rfifo_overflow(),
-                Interrupt::RFIFOUnderflow => client.rfifo_underflow(),
                 Interrupt::DoneCipher => client.done_cipher(),
                 Interrupt::DoneKeyExpansion => client.done_key_expansion(),
                 Interrupt::DoneWipeSecrets => client.done_wipe_secrets(),
+                _ => println!("Interrupt {:?} fired", int),
             });
             self.clear_interrupt(int);
         } else {

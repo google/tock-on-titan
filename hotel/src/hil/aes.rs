@@ -75,7 +75,4 @@ pub trait AesClient {
     fn done_cipher(&self);
     fn done_key_expansion(&self);
     fn done_wipe_secrets(&self);
-    fn rfifo_overflow(&self);
-    fn rfifo_underflow(&self);
-    fn wfifo_overflow(&self);
 }
