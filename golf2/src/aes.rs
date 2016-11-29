@@ -44,10 +44,30 @@ impl<'a> AesDriver<'a> {
                     _ => return Err(SyscallError::InvalidArgument),
                 };
 
-                let key = match app_data.key {
+                let raw_key = match app_data.key {
                     Some(ref slice) => slice,
                     None => return Err(SyscallError::InvalidArgument),
                 };
+
+                match (key_size, raw_key.len()) {
+                    (KeySize::KeySize128, 16) => {}
+                    (KeySize::KeySize192, 24) => {}
+                    (KeySize::KeySize256, 32) => {}
+                    _ => {
+                        println!("Key size is wrong. Given {}, expected {:?}",
+                                 raw_key.len() * 8,
+                                 key_size);
+                        return Err(SyscallError::InvalidArgument);
+                    }
+                }
+
+                let mut key = [0; 8];
+                for (i, word) in raw_key.as_ref().chunks(4).enumerate() {
+                    key[i] = word.iter()
+                        .map(|b| *b as u32)
+                        .enumerate()
+                        .fold(0, |accm, (i, byte)| accm | (byte << (i * 8)));
+                }
 
                 if self.current_user.get().is_some() {
                     return Err(SyscallError::ResourceBusy);
@@ -55,9 +75,8 @@ impl<'a> AesDriver<'a> {
                 self.current_user.set(Some(caller_id));
 
                 try!(self.device
-                    .setup(key_size, key.as_ref())
+                    .setup(key_size, &key)
                     .map_err(|_| SyscallError::InternalError));
-
                 Ok(0)
             })
             .unwrap_or(Err(SyscallError::InternalError))

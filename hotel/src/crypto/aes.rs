@@ -20,23 +20,14 @@ impl AesEngine {
         self.client.set(Some(client));
     }
 
-    pub fn setup(&self, key_size: aes::KeySize, key: &[u8]) -> Result<isize, SyscallError> {
+    pub fn setup(&self, key_size: aes::KeySize, key: &[u32; 8]) -> Result<isize, SyscallError> {
         let ref regs = unsafe { &*self.regs }.aes;
 
         self.enable_all_interrupts();
         regs.ctrl.set(regs.ctrl.get() | key_size as u32 | AesModule::Enable as u32);
-        let mut i = 0;
-        for word in key.chunks(4) {
-            if i >= 8 {
-                println!("Input key too long!");
-                return Err(SyscallError::InvalidState);
-            }
-            let d = word.iter()
-                .map(|b| *b as u32)
-                .enumerate()
-                .fold(0, |accm, (i, byte)| accm | (byte << (i * 8)));
-            regs.key[i].set(d);
-            i += 1;
+
+        for (i, word) in key.iter().enumerate() {
+            regs.key[i].set(*word);
         }
         regs.key_start.set(1);
 
