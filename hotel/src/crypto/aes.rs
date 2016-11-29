@@ -1,6 +1,5 @@
 use core::cell::Cell;
 use hil::aes::{self, AesClient, Interrupt, AesModule, ParsedInterrupt};
-use hil::common::SyscallError;
 use super::keymgr::{KEYMGR0_REGS, Registers};
 
 pub struct AesEngine {
@@ -20,7 +19,7 @@ impl AesEngine {
         self.client.set(Some(client));
     }
 
-    pub fn setup(&self, key_size: aes::KeySize, key: &[u32; 8]) -> Result<isize, SyscallError> {
+    pub fn setup(&self, key_size: aes::KeySize, key: &[u32; 8]) {
         let ref regs = unsafe { &*self.regs }.aes;
 
         self.enable_all_interrupts();
@@ -30,11 +29,9 @@ impl AesEngine {
             regs.key[i].set(*word);
         }
         regs.key_start.set(1);
-
-        Ok(0)
     }
 
-    pub fn set_encrypt_mode(&self, encrypt: bool) -> Result<isize, SyscallError> {
+    pub fn set_encrypt_mode(&self, encrypt: bool) {
         let ref regs = unsafe { &*self.regs }.aes;
 
         let flag = aes::Mode::Encrypt as u32;
@@ -43,11 +40,9 @@ impl AesEngine {
         } else {
             regs.ctrl.set(regs.ctrl.get() & !flag);
         }
-
-        Ok(0)
     }
 
-    pub fn crypt(&self, input: &[u8]) -> Result<isize, SyscallError> {
+    pub fn crypt(&self, input: &[u8]) -> usize {
         let ref regs = unsafe { &*self.regs }.aes;
 
         let mut written_bytes = 0;
@@ -61,7 +56,7 @@ impl AesEngine {
                 .enumerate()
                 .fold(0, |accm, (i, byte)| accm | (byte << (i * 8)));
             regs.wfifo_data.set(d);
-            written_bytes += word.len() as isize;
+            written_bytes += word.len();
             written_words += 1;
         }
 
@@ -70,10 +65,10 @@ impl AesEngine {
             regs.wfifo_data.set(0);
         }
 
-        Ok(written_bytes)
+        written_bytes
     }
 
-    pub fn read_data(&self, output: &mut [u8]) -> Result<usize, SyscallError> {
+    pub fn read_data(&self, output: &mut [u8]) -> usize {
         let ref regs = unsafe { &*self.regs }.aes;
 
         let mut i = 0;
@@ -91,7 +86,7 @@ impl AesEngine {
             }
         }
 
-        Ok(i)
+        i
     }
 
     pub fn enable_all_interrupts(&self) {
@@ -103,14 +98,12 @@ impl AesEngine {
         self.enable_interrupt(Interrupt::DoneWipeSecrets);
     }
 
-    pub fn finish(&self) -> Result<usize, SyscallError> {
+    pub fn finish(&self) {
         let ref regs = unsafe { &*self.regs }.aes;
 
         regs.int_enable.set(0);
         regs.ctrl.set(0);
         regs.wipe_secrets.set(1);
-
-        Ok(0)
     }
 
     pub fn enable_interrupt(&self, interrupt: Interrupt) {

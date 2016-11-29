@@ -74,9 +74,8 @@ impl<'a> AesDriver<'a> {
                 }
                 self.current_user.set(Some(caller_id));
 
-                try!(self.device
-                    .setup(key_size, &key)
-                    .map_err(|_| SyscallError::InternalError));
+                self.device.setup(key_size, &key);
+
                 Ok(0)
             })
             .unwrap_or(Err(SyscallError::InternalError))
@@ -90,9 +89,7 @@ impl<'a> AesDriver<'a> {
                     _ => return Err(SyscallError::ResourceBusy),
                 }
 
-                try!(self.device
-                    .set_encrypt_mode(do_encrypt != 0)
-                    .map_err(|_| SyscallError::InternalError));
+                self.device.set_encrypt_mode(do_encrypt != 0);
 
                 Ok(0)
             })
@@ -112,11 +109,7 @@ impl<'a> AesDriver<'a> {
                     None => return Err(SyscallError::InvalidArgument),
                 };
 
-                let size = try!(self.device
-                    .crypt(input_buffer.as_ref())
-                    .map_err(|_| SyscallError::InternalError));
-
-                Ok(size as isize)
+                Ok(self.device.crypt(input_buffer.as_ref()) as isize)
             })
             .unwrap_or(Err(SyscallError::InternalError))
     }
@@ -134,11 +127,7 @@ impl<'a> AesDriver<'a> {
                     None => return Err(SyscallError::InvalidState),
                 };
 
-                let size = try!(self.device
-                    .read_data(output_buffer.as_mut())
-                    .map_err(|_| SyscallError::InternalError));
-
-                Ok(size as isize)
+                Ok(self.device.read_data(output_buffer.as_mut()) as isize)
             })
             .unwrap_or(Err(SyscallError::InternalError))
     }
@@ -153,7 +142,7 @@ impl<'a> AesDriver<'a> {
 
                 self.current_user.set(None);
 
-                try!(self.device.finish().map_err(|_| SyscallError::InternalError));
+                self.device.finish();
 
                 Ok(0)
             })
