@@ -7,9 +7,11 @@ extern crate hotel;
 #[macro_use(static_init)]
 extern crate kernel;
 
-pub mod digest;
 #[macro_use]
 pub mod io;
+
+pub mod digest;
+pub mod aes;
 
 use kernel::{Chip, MPU, Platform};
 
@@ -56,6 +58,7 @@ pub struct Golf {
     gpio: &'static capsules::gpio::GPIO<'static, hotel::gpio::Pin>,
     timer: &'static capsules::timer::TimerDriver<'static, hotel::timels::Timels>,
     digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
+    aes: &'static aes::AesDriver<'static>,
 }
 
 #[no_mangle]
@@ -127,12 +130,19 @@ pub unsafe fn reset_handler() {
                 kernel::Container::create()),
         16);
 
+    let aes = static_init!(
+        aes::AesDriver,
+        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel::Container::create()),
+        16);
+    hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
+
     let platform = static_init!(Golf, Golf {
         console: console,
         gpio: gpio,
         timer: timer,
         digest: digest,
-    }, 16);
+        aes: aes,
+    }, 20);
 
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
@@ -164,6 +174,7 @@ impl Platform for Golf {
             1 => f(Some(self.gpio)),
             2 => f(Some(self.digest)),
             3 => f(Some(self.timer)),
+            4 => f(Some(self.aes)),
             _ => f(None),
         }
     }

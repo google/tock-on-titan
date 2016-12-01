@@ -1,5 +1,6 @@
 use core::cell::Cell;
-use hotel::hil::digest::{DigestEngine, DigestMode, SyscallError};
+use hotel::hil::common::SyscallError;
+use hotel::hil::digest::{DigestEngine, DigestMode};
 use kernel::{AppId, AppSlice, Container, Driver, Shared};
 use kernel::common::take_cell::TakeCell;
 
