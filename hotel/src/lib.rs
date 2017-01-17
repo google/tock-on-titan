@@ -17,6 +17,7 @@ pub mod pinmux;
 pub mod pmu;
 pub mod timels;
 pub mod timeus;
+pub mod trng;
 pub mod uart;
 pub mod usb;
 

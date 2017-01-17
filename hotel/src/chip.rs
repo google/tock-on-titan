@@ -3,6 +3,7 @@ use crypto;
 use gpio;
 use kernel::Chip;
 use timels;
+use trng;
 use uart;
 use usb;
 
@@ -39,6 +40,8 @@ impl Chip for Hotel {
 
                     159 => timels::Timels0.handle_interrupt(),
                     160 => timels::Timels1.handle_interrupt(),
+
+                    169 => trng::TRNG0.handle_interrupt(),
 
                     174 => uart::UART0.handle_rx_interrupt(),
                     177 => uart::UART0.handle_tx_interrupt(),
