@@ -8,6 +8,9 @@ SECTIONS {
     KEEP(*(.vectors))
     KEEP(*(.irqs))
     *(.text)
+    /* codesigner needs start to be defined.
+     * add 1 to set bit 0 (T-bit/Thumb mode). */
+    start = reset_handler + 1;
     *(.ARM.extab* .gnu.linkonce.armextab.*)
   } > rom
 
