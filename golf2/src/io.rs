@@ -1,11 +1,11 @@
 use core::fmt::*;
-use hotel;
+//use hotel;
 
 pub struct Writer;
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        unsafe {
+/*        unsafe {
             let uart = &hotel::uart::UART0;
 
             static mut initialized: bool = false;
@@ -20,9 +20,10 @@ impl Write for Writer {
             }
 
             uart.send_bytes_sync(s.as_bytes());
-
             Ok(())
         }
+         */
+        Ok(())
     }
 }
 

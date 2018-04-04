@@ -1,15 +1,15 @@
 use cortexm3;
-use crypto;
+//use crypto;
 use gpio;
 use kernel::Chip;
 use timels;
-use trng;
-use uart;
-use usb;
+//use trng;
+//use uart;
+//use usb;
 
 pub struct Hotel {
     mpu: cortexm3::mpu::MPU,
-    systick: &'static cortexm3::systick::SysTick,
+    systick: cortexm3::systick::SysTick,
 }
 
 impl Hotel {
@@ -33,7 +33,7 @@ impl Chip for Hotel {
         unsafe {
             while let Some(nvic_num) = cortexm3::nvic::next_pending() {
                 match nvic_num {
-                    104...109 => crypto::aes::KEYMGR0_AES.handle_interrupt(nvic_num),
+//                    104...109 => crypto::aes::KEYMGR0_AES.handle_interrupt(nvic_num),
 
                     110 => (), // KEYMGR0_DSHA_INT, currently polled
                     111 => (), // KEYMGR0_SHA_WFIFO_FULL
@@ -41,16 +41,16 @@ impl Chip for Hotel {
                     159 => timels::Timels0.handle_interrupt(),
                     160 => timels::Timels1.handle_interrupt(),
 
-                    169 => trng::TRNG0.handle_interrupt(),
+//                    169 => trng::TRNG0.handle_interrupt(),
 
-                    174 => uart::UART0.handle_rx_interrupt(),
-                    177 => uart::UART0.handle_tx_interrupt(),
-                    181 => uart::UART1.handle_rx_interrupt(),
-                    184 => uart::UART1.handle_tx_interrupt(),
-                    188 => uart::UART2.handle_rx_interrupt(),
-                    191 => uart::UART2.handle_tx_interrupt(),
+//                    174 => uart::UART0.handle_rx_interrupt(),
+//                    177 => uart::UART0.handle_tx_interrupt(),
+//                    181 => uart::UART1.handle_rx_interrupt(),
+//                    184 => uart::UART1.handle_tx_interrupt(),
+//                    188 => uart::UART2.handle_rx_interrupt(),
+//                    191 => uart::UART2.handle_tx_interrupt(),
 
-                    193 => usb::USB0.handle_interrupt(),
+//                    193 => usb::USB0.handle_interrupt(),
 
                     pin @ 65...80 => {
                         gpio::PORT0.pins[(pin - 65) as usize].handle_interrupt();

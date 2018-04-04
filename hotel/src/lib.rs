@@ -10,16 +10,16 @@ extern crate kernel;
 pub mod io;
 
 pub mod chip;
-pub mod crypto;
+//pub mod crypto;
 pub mod gpio;
 pub mod hil;
 pub mod pinmux;
 pub mod pmu;
 pub mod timels;
 pub mod timeus;
-pub mod trng;
-pub mod uart;
-pub mod usb;
+//pub mod trng;
+//pub mod uart;
+//pub mod usb;
 
 unsafe extern "C" fn unhandled_interrupt() {
     let mut interrupt_number: u32;

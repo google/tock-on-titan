@@ -1,7 +1,6 @@
 use core::cell::Cell;
-use kernel::common::take_cell::TakeCell;
 use kernel::common::volatile_cell::VolatileCell;
-use kernel::hil::alarm::{Alarm, AlarmClient, Frequency};
+use kernel::hil::time::{self, Alarm, Frequency};
 
 const TIMELS0_BASE: *const Registers = 0x40540000 as *const Registers;
 const TIMELS1_BASE: *const Registers = 0x40540040 as *const Registers;
@@ -23,23 +22,23 @@ struct Registers {
     pub interrupt_wakeup_ack: VolatileCell<u32>,
 }
 
-pub struct Timels {
+pub struct Timels<'a> {
     registers: *const Registers,
-    client: TakeCell<&'static AlarmClient>,
+    client: Cell<Option<&'a time::Client>>,
     now: Cell<u32>,
 }
 
-impl Timels {
-    const fn new(regs: *const Registers) -> Timels {
+impl<'a> Timels<'a> {
+    const fn new(regs: *const Registers) -> Timels<'a> {
         Timels {
             registers: regs,
-            client: TakeCell::empty(),
+            client: Cell::new(None),
             now: Cell::new(0),
         }
     }
 
-    pub fn set_client(&'static self, client: &'static AlarmClient) {
-        self.client.put(Some(client));
+    pub fn set_client(&'static self, client: &'static time::Client) {
+        self.client.set(Some(client));
     }
 
     pub fn handle_interrupt(&self) {
@@ -49,10 +48,22 @@ impl Timels {
         regs.control.set(0);
         self.now.set(self.now.get().wrapping_add(regs.reload.get()));
         regs.reload.set(0);
-        self.client.map(|client| {
+        self.client.get().map(|client| {
             client.fired();
         });
     }
+
+    fn disable_alarm(&self) {
+        let regs = unsafe { &*self.registers };
+        regs.control.set(0);
+    }
+
+    fn is_enabled(&self) -> bool {
+        let regs = unsafe { &*self.registers };
+        regs.control.get() & 1 == 1 && regs.value.get() != 0
+    }
+
+    
 }
 
 pub struct Freq256Khz;
@@ -63,8 +74,19 @@ impl Frequency for Freq256Khz {
     }
 }
 
-impl Alarm for Timels {
+impl<'a> time::Time for Timels<'a> {
     type Frequency = Freq256Khz;
+
+    fn disable(&self) {
+        self.disable_alarm();
+    }
+
+    fn is_armed(&self) -> bool {
+        self.is_enabled()
+    }
+}
+    
+impl<'a> time::Alarm for Timels<'a> {
 
     fn now(&self) -> u32 {
         let regs = unsafe { &*self.registers };
@@ -81,16 +103,6 @@ impl Alarm for Timels {
         regs.reload.set(distance);
         regs.interrupt_enable.set(1);
         regs.control.set(1);
-    }
-
-    fn disable_alarm(&self) {
-        let regs = unsafe { &*self.registers };
-        regs.control.set(0);
-    }
-
-    fn is_armed(&self) -> bool {
-        let regs = unsafe { &*self.registers };
-        regs.control.get() & 1 == 1 && regs.value.get() != 0
     }
 
     fn get_alarm(&self) -> u32 {
