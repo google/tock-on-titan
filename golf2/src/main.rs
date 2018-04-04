@@ -19,6 +19,7 @@ pub mod io;
 
 use kernel::{Chip, Platform};
 use kernel::mpu::MPU;
+use kernel::hil::gpio::Pin;
 
 unsafe fn load_processes_old() -> &'static mut [Option<kernel::process::Process<'static>>] {
     extern "C" {
@@ -178,7 +179,21 @@ pub unsafe fn reset_handler() {
     let mut chip = hotel::chip::Hotel::new();
     chip.mpu().enable_mpu();
 
-
+    // Simple test loop to show system is booting and can twiddle
+    // GPIO
+    hotel::gpio::PORT0.pins[0].make_output();
+    loop {
+        let mut x = 5;
+        for i in 0..1000000 {
+            if x < 500000 {
+                hotel::gpio::PORT0.pins[0].clear();
+            } else {
+                hotel::gpio::PORT0.pins[0].set();
+            }
+            x = x + 1;
+        }
+    }
+    
     kernel::main(golf2, &mut chip, load_processes_old(), &golf2.ipc);
 }
 
