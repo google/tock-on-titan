@@ -6,6 +6,5 @@ authors = ["Amit Levy <amit@amitlevy.com>"]
 build = "build.rs"
 
 [dependencies]
-rust-libcore = "*"
 kernel = { path = "../tock/kernel" }
-cortexm3 = { path = "../cortex-m3" }
+cortexm3 = { path = "../tock/arch/cortex-m3" }
