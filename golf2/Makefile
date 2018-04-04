@@ -17,7 +17,7 @@ target/target/release/golf2-$(APP): target/target/release/golf2 apps/$(APP)/buil
 	  target/target/release/golf2 $@
 
 target/target/release/golf2-$(APP)-self-signed: target/target/release/golf2-$(APP)
-	$(TANGO_CODESIGNER) --input $^ --key=$(TANGO_CODESIGNER_KEY) --output=$@
+	$(TANGO_CODESIGNER) --b --input $^ --key=$(TANGO_CODESIGNER_KEY) --output=$@
 
 target/target/release/golf2-$(APP)-full: target/target/release/golf2-$(APP)-self-signed
 	@cat $(TANGO_BOOTLOADER) $^ > $@
