@@ -4,6 +4,8 @@ use core::cell::Cell;
 use kernel::hil::rng::{Continue, RNG, Client};
 use kernel::common::volatile_cell::VolatileCell;
 
+#[macro_use(debug)]
+
 #[allow(dead_code)]
 #[repr(C, packed)]
 struct Registers {
@@ -116,36 +118,19 @@ struct Registers {
 
 const TRNG0_BASE: *mut Registers = 0x40410000 as *mut Registers;
 
-pub static mut TRNG0: TRNG = unsafe { TRNG::new(TRNG0_BASE) };
+pub static mut TRNG0: Trng<'static> = unsafe { Trng::new(TRNG0_BASE) };
 
-pub struct TRNG {
+pub struct Trng<'a> {
     regs: *mut Registers,
-    client: Cell<Option<&'static Client>>,
+    client: Cell<Option<&'a Client>>,
 }
 
-impl TRNG {
-    const unsafe fn new(trng: *mut Registers) -> TRNG {
-        TRNG {
+impl<'a> Trng<'a> {
+    const unsafe fn new(trng: *mut Registers) -> Trng<'a> {
+        Trng {
             regs: trng,
             client: Cell::new(None),
         }
-    }
-
-    pub fn init(&self) {
-        let regs = unsafe { &*self.regs };
-
-        // Enable bit shuffling and churn mode.  Disable XOR and Von Neumann processing.
-        regs.post_processing_control.set(0xa);
-        regs.slice_max_upper_limit.set(1);
-        regs.slice_min_lower_limit.set(0);
-        regs.timeout_counter.set(0x7ff);
-        regs.timeout_max_try_num.set(4);
-        regs.power_down_b.set(1);
-        regs.go_event.set(1);
-    }
-
-    pub fn set_client<C: Client>(&mut self, client: &'static C) {
-        self.client.set(Some(client));
     }
 
     pub fn handle_interrupt(&self) {
@@ -164,7 +149,27 @@ impl TRNG {
     }
 }
 
-impl RNG for TRNG {
+impl<'a> RNG<'a> for Trng<'a> {
+    
+    fn set_client(&self, client: &'a Client) {
+        self.client.set(Some(client));
+    }
+
+    fn init(&self) {
+        let regs = unsafe { &*self.regs };
+
+        // Enable bit shuffling and churn mode.  Disable XOR and Von Neumann processing.
+        regs.post_processing_control.set(0xa);
+        regs.slice_max_upper_limit.set(1);
+        regs.slice_min_lower_limit.set(0);
+        regs.timeout_counter.set(0x7ff);
+        regs.timeout_max_try_num.set(4);
+        regs.power_down_b.set(1);
+        regs.go_event.set(1);
+    }
+
+
+    
     fn get(&self) {
         let regs = unsafe { &*self.regs };
 
@@ -188,9 +193,9 @@ impl RNG for TRNG {
     }
 }
 
-struct Iter<'a>(&'a TRNG);
+struct Iter<'a, 'b: 'a>(&'a Trng<'b>);
 
-impl<'a> Iterator for Iter<'a> {
+impl<'a, 'b> Iterator for Iter<'a, 'b> {
     type Item = u32;
 
     fn next(&mut self) -> Option<u32> {

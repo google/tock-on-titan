@@ -3,8 +3,8 @@ use cortexm3;
 use gpio;
 use kernel::Chip;
 use timels;
-//use trng;
-//use uart;
+use trng;
+use uart;
 //use usb;
 
 pub struct Hotel {
@@ -41,14 +41,14 @@ impl Chip for Hotel {
                     159 => timels::TIMELS0.handle_interrupt(),
                     160 => timels::TIMELS1.handle_interrupt(),
 
-//                    169 => trng::TRNG0.handle_interrupt(),
+                    169 => trng::TRNG0.handle_interrupt(),
 
-//                    174 => uart::UART0.handle_rx_interrupt(),
-//                    177 => uart::UART0.handle_tx_interrupt(),
-//                    181 => uart::UART1.handle_rx_interrupt(),
-//                    184 => uart::UART1.handle_tx_interrupt(),
-//                    188 => uart::UART2.handle_rx_interrupt(),
-//                    191 => uart::UART2.handle_tx_interrupt(),
+                    174 => uart::UART0.handle_rx_interrupt(),
+                    177 => uart::UART0.handle_tx_interrupt(),
+                    181 => uart::UART1.handle_rx_interrupt(),
+                    184 => uart::UART1.handle_tx_interrupt(),
+                    188 => uart::UART2.handle_rx_interrupt(),
+                    191 => uart::UART2.handle_tx_interrupt(),
 
 //                    193 => usb::USB0.handle_interrupt(),
 

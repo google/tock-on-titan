@@ -5,15 +5,15 @@
 extern crate capsules;
 extern crate compiler_builtins;
 extern crate hotel;
-#[macro_use(static_init)]
+#[macro_use(debug,static_init)]
 extern crate kernel;
 
 
 
 #[macro_use]
 pub mod io;
-//pub mod rng;
- 
+
+pub mod rng_test;
 //pub mod digest;
 //pub mod aes;
 
@@ -21,6 +21,7 @@ use kernel::{Chip, Platform};
 use kernel::mpu::MPU;
 use kernel::hil::gpio::Pin;
 use kernel::hil::uart::UART;
+use kernel::hil::rng::RNG;
 
 unsafe fn load_processes_old() -> &'static mut [Option<kernel::process::Process<'static>>] {
     extern "C" {
@@ -34,7 +35,7 @@ unsafe fn load_processes_old() -> &'static mut [Option<kernel::process::Process<
     static mut MEMORIES: [[u8; 8192]; NUM_PROCS] = [[0; 8192]; NUM_PROCS];
 
     static mut PROCESSES: [Option<kernel::process::Process<'static>>; NUM_PROCS] = [None, None];
-
+    println!("Loading processes.\r");
     let mut addr = &_sapps as *const u8;
     for i in 0..NUM_PROCS {
         // The first member of the LoadInfo header contains the total size of each process image. A
@@ -56,7 +57,7 @@ unsafe fn load_processes_old() -> &'static mut [Option<kernel::process::Process<
     if *(addr as *const usize) != 0 {
         panic!("Exceeded maximum NUM_PROCS.");
     }
-
+    println!("Processes loaded.\r");
     &mut PROCESSES
 }
 
@@ -67,7 +68,7 @@ pub struct Golf {
     ipc: kernel::ipc::IPC,
 //    digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
 //    aes: &'static aes::AesDriver<'static>,
-    rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::TRNG>,
+    rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::Trng<'static>>,
 }
 
 #[no_mangle]
@@ -112,7 +113,9 @@ pub unsafe fn reset_handler() {
         24);
     hotel::uart::UART0.set_client(console);
     console.initialize();
-
+    let kc = static_init!(capsules::console::App, capsules::console::App::default());
+    kernel::debug::assign_console_driver(Some(console), kc);
+    
     let gpio_pins = static_init!(
         [&'static hotel::gpio::GPIOPin; 2],
         [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]],
@@ -148,7 +151,7 @@ pub unsafe fn reset_handler() {
 */
     hotel::trng::TRNG0.init();
     let rng = static_init!(
-        capsules::rng::SimpleRng<'static, hotel::trng::TRNG>,
+        capsules::rng::SimpleRng<'static, hotel::trng::Trng>,
         capsules::rng::SimpleRng::new(&mut hotel::trng::TRNG0, kernel::grant::Grant::create()),
         8);
     hotel::trng::TRNG0.set_client(rng);
@@ -175,26 +178,14 @@ pub unsafe fn reset_handler() {
 
     let end = timerhs.now();
 
-    println!("Tock 1.0 booting. Initialization took {} tics.",
+    println!("Tock 1.0 booting. Initialization took {} tics.\r",
               end.wrapping_sub(start));
+
 
     let mut chip = hotel::chip::Hotel::new();
     chip.mpu().enable_mpu();
 
-    // Simple test loop to show system is booting and can twiddle
-    // GPIO
-    hotel::gpio::PORT0.pins[0].make_output();
-    loop {
-        let mut x = 5;
-        for i in 0..2000000 {
-            if i < 1000000 {
-                hotel::gpio::PORT0.pins[0].clear();
-            } else {
-                hotel::gpio::PORT0.pins[0].set();
-            }
-            x = x + 1;
-        }
-    }
+//    rng_test::run_rng();
     
     kernel::main(golf2, &mut chip, load_processes_old(), &golf2.ipc);
 }
@@ -205,12 +196,12 @@ impl Platform for Golf {
     {
         match driver_num {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
-            capsules::gpio::DRIVER_NUM => f(Some(self.gpio)),
+            capsules::gpio::DRIVER_NUM  => f(Some(self.gpio)),
 //            2 => f(Some(self.digest)),
             capsules::alarm::DRIVER_NUM => f(Some(self.timer)),
 //            4 => f(Some(self.aes)),
-            //            5 => f(Some(self.rng)),
-            kernel::ipc::DRIVER_NUM => f(Some(&self.ipc)),
+            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
+            kernel::ipc::DRIVER_NUM     => f(Some(&self.ipc)),
             _ => f(None),
         }
     }
