@@ -1,7 +1,9 @@
-use hotel::hil::rng::{Continue, Rng, RngClient};
-use kernel::{AppId, AppSlice, Callback, Container, Driver, Shared};
+use kernel::hil::rng::{Continue, RNG, Client};
+use kernel::{AppId, AppSlice, Callback, Driver, Grant, ReturnCode, Shared};
 use kernel::common::take_cell::TakeCell;
 
+
+// This should be replaced with standard RNG capsule
 pub struct App {
     callback: Option<Callback>,
     buffer: Option<AppSlice<Shared, u8>>,
@@ -20,13 +22,13 @@ impl Default for App {
 
 /// Driver for a random number generator, using the Rng trait.
 pub struct RngDriver<'a, G: Rng + 'a> {
-    rng: TakeCell<&'a mut G>,
-    apps: Container<App>,
+    rng: TakeCell<'a, G>,
+    apps: Grant<App>,
 }
 
 impl<'a, G: Rng + 'a> RngDriver<'a, G> {
     /// Creates a new RngDriver.
-    pub fn new(rng: &'a mut G, container: Container<App>) -> RngDriver<'a, G> {
+    pub fn new(rng: &'a mut G, container: Grant<App>) -> RngDriver<'a, G> {
         RngDriver {
             rng: TakeCell::new(rng),
             apps: container,
@@ -36,45 +38,51 @@ impl<'a, G: Rng + 'a> RngDriver<'a, G> {
 
 impl<'a, G: Rng + 'a> Driver for RngDriver<'a, G> {
     /// Saves an application-provided buffer to be filled with random data.
-    fn allow(&self, app_id: AppId, _: usize, slice: AppSlice<Shared, u8>) -> isize {
+    fn allow(&self, app_id: AppId, _: usize, slice: AppSlice<Shared, u8>) -> ReturnCode {
         self.apps
             .enter(app_id, |app, _| {
                 app.buffer = Some(slice);
                 app.offset = 0;
-                0
+                ReturnCode::SUCCESS
             })
-            .unwrap_or(-1)
+            .unwrap_or_else(|err| err.into())
     }
 
     /// Saves an application-provided callback that will be used to notify
     /// the application when the provided buffer is full.
-    fn subscribe(&self, _: usize, callback: Callback) -> isize {
+    fn subscribe(&self, _: usize, callback: Callback) -> ReturnCode {
         self.apps
             .enter(callback.app_id(), |app, _| {
                 app.callback = Some(callback);
-                0
+                ReturnCode::SUCCESS
             })
-            .unwrap_or(-1)
+    .unwrap_or_else(|err| err.into())
     }
 
     /// Instructs the driver to begin filling the application-provided buffer with
     /// random data.  If the application has not provided both a buffer to fill and
     /// a notification callback this will return an error.
-    fn command(&self, _: usize, _: usize, app_id: AppId) -> isize {
-        self.apps
-            .enter(app_id, |app, _| {
-                if app.callback.is_none() || app.buffer.is_none() {
-                    return -1;
-                }
-
-                self.rng
-                    .map(|rng| {
-                        rng.get_data();
-                        0
+    fn command(&self, command_num: usize, data: usize, _: usize, app_id: AppId) -> ReturnCode {
+        match command_num {
+            0 => /* Check if exists */ ReturnCode::SUCCESS,
+            // Ask for data until buffer filled in
+            1 => {
+                self.apps
+                    .enter(app_id, |app, _| {
+                        if app.callback.is_none() || app.buffer.is_none() {
+                            return ReturnCode::ERESERVE;
+                        }
+                        
+                        self.rng
+                            .map(|rng| {
+                                rng.get_data();
+                                ReturnCode::SUCCESS
+                            })
+                            .unwrap_or(ReturnCode::ERESERVE)
                     })
-                    .unwrap_or(-1)
-            })
-            .unwrap_or(-1)
+                    .unwrap_or_else(|err| err.into())},
+            _ => ReturnCode::ENOSUPPORT,
+        }
     }
 }
 
@@ -140,6 +148,6 @@ fn u32_to_byte_array(x: u32) -> [u8; 4] {
     let x2 = ((x >> 8) & 0xff) as u8;
     let x3 = ((x >> 16) & 0xff) as u8;
     let x4 = ((x >> 24) & 0xff) as u8;
-
+    
     [x1, x2, x3, x4]
 }

@@ -1,7 +1,7 @@
 //! Driver for the True Random Number Generator (TRNG).
 
-use hil::rng::{Continue, Rng, RngClient};
-use kernel::common::take_cell::TakeCell;
+use core::cell::Cell;
+use kernel::hil::rng::{Continue, RNG, Client};
 use kernel::common::volatile_cell::VolatileCell;
 
 #[allow(dead_code)]
@@ -120,14 +120,14 @@ pub static mut TRNG0: TRNG = unsafe { TRNG::new(TRNG0_BASE) };
 
 pub struct TRNG {
     regs: *mut Registers,
-    client: TakeCell<&'static RngClient>,
+    client: Cell<Option<&'static Client>>,
 }
 
 impl TRNG {
     const unsafe fn new(trng: *mut Registers) -> TRNG {
         TRNG {
             regs: trng,
-            client: TakeCell::empty(),
+            client: Cell::new(None),
         }
     }
 
@@ -144,8 +144,8 @@ impl TRNG {
         regs.go_event.set(1);
     }
 
-    pub fn set_client<C: RngClient>(&mut self, client: &'static C) {
-        self.client.put(Some(client));
+    pub fn set_client<C: Client>(&mut self, client: &'static C) {
+        self.client.set(Some(client));
     }
 
     pub fn handle_interrupt(&self) {
@@ -155,8 +155,8 @@ impl TRNG {
         regs.interrupt_enable.set(0);
         regs.interrupt_state.set(0x1);
 
-        self.client.map(|client| {
-            if let Continue::More = client.random_data_available(&mut Iter(self)) {
+        self.client.get().map(|client| {
+            if let Continue::More = client.randomness_available(&mut Iter(self)) {
                 // Re-enable the interrupt since the client needs more data.
                 regs.interrupt_enable.set(0x1);
             }
@@ -164,8 +164,8 @@ impl TRNG {
     }
 }
 
-impl Rng for TRNG {
-    fn get_data(&self) {
+impl RNG for TRNG {
+    fn get(&self) {
         let regs = unsafe { &*self.regs };
 
         if regs.empty.get() > 0 {
@@ -179,8 +179,8 @@ impl Rng for TRNG {
             // Enable interrupts so we know when there is random data ready.
             regs.interrupt_enable.set(0x1);
         } else {
-            self.client.map(|client| {
-                if let Continue::More = client.random_data_available(&mut Iter(self)) {
+            self.client.get().map(|client| {
+                if let Continue::More = client.randomness_available(&mut Iter(self)) {
                     regs.interrupt_enable.set(0x1);
                 }
             });

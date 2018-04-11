@@ -67,7 +67,7 @@ pub struct Golf {
     ipc: kernel::ipc::IPC,
 //    digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
 //    aes: &'static aes::AesDriver<'static>,
-//    rng: &'static rng::RngDriver<'static, hotel::trng::TRNG>,
+    rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::TRNG>,
 }
 
 #[no_mangle]
@@ -145,14 +145,14 @@ pub unsafe fn reset_handler() {
         aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel::Container::create()),
         16);
     hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
-
+*/
     hotel::trng::TRNG0.init();
     let rng = static_init!(
-        rng::RngDriver<'static, hotel::trng::TRNG>,
-        rng::RngDriver::new(&mut hotel::trng::TRNG0, kernel::Container::create()),
+        capsules::rng::SimpleRng<'static, hotel::trng::TRNG>,
+        capsules::rng::SimpleRng::new(&mut hotel::trng::TRNG0, kernel::grant::Grant::create()),
         8);
     hotel::trng::TRNG0.set_client(rng);
-*/ 
+ 
     let golf2 = static_init!(Golf, Golf {
         console: console,
         gpio: gpio,
@@ -160,7 +160,7 @@ pub unsafe fn reset_handler() {
         ipc: kernel::ipc::IPC::new(),
 //        digest: digest,
 //        aes: aes,
-//        rng: rng,
+        rng: rng,
     }, 8);
 /*
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
