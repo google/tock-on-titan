@@ -18,7 +18,7 @@ pub mod pmu;
 pub mod timels;
 pub mod timeus;
 //pub mod trng;
-//pub mod uart;
+pub mod uart;
 //pub mod usb;
 
 unsafe extern "C" fn unhandled_interrupt() {

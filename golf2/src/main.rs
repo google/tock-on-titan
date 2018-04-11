@@ -13,13 +13,14 @@ extern crate kernel;
 #[macro_use]
 pub mod io;
 //pub mod rng;
-
+ 
 //pub mod digest;
 //pub mod aes;
 
 use kernel::{Chip, Platform};
 use kernel::mpu::MPU;
 use kernel::hil::gpio::Pin;
+use kernel::hil::uart::UART;
 
 unsafe fn load_processes_old() -> &'static mut [Option<kernel::process::Process<'static>>] {
     extern "C" {
@@ -60,7 +61,7 @@ unsafe fn load_processes_old() -> &'static mut [Option<kernel::process::Process<
 }
 
 pub struct Golf {
-//    console: &'static capsules::console::Console<'static, hotel::uart::UART>,
+    console: &'static capsules::console::Console<'static, hotel::uart::UART>,
     gpio: &'static capsules::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
     timer: &'static capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
     ipc: kernel::ipc::IPC,
@@ -102,15 +103,16 @@ pub unsafe fn reset_handler() {
         pinmux.uart0_rx.select.set(hotel::pinmux::SelectablePin::Diob6);
     }
 
-/*    let console = static_init!(
+    let console = static_init!(
         capsules::console::Console<'static, hotel::uart::UART>,
         capsules::console::Console::new(&hotel::uart::UART0,
+                                        115200,
                                        &mut capsules::console::WRITE_BUF,
-                                       kernel::container::Container::create()),
+                                       kernel::grant::Grant::create()),
         24);
     hotel::uart::UART0.set_client(console);
     console.initialize();
-*/
+
     let gpio_pins = static_init!(
         [&'static hotel::gpio::GPIOPin; 2],
         [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]],
@@ -152,7 +154,7 @@ pub unsafe fn reset_handler() {
     hotel::trng::TRNG0.set_client(rng);
 */ 
     let golf2 = static_init!(Golf, Golf {
-//        console: console,
+        console: console,
         gpio: gpio,
         timer: timer,
         ipc: kernel::ipc::IPC::new(),
@@ -174,7 +176,7 @@ pub unsafe fn reset_handler() {
     let end = timerhs.now();
 
     println!("Hello from Rust! Initialization took {} tics.",
-             end.wrapping_sub(start));
+              end.wrapping_sub(start));
 
     let mut chip = hotel::chip::Hotel::new();
     chip.mpu().enable_mpu();
@@ -184,8 +186,8 @@ pub unsafe fn reset_handler() {
     hotel::gpio::PORT0.pins[0].make_output();
     loop {
         let mut x = 5;
-        for i in 0..1000000 {
-            if x < 500000 {
+        for i in 0..2000000 {
+            if i < 1000000 {
                 hotel::gpio::PORT0.pins[0].clear();
             } else {
                 hotel::gpio::PORT0.pins[0].set();
@@ -202,7 +204,7 @@ impl Platform for Golf {
         where F: FnOnce(Option<&kernel::Driver>) -> R
     {
         match driver_num {
-//            casules::console::DRIVER_NUM => f(Some(self.console)),
+            capsules::console::DRIVER_NUM => f(Some(self.console)),
             capsules::gpio::DRIVER_NUM => f(Some(self.gpio)),
 //            2 => f(Some(self.digest)),
             capsules::alarm::DRIVER_NUM => f(Some(self.timer)),

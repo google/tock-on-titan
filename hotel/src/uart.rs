@@ -33,6 +33,7 @@
 //! TODO
 //!
 
+use core::cell::Cell;
 use kernel::common::take_cell::TakeCell;
 use kernel::common::volatile_cell::VolatileCell;
 use kernel::hil;
@@ -71,12 +72,14 @@ struct Buffer {
 
 /// A UART channel
 ///
-/// Each UART manages it's own clock and NVIC interrupt internally.
+/// Each UART manages its own clock and NVIC interrupt internally.
 pub struct UART {
     regs: *mut Registers,
     clock: Clock,
-    buffer: TakeCell<Buffer>,
-    client: TakeCell<&'static hil::uart::Client>,
+    tx_buffer: TakeCell<'static, [u8]>,
+    tx_limit: Cell<usize>,
+    tx_cursor: Cell<usize>,
+    client: Cell<Option<&'static hil::uart::Client>>,
 }
 
 impl UART {
@@ -84,13 +87,11 @@ impl UART {
         UART {
             regs: uart,
             clock: Clock::new(PeripheralClock::Bank1(clock)),
-            buffer: TakeCell::empty(),
-            client: TakeCell::empty(),
+            tx_buffer: TakeCell::empty(),
+            tx_limit: Cell::new(0),
+            tx_cursor: Cell::new(0),
+            client: Cell::new(None),
         }
-    }
-
-    pub fn set_client(&self, client: &'static hil::uart::Client) {
-        self.client.put(Some(client));
     }
 
     /// Enables transmission on the UART
@@ -183,7 +184,7 @@ impl UART {
         let regs = &*self.regs;
 
         self.enable_tx();
-
+        
         for b in bytes {
             while regs.state.get() & 1 != 0 {}
             regs.write_data.set(*b as u32);
@@ -205,23 +206,21 @@ impl UART {
 
         // If there is no current buffer, just return zero. Probably shouldn't
         // happen though.
-        let nwritten = self.buffer
-            .map(|buffer| {
-                let init_cursor = buffer.cursor;
-
-                let bytes: &[u8] = buffer.bytes;
-
-                for b in bytes[buffer.cursor..buffer.limit].iter() {
-                    if regs.state.get() & 1 == 1 {
-                        break; // TX Buffer full, we'll continue later
-                    }
-                    buffer.cursor += 1;
-                    regs.write_data.set(*b as u32);
+        let nwritten = self.tx_buffer.map(|bytes| {
+            let init_cursor = self.tx_cursor.get();
+            let limit = self.tx_limit.get();
+            
+            for b in bytes[init_cursor..limit].iter() {
+                if regs.state.get() & 1 == 1 {
+                    break; // TX Buffer full, we'll continue later
                 }
-                buffer.cursor - init_cursor
-            })
+                self.tx_cursor.set(self.tx_cursor.get() + 1);
+                regs.write_data.set(*b as u32);
+            }
+            self.tx_cursor.get() - init_cursor
+        })
             .unwrap_or(0);
-
+        
         if nwritten > 0 {
             // if we wrote anything, we're gonna want to get notified when the FIFO has room again.
             // Technically we could be done here if there is nothing left to send, but we want to
@@ -250,10 +249,14 @@ impl UART {
 
         regs.clear_interrupt_state.set(1);
         if self.send_remaining_bytes() == 0 {
-            self.client.map(|client| {
-                self.buffer.take().map(move |buffer| {
-                    client.write_done(buffer.bytes);
-                });
+            self.client.get().map(|client| {
+                if self.tx_buffer.is_some() {
+                    client.transmit_complete(self.tx_buffer.take().unwrap(), hil::uart::Error::CommandComplete);
+                }
+//                }
+//                self.tx_buffer.map(|buffer| {
+//                    client.transmit_complete(buffer, hil::uart::Error::CommandComplete);
+//                });
             });
         }
     }
@@ -273,80 +276,36 @@ impl UART {
     ///
     pub fn handle_rx_interrupt(&self) {
         let regs = unsafe { &*self.regs };
-
+        // Currently discards bytes: need to read into buffer. -pal 4/11/18
         regs.clear_interrupt_state.set(2);
-        self.client.map(|client| {
+        self.client.get().map(|client| {
             while regs.state.get() & 1 << 7 == 0 {
                 // While RX FIFO not empty
                 let b = regs.read_data.get() as u8;
-                client.read_done(b);
+//                client.receive_complete(b, hil::uart::Error::CommandComplete);
             }
         });
-    }
-
-    /// Asynchronously send a mutable slice of bytes over the UART
-    ///
-    /// The client is notified of completion through the client's callback. The
-    /// buffer is returned through the callback so the client can reuse it.
-    ///
-    /// The slice is not modified, but the `mut` qualifier is needed to prevent
-    /// the client from loosing mutable access.
-    ///
-    pub fn send_mut_bytes(&self, bytes: &'static mut [u8]) {
-        let len = bytes.len();
-        self.buffer.replace(Buffer {
-            bytes: bytes,
-            cursor: 0,
-            limit: len,
-        });
-        self.send_remaining_bytes();
     }
 }
 
 impl hil::uart::UART for UART {
-    fn init(&mut self, params: hil::uart::UARTParams) {
+    fn init(&self, params: hil::uart::UARTParams) {
         self.config(params.baud_rate);
         // TODO(alevy) can we handle other parameters?
     }
 
-    fn send_byte(&self, _byte: u8) {
-        unimplemented!();
+    fn set_client(&self, client: &'static hil::uart::Client) {
+        self.client.set(Some(client));
     }
-
-    fn read_byte(&self) -> u8 {
-        unimplemented!();
-    }
-
-    fn rx_ready(&self) -> bool {
-        unimplemented!();
-    }
-
-    fn tx_ready(&self) -> bool {
-        unimplemented!();
-    }
-
-    fn enable_rx(&self) {
-        UART::enable_rx(self);
-    }
-
-    fn disable_rx(&mut self) {
-        UART::disable_rx(self);
-    }
-
-    fn enable_tx(&self) {
-        UART::enable_tx(self);
-    }
-
-    fn disable_tx(&mut self) {
-        UART::disable_tx(self);
-    }
-
-    fn send_bytes(&self, bytes: &'static mut [u8], len: usize) {
-        self.buffer.replace(Buffer {
-            bytes: bytes,
-            cursor: 0,
-            limit: len,
-        });
+    
+    fn transmit(&self, tx_buffer: &'static mut [u8], tx_len: usize) {
+        self.tx_buffer.replace(tx_buffer);
+        self.tx_cursor.set(0);
+        self.tx_limit.set(tx_len);
         self.send_remaining_bytes();
+    }
+
+    fn receive(&self, rx_buffer: &'static mut[u8], rx_len: usize) {
+        unimplemented!();
     }
 }
