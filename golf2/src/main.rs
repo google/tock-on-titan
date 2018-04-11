@@ -45,8 +45,8 @@ unsafe fn load_processes_old() -> &'static mut [Option<kernel::process::Process<
             break;
         }
 
-        let process = &mut PROCESSES[i];
-        let memory = &mut MEMORIES[i];
+        let _process = &mut PROCESSES[i];
+        let _memory = &mut MEMORIES[i];
         //*process = Some(kernel::process::Process::create(addr, total_size, memory));
         // TODO: panic if loading failed?
 
@@ -129,9 +129,9 @@ pub unsafe fn reset_handler() {
     let timer = static_init!(
         capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
         capsules::alarm::AlarmDriver::new(
-            &hotel::timels::Timels0, kernel::Grant::create()),
+            &hotel::timels::TIMELS0, kernel::Grant::create()),
         12);
-    hotel::timels::Timels0.set_client(timer);
+    hotel::timels::TIMELS0.set_client(timer);
 /*
     let digest = static_init!(
         digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
@@ -175,7 +175,7 @@ pub unsafe fn reset_handler() {
 
     let end = timerhs.now();
 
-    println!("Hello from Rust! Initialization took {} tics.",
+    println!("Tock 1.0 booting. Initialization took {} tics.",
               end.wrapping_sub(start));
 
     let mut chip = hotel::chip::Hotel::new();

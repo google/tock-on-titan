@@ -101,15 +101,15 @@ impl Timeus {
     }
 
     pub fn now(&self) -> u32 {
-        self.counter().current_value.get()
+        unsafe {self.counter().current_value.get()}
     }
 
 
     pub fn start(&self) {
         let counter = self.counter();
-        counter.max_value.set(!0); // MAX_INT
-        counter.divider.set(1);
-        counter.wrapping.set(Enable::Enabled);
+        unsafe {counter.max_value.set(!0); // MAX_INT
+                counter.divider.set(1);
+                counter.wrapping.set(Enable::Enabled)};
     }
 
     fn counter(&self) -> &Counter {

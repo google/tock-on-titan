@@ -5,8 +5,8 @@ use kernel::hil::time::{self, Alarm, Frequency};
 const TIMELS0_BASE: *const Registers = 0x40540000 as *const Registers;
 const TIMELS1_BASE: *const Registers = 0x40540040 as *const Registers;
 
-pub static mut Timels0: Timels = Timels::new(TIMELS0_BASE);
-pub static mut Timels1: Timels = Timels::new(TIMELS1_BASE);
+pub static mut TIMELS0: Timels = Timels::new(TIMELS0_BASE);
+pub static mut TIMELS1: Timels = Timels::new(TIMELS1_BASE);
 
 struct Registers {
     pub control: VolatileCell<u32>,
@@ -86,7 +86,7 @@ impl<'a> time::Time for Timels<'a> {
     }
 }
     
-impl<'a> time::Alarm for Timels<'a> {
+impl<'a> Alarm for Timels<'a> {
 
     fn now(&self) -> u32 {
         let regs = unsafe { &*self.registers };

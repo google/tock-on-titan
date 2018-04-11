@@ -38,8 +38,8 @@ impl Chip for Hotel {
                     110 => (), // KEYMGR0_DSHA_INT, currently polled
                     111 => (), // KEYMGR0_SHA_WFIFO_FULL
 
-                    159 => timels::Timels0.handle_interrupt(),
-                    160 => timels::Timels1.handle_interrupt(),
+                    159 => timels::TIMELS0.handle_interrupt(),
+                    160 => timels::TIMELS1.handle_interrupt(),
 
 //                    169 => trng::TRNG0.handle_interrupt(),
 

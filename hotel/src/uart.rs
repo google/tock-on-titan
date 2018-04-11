@@ -63,12 +63,12 @@ pub static mut UART1: UART = unsafe { UART::new(UART1_BASE, PeripheralClock1::Ua
 
 pub static mut UART2: UART = unsafe { UART::new(UART2_BASE, PeripheralClock1::Uart2Timer) };
 
-/// A resumable buffer that tracks the last written index
-struct Buffer {
-    bytes: &'static mut [u8],
-    cursor: usize,
-    limit: usize,
-}
+// A resumable buffer that tracks the last written index
+//struct Buffer {
+//    bytes: &'static mut [u8],
+//    cursor: usize,
+//    limit: usize,
+//}
 
 /// A UART channel
 ///
@@ -278,10 +278,10 @@ impl UART {
         let regs = unsafe { &*self.regs };
         // Currently discards bytes: need to read into buffer. -pal 4/11/18
         regs.clear_interrupt_state.set(2);
-        self.client.get().map(|client| {
+        self.client.get().map(|_client| {
             while regs.state.get() & 1 << 7 == 0 {
                 // While RX FIFO not empty
-                let b = regs.read_data.get() as u8;
+                let _b = regs.read_data.get() as u8;
 //                client.receive_complete(b, hil::uart::Error::CommandComplete);
             }
         });
@@ -305,7 +305,7 @@ impl hil::uart::UART for UART {
         self.send_remaining_bytes();
     }
 
-    fn receive(&self, rx_buffer: &'static mut[u8], rx_len: usize) {
+    fn receive(&self, _rx_buffer: &'static mut[u8], _rx_len: usize) {
         unimplemented!();
     }
 }
