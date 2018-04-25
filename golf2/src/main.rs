@@ -180,7 +180,6 @@ impl Platform for Golf {
     fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
         where F: FnOnce(Option<&kernel::Driver>) -> R
     {
-        debug!("Received system call for device {}", driver_num);
         match driver_num {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
             capsules::gpio::DRIVER_NUM  => f(Some(self.gpio)),
