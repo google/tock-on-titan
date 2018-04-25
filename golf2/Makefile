@@ -13,12 +13,13 @@ all: target/$(TARGET)/release/golf2-$(APP)-full
 program: target/$(TARGET)/release/golf2-$(APP)-full
 	$(TANGO_SPIFLASH) --input=$^ --verbose
 
-.PHONY: apps/$(APP)/build/$(TOCK_ARCH)/app.bin
-apps/$(APP)/build/$(TOCK_ARCH)/app.bin:
+.PHONY: apps/$(APP)/build/$(TOCK_ARCH)/$(TOCK_ARCH)/$(TOCK_ARCH).bin
+apps/$(APP)/build/$(TOCK_ARCH)/$(TOCK_ARCH)/$(TOCK_ARCH).bin:
 	make -C apps/$(APP) TOCK_ARCH=$(TOCK_ARCH)
 
-target/$(TARGET)/release/golf2-$(APP): target/$(TARGET)/release/golf2.bin apps/$(APP)/build/$(TOCK_ARCH)/app.bin
-	arm-none-eabi-objcopy --update-section .apps=apps/$(APP)/build/$(TOCK_ARCH)/app.bin \
+
+target/$(TARGET)/release/golf2-$(APP): target/$(TARGET)/release/golf2.bin apps/$(APP)/build/$(TOCK_ARCH)/$(TOCK_ARCH)/$(TOCK_ARCH).bin
+	arm-none-eabi-objcopy --update-section .apps=apps/$(APP)/build/$(TOCK_ARCH)/$(TOCK_ARCH)/$(TOCK_ARCH).bin \
 	  --set-section-flags .apps=alloc,code \
 	  target/$(TARGET)/release/golf2 $@
 

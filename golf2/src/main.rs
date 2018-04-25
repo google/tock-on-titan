@@ -23,43 +23,16 @@ use kernel::hil::gpio::Pin;
 use kernel::hil::uart::UART;
 use kernel::hil::rng::RNG;
 
-unsafe fn load_processes_old() -> &'static mut [Option<kernel::process::Process<'static>>] {
-    extern "C" {
-        /// Beginning of the ROM region containing app images.
-        static _sapps: u8;
-    }
+// State for loading apps
+const NUM_PROCS: usize = 2;
 
-    const NUM_PROCS: usize = 2;
+// how should the kernel respond when a process faults
+const FAULT_RESPONSE: kernel::process::FaultResponse = kernel::process::FaultResponse::Panic;
 
-    #[link_section = ".app_memory"]
-    static mut MEMORIES: [[u8; 8192]; NUM_PROCS] = [[0; 8192]; NUM_PROCS];
+#[link_section = ".app_memory"]
+static mut APP_MEMORY: [u8; 16384] = [0; 16384];
 
-    static mut PROCESSES: [Option<kernel::process::Process<'static>>; NUM_PROCS] = [None, None];
-    println!("Loading processes.\r");
-    let mut addr = &_sapps as *const u8;
-    for i in 0..NUM_PROCS {
-        // The first member of the LoadInfo header contains the total size of each process image. A
-        // sentinel value of 0 (invalid because it's smaller than the header itself) is used to
-        // mark the end of the list of processes.
-        let total_size = *(addr as *const usize);
-        if total_size == 0 {
-            break;
-        }
-
-        let _process = &mut PROCESSES[i];
-        let _memory = &mut MEMORIES[i];
-        //*process = Some(kernel::process::Process::create(addr, total_size, memory));
-        // TODO: panic if loading failed?
-
-        addr = addr.offset(total_size as isize);
-    }
-
-    if *(addr as *const usize) != 0 {
-        panic!("Exceeded maximum NUM_PROCS.");
-    }
-    println!("Processes loaded.\r");
-    &mut PROCESSES
-}
+static mut PROCESSES: [Option<kernel::Process<'static>>; NUM_PROCS] = [None, None];
 
 pub struct Golf {
     console: &'static capsules::console::Console<'static, hotel::uart::UART>,
@@ -186,14 +159,28 @@ pub unsafe fn reset_handler() {
     chip.mpu().enable_mpu();
 
 //    rng_test::run_rng();
-    
-    kernel::main(golf2, &mut chip, load_processes_old(), &golf2.ipc);
+
+    extern "C" {
+        /// Beginning of the ROM region containing app images.
+        static _sapps: u8;
+    }
+
+    kernel::process::load_processes(
+        &_sapps as *const u8,
+        &mut APP_MEMORY,
+        &mut PROCESSES,
+        FAULT_RESPONSE,
+    );
+
+    debug!("Loaded processes: finish boot sequence.\r");
+    kernel::main(golf2, &mut chip, &mut PROCESSES, &golf2.ipc);
 }
 
 impl Platform for Golf {
     fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
         where F: FnOnce(Option<&kernel::Driver>) -> R
     {
+        debug!("Received system call for device {}", driver_num);
         match driver_num {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
             capsules::gpio::DRIVER_NUM  => f(Some(self.gpio)),

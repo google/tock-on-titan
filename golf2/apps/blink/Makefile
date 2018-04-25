@@ -10,7 +10,6 @@ OBJS += $(patsubst %.c,$(BUILDDIR)/%.o,$(C_SRCS))
 
 CPPFLAGS += -DSTACK_SIZE=2048
 
-
 include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk
 
 $(BUILDDIR)/%.o: %.c | $(BUILDDIR)
