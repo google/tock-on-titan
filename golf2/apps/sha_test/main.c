@@ -1,10 +1,11 @@
-#include <firestorm.h>
+#include <tock.h>
 #include <gpio.h>
 #include <string.h>
 #include <stdio.h>
 
 #include "digest.h"
 
+#define LED_0 0
 // TODO: Kernel bug? can't `allow` const data
 static /*const*/ char input_data[] = "Hello World!\n";
 
@@ -71,7 +72,7 @@ int main(void) {
   gpio_enable_output(LED_0);
   gpio_set(LED_0);
 
-  int mode = DIGEST_MODE_SHA1;
+  int mode = DIGEST_MODE_SHA256;
 
   printf("Hashing \"%s\"\n", input_data);
 

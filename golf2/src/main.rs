@@ -8,18 +8,15 @@ extern crate hotel;
 #[macro_use(debug,static_init)]
 extern crate kernel;
 
-
-
 #[macro_use]
 pub mod io;
 
 pub mod rng_test;
-//pub mod digest;
-//pub mod aes;
+pub mod digest;
+pub mod aes;
 
 use kernel::{Chip, Platform};
 use kernel::mpu::MPU;
-use kernel::hil::gpio::Pin;
 use kernel::hil::uart::UART;
 use kernel::hil::rng::RNG;
 
@@ -39,8 +36,8 @@ pub struct Golf {
     gpio: &'static capsules::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
     timer: &'static capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
     ipc: kernel::ipc::IPC,
-//    digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
-//    aes: &'static aes::AesDriver<'static>,
+    digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
+    aes: &'static aes::AesDriver<'static>,
     rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::Trng<'static>>,
 }
 
@@ -108,20 +105,20 @@ pub unsafe fn reset_handler() {
             &hotel::timels::TIMELS0, kernel::Grant::create()),
         12);
     hotel::timels::TIMELS0.set_client(timer);
-/*
+
     let digest = static_init!(
         digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
         digest::DigestDriver::new(
                 &mut hotel::crypto::sha::KEYMGR0_SHA,
-                kernel::Container::create()),
+                kernel::Grant::create()),
         16);
 
     let aes = static_init!(
         aes::AesDriver,
-        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel::Container::create()),
+        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel::Grant::create()),
         16);
     hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
-*/
+
     hotel::trng::TRNG0.init();
     let rng = static_init!(
         capsules::rng::SimpleRng<'static, hotel::trng::Trng>,
@@ -134,8 +131,8 @@ pub unsafe fn reset_handler() {
         gpio: gpio,
         timer: timer,
         ipc: kernel::ipc::IPC::new(),
-//        digest: digest,
-//        aes: aes,
+        digest: digest,
+        aes: aes,
         rng: rng,
     }, 8);
 /*
@@ -172,7 +169,7 @@ pub unsafe fn reset_handler() {
         FAULT_RESPONSE,
     );
 
-    debug!("Loaded processes: finish boot sequence.\r");
+    //debug!("Loaded processes: finish boot sequence.\r");
     kernel::main(golf2, &mut chip, &mut PROCESSES, &golf2.ipc);
 }
 
@@ -182,10 +179,10 @@ impl Platform for Golf {
     {
         match driver_num {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
-            capsules::gpio::DRIVER_NUM  => f(Some(self.gpio)),
-//            2 => f(Some(self.digest)),
+            capsules::gpio::DRIVER_NUM    => f(Some(self.gpio)),
+            digest::DRIVER_NUM             => f(Some(self.digest)),
             capsules::alarm::DRIVER_NUM => f(Some(self.timer)),
-//            4 => f(Some(self.aes)),
+            aes::DRIVER_NUM   => f(Some(self.aes)),
             capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
             kernel::ipc::DRIVER_NUM     => f(Some(&self.ipc)),
             _ => f(None),

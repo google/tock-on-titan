@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "aes.h"
+#include "gaes.h"
 #include "tock.h"
 
 static void tock_aes_mark_true_cb(int unused __attribute__((unused)),
@@ -19,15 +19,17 @@ int tock_aes_setup(void *key, size_t len, int aes_size, int encrypt) {
   ret = subscribe(HOTEL_DRIVER_AES, TOCK_AES_DONE_KEY_EXPANSION_INT,
                   tock_aes_mark_true_cb, &key_expansion_done);
   if (ret < 0) return ret;
-
-  ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_SETUP, aes_size);
+  printf("Calling aes %i, %i, %i, %i\n", HOTEL_DRIVER_AES, TOCK_AES_CMD_SETUP, aes_size, 0);
+  ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_SETUP, aes_size, 0);
   if (ret < 0) return ret;
 
   yield_for(&key_expansion_done);
+  printf("Calling aes %i, %i, %i\n", HOTEL_DRIVER_AES, TOCK_AES_CMD_SET_ENCRYPT_MODE, encrypt);
 
-  ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_SET_ENCRYPT_MODE, encrypt);
+  delay_ms(10000);
+  ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_SET_ENCRYPT_MODE, encrypt, 0);
+  
   if (ret < 0) return ret;
-
   return 0;
 }
 
@@ -47,7 +49,8 @@ int tock_aes_crypt(void *data, size_t len, void *out, size_t outlen) {
                     tock_aes_mark_true_cb, &cipher_done);
     if (ret < 0) return ret;
 
-    ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_CRYPT, 0);
+    printf("Calling aes %i, %i, %i, %i\n", HOTEL_DRIVER_AES, TOCK_AES_CMD_CRYPT, 0, 0);
+    ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_CRYPT, 0, 0);
     if (ret < 0) return ret;
     written_bytes += ret;
 
@@ -58,7 +61,9 @@ int tock_aes_crypt(void *data, size_t len, void *out, size_t outlen) {
                 outlen - read_bytes);
     if (ret < 0) return ret;
 
-    ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_READ_DATA, 0);
+    delay_ms(5000);
+    printf("Calling aes %i, %i, %i, %i\n", HOTEL_DRIVER_AES, TOCK_AES_CMD_READ_DATA, 0, 0);
+    ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_READ_DATA, 0, 0);
     if (ret < 0) return ret;
     read_bytes += ret;
 
@@ -71,5 +76,5 @@ int tock_aes_crypt(void *data, size_t len, void *out, size_t outlen) {
 }
 
 int tock_aes_finish() {
-  return command(HOTEL_DRIVER_AES, TOCK_AES_CMD_FINISH, 0);
+  return command(HOTEL_DRIVER_AES, TOCK_AES_CMD_FINISH, 0, 0);
 }

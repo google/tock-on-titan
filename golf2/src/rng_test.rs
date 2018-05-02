@@ -1,5 +1,5 @@
 use capsules::test::rng::TestRng;
-use kernel::hil::rng::{RNG, Continue, Client};
+use kernel::hil::rng::RNG;
 use hotel::trng;
 
 pub unsafe fn run_rng() {

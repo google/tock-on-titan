@@ -1,3 +1,4 @@
+use core::cell::Cell;
 use core::mem;
 use hil::digest::{DigestEngine, DigestMode, DigestError};
 use kernel::common::volatile_cell::VolatileCell;
@@ -26,14 +27,14 @@ enum ShaCfgEnMask {
 
 pub struct ShaEngine {
     regs: *mut Registers,
-    current_mode: Option<DigestMode>,
+    current_mode: Cell<Option<DigestMode>>,
 }
 
 impl ShaEngine {
     const unsafe fn new(regs: *mut Registers) -> ShaEngine {
         ShaEngine {
             regs: regs,
-            current_mode: None,
+            current_mode: Cell::new(None),
         }
     }
 }
@@ -41,7 +42,7 @@ impl ShaEngine {
 pub static mut KEYMGR0_SHA: ShaEngine = unsafe { ShaEngine::new(KEYMGR0_REGS) };
 
 impl DigestEngine for ShaEngine {
-    fn initialize(&mut self, mode: DigestMode) -> Result<(), DigestError> {
+    fn initialize(&self, mode: DigestMode) -> Result<(), DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
 
         // Compile-time check for DigestMode exhaustiveness
@@ -49,7 +50,7 @@ impl DigestEngine for ShaEngine {
             DigestMode::Sha1 |
             DigestMode::Sha256 => (),
         };
-        self.current_mode = Some(mode);
+        self.current_mode.set(Some(mode));
 
         regs.trig.set(ShaTrigMask::Stop as u32);
 
@@ -65,10 +66,10 @@ impl DigestEngine for ShaEngine {
         Ok(())
     }
 
-    fn update(&mut self, data: &[u8]) -> Result<usize, DigestError> {
+    fn update(&self, data: &[u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
 
-        if self.current_mode.is_none() {
+        if self.current_mode.get().is_none() {
             return Err(DigestError::NotConfigured);
         }
 
@@ -82,10 +83,10 @@ impl DigestEngine for ShaEngine {
         Ok(data.len())
     }
 
-    fn finalize(&mut self, output: &mut [u8]) -> Result<usize, DigestError> {
+    fn finalize(&self, output: &mut [u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
 
-        let expected_output_size = match self.current_mode {
+        let expected_output_size = match self.current_mode.get() {
             None => return Err(DigestError::NotConfigured),
             Some(mode) => mode.output_size(),
         };

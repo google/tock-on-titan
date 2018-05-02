@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-#define HOTEL_DRIVER_AES 4
+#define HOTEL_DRIVER_AES 0x40000
 
 #define TOCK_AES_CMD_SETUP 0
 #define TOCK_AES_CMD_CRYPT 1

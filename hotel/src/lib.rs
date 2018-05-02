@@ -10,7 +10,7 @@ extern crate kernel;
 pub mod io;
 
 pub mod chip;
-//pub mod crypto;
+pub mod crypto;
 pub mod gpio;
 pub mod hil;
 pub mod pinmux;
