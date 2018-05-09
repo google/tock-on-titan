@@ -1,7 +1,7 @@
 #![crate_name = "hotel"]
 #![crate_type = "rlib"]
 #![no_std]
-#![feature(asm,associated_consts,core_intrinsics,const_fn)]
+#![feature(asm,core_intrinsics,const_fn)]
 
 extern crate cortexm3;
 extern crate kernel;

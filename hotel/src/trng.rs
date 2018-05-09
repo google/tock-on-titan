@@ -4,8 +4,6 @@ use core::cell::Cell;
 use kernel::hil::rng::{Continue, RNG, Client};
 use kernel::common::volatile_cell::VolatileCell;
 
-#[macro_use(debug)]
-
 #[allow(dead_code)]
 #[repr(C, packed)]
 struct Registers {

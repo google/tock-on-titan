@@ -121,7 +121,6 @@ impl AesEngine {
 
     pub fn handle_interrupt(&self, interrupt: u32) {
         if let ParsedInterrupt::Found(int) = interrupt.into() {
-            println!("AES handled interrupt: {}", interrupt);
             self.client.get().map(|client| match int {
                 Interrupt::DoneCipher => client.done_cipher(),
                 Interrupt::DoneKeyExpansion => client.done_key_expansion(),

@@ -5,7 +5,7 @@
 extern crate capsules;
 extern crate compiler_builtins;
 extern crate hotel;
-#[macro_use(debug,static_init)]
+#[macro_use(static_init)]
 extern crate kernel;
 
 #[macro_use]

@@ -27,40 +27,40 @@ void print_buffer(char *buffer, size_t length, const char *format) {
 
 int main(void) {
   printf("==== Starting Encryption ====\n");
-  printf("Expected: 0x");
+  printf("Expecting [%d]: 0x", sizeof(expected));
   print_buffer(expected, sizeof(expected), "%02x");
-  printf("Setting up key.");
+  printf("Setting up key.\n");
   tock_aes_setup(key, strlen(key), TOCK_AES_SIZE_128, TOCK_AES_ENCRYPT);
-  printf("Encrypting.");
+  printf("Encrypting.\n");
   int len = tock_aes_crypt(data, strlen(data), output, sizeof(output));
   tock_aes_finish();
 
   if (len >= 0) {
-    printf("Result:   0x");
+    printf("Result    [%d]: 0x", len);
     print_buffer(output, len, "%02x");
   } else {
     printf("Got error while encrypting: %d\n", -len);
     return -1;
   }
-
-  printf("\n\n");
+  
+  printf("\n");
   printf("==== Starting Decryption ====\n");
 
-  printf("Expecting: ");
+  printf("Expecting [%d]: ", sizeof(data));
   print_buffer(data, strlen(data), "%c");
 
   int res;
-  printf("Setting up key.");
+  printf("Setting up key.\n");
   res = tock_aes_setup(key, strlen(key), TOCK_AES_SIZE_128, TOCK_AES_DECRYPT);
   if (res < 0) {
     printf("Got error while setup: %d\n", res);
   }
-  printf("Decrypting.");
+  printf("Decrypting.\n");
   int dec_len = tock_aes_crypt(output, len, decrypted, sizeof(decrypted));
   tock_aes_finish();
 
   if (dec_len >= 0) {
-    printf("Result:    ");
+    printf("Result    [%d]: ", dec_len);
     print_buffer(decrypted, dec_len, "%c");
   } else {
     printf("Got error while decrypting: %d\n", -dec_len);

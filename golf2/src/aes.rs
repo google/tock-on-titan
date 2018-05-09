@@ -24,6 +24,7 @@ pub struct AesDriver<'a> {
     device: &'a AesEngine,
     apps: Grant<AppData>,
     current_user: Cell<Option<AppId>>,
+    bytes_encrypted: Cell<usize>,
 }
 
 impl<'a> AesDriver<'a> {
@@ -32,6 +33,7 @@ impl<'a> AesDriver<'a> {
             device: device,
             apps: container,
             current_user: Cell::new(None),
+            bytes_encrypted: Cell::new(0),
         }
     }
 
@@ -97,22 +99,22 @@ impl<'a> AesDriver<'a> {
             .unwrap_or(ReturnCode::FAIL)
     }
 
-    fn crypt(&self, caller_id: AppId) -> Result<isize, ReturnCode> {
+    fn crypt(&self, caller_id: AppId) -> ReturnCode {
         self.apps
             .enter(caller_id, |app_data, _| {
                 match self.current_user.get() {
                     Some(cur) if cur.idx() == caller_id.idx() => {}
-                    _ => return Err(ReturnCode::EBUSY),
+                    _ => return ReturnCode::EBUSY,
                 }
 
                 let input_buffer = match app_data.input_buffer {
                     Some(ref slice) => slice,
-                    None => return Err(ReturnCode::EINVAL),
+                    None => return ReturnCode::EINVAL,
                 };
-
-                Ok(self.device.crypt(input_buffer.as_ref()) as isize)
-            })
-            .unwrap_or(Err(ReturnCode::FAIL))
+                let count = self.device.crypt(input_buffer.as_ref());
+                self.bytes_encrypted.set(count);
+                return ReturnCode::SUCCESS;
+            }).unwrap_or_else(|err| err.into())
     }
 
     fn read_data(&self, caller_id: AppId) -> Result<isize, ReturnCode> {
@@ -178,24 +180,23 @@ impl<'a> Driver for AesDriver<'a> {
     }
 
     fn command(&self, command_num: usize, arg1: usize, _: usize, caller_id: AppId) -> ReturnCode {
-        println!("aes_command({}, {} ...) called", command_num, arg1);
         match command_num {
-            // initialize encryption
-            0 => self.setup(caller_id, arg1),
-            1 => {
-                match self.crypt(caller_id) {
-                    Ok(_) => ReturnCode::SUCCESS,
-                    Err(e) => e
-                }
+            
+            0 /* Check if present */ => ReturnCode::SUCCESS,            
+            1 /* init encryption */ => self.setup(caller_id, arg1),
+            2 /* start encryption */ => {
+                self.crypt(caller_id)
             }
-            2 => {
+            3 /* read data */ => {
                 match self.read_data(caller_id) {
                     Ok(_) => ReturnCode::SUCCESS,
                     Err(e) => e
                 }
             }
-            3 => self.finish(caller_id),
-            4 => self.set_encrypt_mode(caller_id, arg1),
+            4 /* finish encryption */ => self.finish(caller_id),
+            5 /* set encryption mode */ => {
+                self.set_encrypt_mode(caller_id, arg1)
+            }, 
             _ => ReturnCode::ENOSUPPORT,
         }
     }
@@ -236,10 +237,15 @@ impl<'a> Driver for AesDriver<'a> {
 
 impl<'a> AesClient for AesDriver<'a> {
     fn done_cipher(&self) {
-        println!("done_cipher called.");
         self.current_user.get().map(|current_user| {
             let _ = self.apps.enter(current_user, |app_data, _| {
-                app_data.callbacks.done_cipher.map(|mut cb| cb.schedule(0, 0, 0));
+                let val = match app_data.output_buffer {
+                    Some(ref mut slice) => {
+                        self.device.read_data(slice.as_mut())
+                    },
+                    None => {0}
+                };
+                app_data.callbacks.done_cipher.map(|mut cb| cb.schedule(val, 0, 0));
             });
         });
     }
