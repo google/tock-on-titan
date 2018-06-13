@@ -243,17 +243,12 @@ impl USB {
             descs[self.next_out_idx.get()].flags = (DescFlag::LAST | DescFlag::IOC).bytes(64);
         });
 
-        // Enable EP0 OUT interrupts
-        self.registers
-            .device_all_ep_interrupt_mask
-            .set(self.registers.device_all_ep_interrupt_mask.get() | AllEndpointInterruptMask::OUT0 as u32);
-        // Disable EP0 IN interrupts
-        self.registers
-            .device_all_ep_interrupt_mask
-            .set(self.registers.device_all_ep_interrupt_mask.get() & !(AllEndpointInterruptMask::IN0 as u32));
+        // Enable OUT and disable IN interrupts
+        let mut interrupts = self.registers.device_all_ep_interrupt_mask.get();
+        interrupts |= AllEndpointInterruptMask::OUT0 as u32;
+        interrupts &= !(AllEndpointInterruptMask::IN0 as u32);
+        self.registers.device_all_ep_interrupt_mask.set(interrupts);
 
-        // Enable OUT endpoint 0 and clear NAK bit; clearing the NAK
-        // bit tells host that device is ready to receive.
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
         self.flush_tx_fifo(0);
         self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
