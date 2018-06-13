@@ -161,15 +161,12 @@ const BASE_ADDR: *const Registers = 0x40300000 as *const Registers;
 /// USB driver 0
 pub static mut USB0: USB = unsafe { USB::new() };
 
-/// OUT descriptors to pass into `USB#init`.
+// IN and OUT descriptors/bufers to pass into `USB#init`.
 pub static mut OUT_DESCRIPTORS: [DMADescriptor; 2] = [DMADescriptor {
     flags: DescFlag::HOST_BUSY,
     addr: 0,
 }; 2];
-/// OUT buffers to pass into `USB#init`.
 pub static mut OUT_BUFFERS: [[u32; 16]; 2] = [[0; 16]; 2];
-
-/// IN descriptors to pass into `USB#init`.
 pub static mut IN_DESCRIPTORS: [DMADescriptor; 4] = [DMADescriptor {
     flags: DescFlag::HOST_BUSY,
     addr: 0,
@@ -428,7 +425,8 @@ impl USB {
         }
 
         // Prepare next OUT descriptor if XferCompl
-        if inter_out && ep_out_interrupts & 1 != 0 {
+        if inter_out &&
+            ep_out_interrupts & (OutEndpointInterruptMask::XferComplMsk as u32) != 0 {
             self.got_rx_packet();
         }
 
@@ -469,7 +467,8 @@ impl USB {
             }
             USBState::DataStageIn => {
                 usb_debug!("USB: state is data stage in\n");
-                if inter_in && ep_in_interrupts & 1 != 0 {
+                if inter_in &&
+                    ep_in_interrupts & (InEndpointInterruptMask::XferComplMsk as u32) != 0 {
                     self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                 }
 
@@ -528,27 +527,27 @@ impl USB {
         self.ep0_out_buffers.get().map(|bufs| {
             let idx =  self.cur_out_idx.get();
             let req = SetupRequest::new(&bufs[idx]);
+            
             usb_debug!("  - type={:?} recip={:?} dir={:?} request={:?}\n", req.req_type(), req.recipient(), req.data_direction(), req.request());
+            
             if req.req_type() == SetupRequestClass::Standard &&
-               req.recipient() == SetupRecipient::Device {
-                // Standard device request: host-to-device to device
-
-                if req.data_direction() == SetupDirection::DeviceToHost {
-                    self.handle_setup_device_to_host(transfer_type, &req);
-                } else if req.w_length > 0 {
-                    // Host-to-device, there is data
-                    self.handle_setup_host_to_device(transfer_type, &req);
+                req.recipient() == SetupRecipient::Device {
+                    if req.data_direction() == SetupDirection::DeviceToHost {
+                        self.handle_setup_device_to_host(transfer_type, &req);
+                    } else if req.w_length > 0 {
+                        // Host-to-device, there is data
+                        self.handle_setup_host_to_device(transfer_type, &req);
+                    } else {
+                        // Host-to-device, no data stage
+                        self.handle_setup_no_data_phase(transfer_type, &req);
+                    }
+                } else if req.recipient() == SetupRecipient::Interface {
+                    // Interface
+                    // TODO
+                    panic!("Recipient is interface");
                 } else {
-                    // Host-to-device, no data stage
-                    self.handle_setup_no_data_phase(transfer_type, &req);
+                    usb_debug!("  - unknown case.\n");
                 }
-            } else if req.recipient() == SetupRecipient::Interface {
-                // Interface
-                // TODO
-                panic!("Recipient is interface");
-            } else {
-//                usb_debug!("  - unknown case.\n");
-            }
         });
     }
 
@@ -579,9 +578,12 @@ impl USB {
                             }.serialize(buf)).unwrap_or(0);
                         len = ::core::cmp::min(len, req.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
-                            descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
-                                              DescFlag::SHORT | DescFlag::IOC).bytes(len as u16);
+                            descs[0].flags = (DescFlag::HOST_READY |
+                                              DescFlag::LAST |
+                                              DescFlag::SHORT |
+                                              DescFlag::IOC).bytes(len as u16);
                         });
+                        
                         usb_debug!("Trying to send device descriptor.\n");
                         self.expect_data_phase_in(transfer_type);
                     },
@@ -594,8 +596,10 @@ impl USB {
                         usb_debug!("USB: Trying to send configuration descriptor, len {}: {:?}\n  ", len, c);
                         len = ::core::cmp::min(len, req.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
-                            descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
-                                              DescFlag::SHORT | DescFlag::IOC).bytes(len as u16);
+                            descs[0].flags = (DescFlag::HOST_READY |
+                                              DescFlag::LAST |
+                                              DescFlag::SHORT |
+                                              DescFlag::IOC).bytes(len as u16);
                         });
                         self.expect_data_phase_in(transfer_type);
                     },
@@ -778,8 +782,28 @@ impl USB {
     /// Only call this when  transaction is not underway and data from this FIFO
     /// is not being copied.
     fn flush_tx_fifo(&self, fifo_num: u8) {
-        self.registers.reset.set((fifo_num as u32) << 6 | // TxFIFO number: 0
-            (Reset::TxFFlsh as u32));                 // TxFFlsh
+        let reset_val = (Reset::TxFFlsh as u32) |
+        (match fifo_num {
+            0  => Reset::FlushFifo0,
+            1  => Reset::FlushFifo1,
+            2  => Reset::FlushFifo2,
+            3  => Reset::FlushFifo3,
+            4  => Reset::FlushFifo4,
+            5  => Reset::FlushFifo5,
+            6  => Reset::FlushFifo6,
+            7  => Reset::FlushFifo7,
+            8  => Reset::FlushFifo8,
+            9  => Reset::FlushFifo9,
+            10 => Reset::FlushFifo10,
+            11 => Reset::FlushFifo11,
+            12 => Reset::FlushFifo12,
+            13 => Reset::FlushFifo13,
+            14 => Reset::FlushFifo14,
+            15 => Reset::FlushFifo15,
+            16 => Reset::FlushFifoAll,
+            _  => Reset::FlushFifoAll, // Should Panic, or make param typed
+        } as u32);
+        self.registers.reset.set(reset_val);
 
         // Wait for TxFFlsh to clear
         while self.registers.reset.get() & (Reset::TxFFlsh as u32) != 0 {}

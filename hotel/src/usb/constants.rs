@@ -49,9 +49,26 @@ pub enum Interrupt {
 
 #[allow(dead_code)]
 pub enum Reset {
-    CSftRst          = 1 <<  0,
-    RxFFlsh          = 1 <<  4,
-    TxFFlsh          = 1 <<  5,
+    CSftRst          =  1 <<  0,
+    RxFFlsh          =  1 <<  4,
+    TxFFlsh          =  1 <<  5,
+    FlushFifo0       =  0 <<  6,
+    FlushFifo1       =  1 <<  6,
+    FlushFifo2       =  2 <<  6,
+    FlushFifo3       =  3 <<  6,
+    FlushFifo4       =  4 <<  6,
+    FlushFifo5       =  5 <<  6,
+    FlushFifo6       =  6 <<  6,
+    FlushFifo7       =  7 <<  6,
+    FlushFifo8       =  8 <<  6,
+    FlushFifo9       =  9 <<  6,
+    FlushFifo10      = 10 <<  6,
+    FlushFifo11      = 11 <<  6,
+    FlushFifo12      = 12 <<  6,
+    FlushFifo13      = 13 <<  6,
+    FlushFifo14      = 14 <<  6,
+    FlushFifo15      = 15 <<  6,
+    FlushFifoAll     = 16 <<  6, // It's 5 bits, 0x10 means all FIFOs
     DMAReq           = 1 << 30,
     AHBIdle          = 1 << 31,
 }
@@ -90,6 +107,44 @@ pub enum AllEndpointInterruptMask {
     OUT13 = 1 << 29,
     OUT14 = 1 << 30,
     OUT15 = 1 << 31,
+}
+
+// OTG Databook, Table 5-58
+#[allow(dead_code)]
+pub enum OutEndpointInterruptMask {
+    XferComplMsk =         1 <<  0,    
+    EPDisbldMsg =          1 <<  1,
+    AHBErrMsk =            1 <<  2,
+    SetUPMsk =             1 <<  3,
+    OUTTknEPdisMsk =       1 <<  4,
+    StsPhseRcvdMsk =       1 <<  5,
+    Back2BackSETupMsk =    1 <<  6,
+    // Bit 7 reserved
+    OutPkrErrMsk =         1 <<  8,
+    BnaOutIntrMsk =        1 <<  9,
+    // Bits 10-11 reserved
+    BbleErrMsk =           1 << 12,
+    NAKMsk =               1 << 13,
+    NYETMsk =              1 << 14,
+    // Bits 15-31 reserved
+}
+
+// OTG Databook, Table 5-57
+#[allow(dead_code)]
+pub enum InEndpointInterruptMask {
+    XferComplMsk =         1 <<  0,    
+    EPDisbldMsg =          1 <<  1,
+    AHBErrMsk =            1 <<  2,
+    TimeOUTMsk =           1 <<  3,
+    INTknTXFEdmpMsk =      1 <<  4,
+    INTknEPMisMsk =        1 <<  5,
+    INTEPNakEffMsk =       1 <<  6,
+    // Bit 7 reserved
+    TxfifiUndrnMsk =       1 <<  8,
+    BNAInIntrMsk =         1 <<  9,
+    // Bits 10-12 reserved
+    NAKMsk =               1 << 13,
+    // Bits 14-31 reserved
 }
 
 pub const GET_DESCRIPTOR_DEVICE: u32           = 1;
