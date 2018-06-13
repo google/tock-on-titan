@@ -5,7 +5,7 @@ use kernel::Chip;
 use timels;
 use trng;
 use uart;
-//use usb;
+use usb;
 
 pub struct Hotel {
     mpu: cortexm3::mpu::MPU,
@@ -50,7 +50,9 @@ impl Chip for Hotel {
                     188 => uart::UART2.handle_rx_interrupt(),
                     191 => uart::UART2.handle_tx_interrupt(),
 
-//                    193 => usb::USB0.handle_interrupt(),
+                    193 => {
+                        usb::USB0.handle_interrupt()
+                    },
 
                     pin @ 65...80 => {
                         gpio::PORT0.pins[(pin - 65) as usize].handle_interrupt();

@@ -135,7 +135,7 @@ pub unsafe fn reset_handler() {
         aes: aes,
         rng: rng,
     }, 8);
-/*
+
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
                           &mut hotel::usb::IN_DESCRIPTORS,
@@ -144,7 +144,7 @@ pub unsafe fn reset_handler() {
                           None,
                           Some(0x0011),
                           Some(0x7788));
-*/
+
 
     let end = timerhs.now();
 

@@ -2,9 +2,10 @@ use core::intrinsics::copy_nonoverlapping;
 use core::mem::{transmute, size_of};
 
 pub unsafe trait Serialize: Sized {
-    fn serialize(&self, buffer: &mut [u8]) -> usize {
-        let length = if buffer.len() < size_of::<Self>() {
-            buffer.len()
+    fn serialize(&self, buffer: &mut [u32]) -> usize {
+        let len = buffer.len() * 4; // Convert to byte length
+        let length = if len < size_of::<Self>() {
+            len
         } else {
             size_of::<Self>()
         };

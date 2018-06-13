@@ -2,9 +2,11 @@
 #![crate_type = "rlib"]
 #![no_std]
 #![feature(asm,core_intrinsics,const_fn)]
+#![feature(attr_literals)]
 
 extern crate cortexm3;
 extern crate kernel;
+extern crate aligned;
 
 #[macro_use]
 pub mod io;
@@ -19,7 +21,7 @@ pub mod timels;
 pub mod timeus;
 pub mod trng;
 pub mod uart;
-//pub mod usb;
+pub mod usb;
 
 unsafe extern "C" fn unhandled_interrupt() {
     let mut interrupt_number: u32;
