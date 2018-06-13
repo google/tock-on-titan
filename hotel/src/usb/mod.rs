@@ -4,7 +4,6 @@ use core::cell::Cell;
 use core::ops::Deref;
 use kernel::common::take_cell::TakeCell;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
-use aligned::Aligned;
 
 mod constants;
 mod registers;
@@ -17,6 +16,19 @@ use self::registers::{EpCtl, DescFlag, Registers};
 pub use self::registers::DMADescriptor;
 use self::types::{SetupRequest, DeviceDescriptor, ConfigurationDescriptor};
 use self::types::{SetupDirection, SetupRequestClass, SetupRecipient};
+
+
+// Simple macro for USB debugging output: default definitions do nothing,
+// but you can uncomment print defintions to get detailed output on the
+// messages sent and received.
+macro_rules! usb_debug {
+//    () => ({print!();});
+//    ($fmt:expr) => ({print!($fmt);});
+//    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
+    () => ({});
+    ($fmt:expr) => ({});
+    ($fmt:expr, $($arg:tt)+) => ({});
+}
 
 /// A StaticRef is a pointer to statically allocated mutable data such
 /// as memory mapped I/O registers.
@@ -198,60 +210,68 @@ impl USB {
     /// from the host, whose reception will trigger an interrupt.
     ///
     /// A SETUP packet is less than 64 bytes, so only one OUT
-    /// descriptor is needed. This function sets the max size of
-    /// the packet to 64 bytes the Last and
-    /// Interrupt-on-completion bits and max size to 64 bytes.
+    /// descriptor is needed. This function sets the max size of the
+    /// packet to 64 bytes the Last and Interrupt-on-completion bits
+    /// and max size to 64 bytes.
     ///
-    /// In preparation for a SETUP packet we only want to receive interrupts for
-    /// OUT, not IN.
+    /// Preparing for a SETUP packet disables IN interrupts (device should
+    /// not be sending anything) and enables OUT interrupts (for reception
+    /// from host).
     fn expect_setup_packet(&self) {
-        print!("USB: WaitingForSetupPacket in expect_setup_packet.\n");
+        usb_debug!("USB: WaitingForSetupPacket in expect_setup_packet.\n");
         self.state.set(USBState::WaitingForSetupPacket);
         self.ep0_out_descriptors.map(|descs| {
             descs[self.next_out_idx.get()].flags =
                 (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
         });
 
-        // EP0 OUT interrupts on
+        // Enable EP0 OUT interrupts
         self.registers
             .device_all_ep_interrupt_mask
             .set(self.registers.device_all_ep_interrupt_mask.get() | AllEndpointInterruptMask::OUT0 as u32);
-        // EP0 IN interrupts off
+        // Disable EP0 IN interrupts 
         self.registers
             .device_all_ep_interrupt_mask
             .set(self.registers.device_all_ep_interrupt_mask.get() & !(AllEndpointInterruptMask::IN0 as u32));
 
-        // Enable OUT endpoint 0 and clear NAK bit
+        // Enable OUT endpoint 0 and clear NAK bit; clearing the NAK
+        // bit tells host that device is ready to receive.
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
     }
-
-    // STALL indicates endpoint is unable to transmit or receive data.
-    // STALLing during SETUP forces host to send a new SETUP; can be
-    // used to indicate an unknown request was issued.
+    
+    // Stalls both the IN and OUT endpoints for endpoint 0.
+    //
+    // A STALL condition indicates that an endpoint is unable to
+    // transmit or receive data.  STALLing when waiting for a SETUP
+    // message forces the host to send a new SETUP. This can be used to
+    // indicate the request wasn't understood or needs to be resent.
     fn stall_both_fifos(&self) {
-        print!("USB: WaitingForSetupPacket in stall_both_fifos.\n");
+        usb_debug!("USB: WaitingForSetupPacket in stall_both_fifos.\n");
         self.state.set(USBState::WaitingForSetupPacket);
         self.ep0_out_descriptors.map(|descs| {
             descs[self.next_out_idx.get()].flags = (DescFlag::LAST | DescFlag::IOC).bytes(64);
         });
 
-        // EP0 OUT interrupts on
+        // Enable EP0 OUT interrupts
         self.registers
             .device_all_ep_interrupt_mask
             .set(self.registers.device_all_ep_interrupt_mask.get() | AllEndpointInterruptMask::OUT0 as u32);
-        // EP0 IN interrupts off
+        // Disable EP0 IN interrupts
         self.registers
             .device_all_ep_interrupt_mask
             .set(self.registers.device_all_ep_interrupt_mask.get() & !(AllEndpointInterruptMask::IN0 as u32));
 
-        // Enable OUT endpoint 0 and clear NAK bit
+        // Enable OUT endpoint 0 and clear NAK bit; clearing the NAK
+        // bit tells host that device is ready to receive.
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
         self.flush_tx_fifo(0);
         self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
     }
 
-    /// Call when a full packet has been received on EP0 OUT.
-    /// Swaps the descriptors.
+    /// Swaps which descriptor is set up to receive so stack can
+    /// receive a new packet while processing the current one.
+    /// Usually called when a full packet has been received on
+    /// endpoint 0 OUT.
     fn got_rx_packet(&self) {
         self.ep0_out_descriptors.map(|descs| {
             let mut noi = self.next_out_idx.get();
@@ -264,8 +284,10 @@ impl USB {
 
     /// Initialize descriptors for endpoint 0 IN and OUT
     ///
-    /// Reset the endpoint 0 descriptors to a clean state and prepares for a
-    /// SETUP packet from the host.
+    /// This resets the endpoint 0 descriptors to a clean state and
+    /// puts the stack into the state of waiting for a SETUP packet
+    /// from the host (since this is the first message in an enumeration
+    /// exchange).
     fn init_descriptors(&self) {
         // Setup descriptor for OUT endpoint 0
         self.ep0_out_buffers.get().map(|bufs| {
@@ -294,9 +316,9 @@ impl USB {
         self.expect_setup_packet();
     }
 
-    /// Reset the device in response to a USB RESET
+    /// Reset the device in response to a USB RESET.
     fn reset(&self) {
-        print!("USB: WaitingForSetupPacket in reset.\n");
+        usb_debug!("USB: WaitingForSetupPacket in reset.\n");
         self.state.set(USBState::WaitingForSetupPacket);
         // Reset device address field (bits 10:4) of device config
         //self.registers.device_config.set(self.registers.device_config.get() & !(0b1111111 << 4));
@@ -318,30 +340,30 @@ impl USB {
         // Save current interrupt status snapshot so can clear only those at the
         // end
         let status = self.registers.interrupt_status.get();
-        print!("USB interrupt, status: {:08x}\n", status);
-        if (status & Interrupt::HostMode as u32) != 0           {print!("  +Host mode\n");}
-        if (status & Interrupt::Mismatch as u32) != 0           {print!("  +Mismatch\n");}
-        if (status & Interrupt::OTG as u32) != 0                {print!("  +OTG\n");}
-        if (status & Interrupt::SOF as u32) != 0                {print!("  +SOF\n");}
-        if (status & Interrupt::RxFIFO as u32) != 0             {print!("  +RxFIFO\n");}
-        if (status & Interrupt::GlobalInNak as u32) != 0        {print!("  +GlobalInNak\n");}
-        if (status & Interrupt::OutNak as u32) != 0             {print!("  +OutNak\n");}
-        if (status & Interrupt::EarlySuspend as u32) != 0       {print!("  +EarlySuspend\n");}
-        if (status & Interrupt::Suspend as u32) != 0            {print!("  +Suspend\n");}
-        if (status & Interrupt::Reset as u32) != 0              {print!("  +USB reset\n");}
-        if (status & Interrupt::EnumDone as u32) != 0           {print!("  +Speed enum done\n");}
-        if (status & Interrupt::OutISOCDrop as u32) != 0        {print!("  +Out ISOC drop\n");}
-        if (status & Interrupt::EOPF as u32) != 0               {print!("  +EOPF\n");}
-        if (status & Interrupt::EndpointMismatch as u32) != 0   {print!("  +Endpoint mismatch\n");}
-        if (status & Interrupt::InEndpoints as u32) != 0        {print!("  +IN endpoints\n");}
-        if (status & Interrupt::OutEndpoints as u32) != 0       {print!("  +OUT endpoints\n");}
-        if (status & Interrupt::InISOCIncomplete as u32) != 0   {print!("  +IN ISOC incomplete\n");}
-        if (status & Interrupt::IncompletePeriodic as u32) != 0 {print!("  +Incomp periodic\n");}
-        if (status & Interrupt::FetchSuspend as u32) != 0       {print!("  +Fetch suspend\n");}
-        if (status & Interrupt::ResetDetected as u32) != 0      {print!("  +Reset detected\n");}
-        if (status & Interrupt::ConnectIDChange as u32) != 0    {print!("  +Connect ID change\n");}
-        if (status & Interrupt::SessionRequest as u32) != 0     {print!("  +Session request\n");}
-        if (status & Interrupt::ResumeWakeup as u32) != 0       {print!("  +Resume/wakeup\n");}
+        usb_debug!("USB interrupt, status: {:08x}\n", status);
+        if (status & Interrupt::HostMode as u32) != 0           {usb_debug!("  +Host mode\n");}
+        if (status & Interrupt::Mismatch as u32) != 0           {usb_debug!("  +Mismatch\n");}
+        if (status & Interrupt::OTG as u32) != 0                {usb_debug!("  +OTG\n");}
+        if (status & Interrupt::SOF as u32) != 0                {usb_debug!("  +SOF\n");}
+        if (status & Interrupt::RxFIFO as u32) != 0             {usb_debug!("  +RxFIFO\n");}
+        if (status & Interrupt::GlobalInNak as u32) != 0        {usb_debug!("  +GlobalInNak\n");}
+        if (status & Interrupt::OutNak as u32) != 0             {usb_debug!("  +OutNak\n");}
+        if (status & Interrupt::EarlySuspend as u32) != 0       {usb_debug!("  +EarlySuspend\n");}
+        if (status & Interrupt::Suspend as u32) != 0            {usb_debug!("  +Suspend\n");}
+        if (status & Interrupt::Reset as u32) != 0              {usb_debug!("  +USB reset\n");}
+        if (status & Interrupt::EnumDone as u32) != 0           {usb_debug!("  +Speed enum done\n");}
+        if (status & Interrupt::OutISOCDrop as u32) != 0        {usb_debug!("  +Out ISOC drop\n");}
+        if (status & Interrupt::EOPF as u32) != 0               {usb_debug!("  +EOPF\n");}
+        if (status & Interrupt::EndpointMismatch as u32) != 0   {usb_debug!("  +Endpoint mismatch\n");}
+        if (status & Interrupt::InEndpoints as u32) != 0        {usb_debug!("  +IN endpoints\n");}
+        if (status & Interrupt::OutEndpoints as u32) != 0       {usb_debug!("  +OUT endpoints\n");}
+        if (status & Interrupt::InISOCIncomplete as u32) != 0   {usb_debug!("  +IN ISOC incomplete\n");}
+        if (status & Interrupt::IncompletePeriodic as u32) != 0 {usb_debug!("  +Incomp periodic\n");}
+        if (status & Interrupt::FetchSuspend as u32) != 0       {usb_debug!("  +Fetch suspend\n");}
+        if (status & Interrupt::ResetDetected as u32) != 0      {usb_debug!("  +Reset detected\n");}
+        if (status & Interrupt::ConnectIDChange as u32) != 0    {usb_debug!("  +Connect ID change\n");}
+        if (status & Interrupt::SessionRequest as u32) != 0     {usb_debug!("  +Session request\n");}
+        if (status & Interrupt::ResumeWakeup as u32) != 0       {usb_debug!("  +Resume/wakeup\n");}
 
         if status & ENUM_DONE != 0 {
             // MPS default set to 0 == 64 bytes
@@ -358,29 +380,29 @@ impl USB {
         }
 
         if self.registers.interrupt_mask.get() & status & SOF != 0 {
-            print!(" - clearing SOF\n");
+            usb_debug!(" - clearing SOF\n");
             self.registers.interrupt_mask.set(self.registers.interrupt_mask.get() & !SOF);
         }
 
         if status & GOUTNAKEFF != 0 {
             // Clear Global OUT NAK
-            print!(" - clearing OUT NAK\n");
+            usb_debug!(" - clearing OUT NAK\n");
             self.registers.device_control.set(self.registers.device_control.get() | 1 << 10);
         }
 
         if status & GINNAKEFF != 0 {
             // Clear Global Non-periodic IN NAK
-            print!(" - clearing IN NAK\n");
+            usb_debug!(" - clearing IN NAK\n");
             self.registers.device_control.set(self.registers.device_control.get() | 1 << 8);
         }
 
         if status & (OEPINT | IEPINT) != 0 {
-            print!(" - handling endpoint interrupts\n");
+            usb_debug!(" - handling endpoint interrupts\n");
             let daint = self.registers.device_all_ep_interrupt.get();
             let inter_ep0_out = daint & 1 << 16 != 0;
             let inter_ep0_in = daint & 1 != 0;
             if inter_ep0_out || inter_ep0_in {
-                print!(" - handle endpoint 0\n");
+                usb_debug!(" - handle endpoint 0\n");
                 self.handle_ep0(inter_ep0_out, inter_ep0_in);
             }
         }
@@ -413,7 +435,7 @@ impl USB {
         }
 
         let transfer_type = TableCase::decode_interrupt(ep_out_interrupts);
-        print!("USB: handle endpoint 0, transfer type: {:?}\n", transfer_type);
+        usb_debug!("USB: handle endpoint 0, transfer type: {:?}\n", transfer_type);
         let flags = self.ep0_out_descriptors
             .map(|descs| descs[self.cur_out_idx.get()].flags)
             .unwrap();
@@ -421,24 +443,24 @@ impl USB {
 
         match self.state.get() {
             USBState::WaitingForSetupPacket => {
-                print!("USB: waiting for setup in\n");
+                usb_debug!("USB: waiting for setup in\n");
                 if transfer_type == TableCase::A || transfer_type == TableCase::C {
                     if setup_ready {
                         self.handle_setup(transfer_type);
                     } else {
                         
-                        print!("Unhandled USB event out:{:#x} in:{:#x} ",
+                        usb_debug!("Unhandled USB event out:{:#x} in:{:#x} ",
                                ep_out_interrupts,
                                ep_in_interrupts);
-                        print!("flags: \n"); 
-                        if (flags & DescFlag::LAST) == DescFlag::LAST                {print!(" +LAST\n");}
-                        if (flags & DescFlag::SHORT) == DescFlag::SHORT              {print!(" +SHORT\n");}
-                        if (flags & DescFlag::IOC) == DescFlag::IOC                  {print!(" +IOC\n");}
-                        if (flags & DescFlag::SETUP_READY) == DescFlag::SETUP_READY  {print!(" +SETUP_READY\n");}
-                        if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_READY     {print!(" +HOST_READY\n");}
-                        if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_BUSY       {print!(" +DMA_BUSY\n");}
-                        if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_DONE       {print!(" +DMA_DONE\n");}
-                        if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_BUSY      {print!(" +HOST_BUSY\n");}
+                        usb_debug!("flags: \n"); 
+                        if (flags & DescFlag::LAST) == DescFlag::LAST                {usb_debug!(" +LAST\n");}
+                        if (flags & DescFlag::SHORT) == DescFlag::SHORT              {usb_debug!(" +SHORT\n");}
+                        if (flags & DescFlag::IOC) == DescFlag::IOC                  {usb_debug!(" +IOC\n");}
+                        if (flags & DescFlag::SETUP_READY) == DescFlag::SETUP_READY  {usb_debug!(" +SETUP_READY\n");}
+                        if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_READY     {usb_debug!(" +HOST_READY\n");}
+                        if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_BUSY       {usb_debug!(" +DMA_BUSY\n");}
+                        if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_DONE       {usb_debug!(" +DMA_DONE\n");}
+                        if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_BUSY      {usb_debug!(" +HOST_BUSY\n");}
                         panic!("Waiting for set up packet but non-setup packet received.");
                     }
                 } else if transfer_type == TableCase::B {
@@ -448,7 +470,7 @@ impl USB {
                 }
             }
             USBState::DataStageIn => {
-                print!("USB: state is data stage in\n");
+                usb_debug!("USB: state is data stage in\n");
                 if inter_in && ep_in_interrupts & 1 != 0 {
                     self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                 }
@@ -491,25 +513,31 @@ impl USB {
         }
     }
 
-    /// Handle SETUP packets to endpoint 0
+    /// Handle a SETUP packet to endpoint 0 OUT.
     ///
-    /// `transfer_type` is the `TableCase` found by inspecting endpoint-0's
-    /// interrupt register.
+    /// `transfer_type` is the `TableCase` found by inspecting
+    /// endpoint-0's interrupt register. Currently only Standard
+    /// requests to Devices are supported: requests to an Interface
+    /// will panic. Based on the direction of the request and data
+    /// size, this function calls one of handle_setup_device_to_host,
+    /// handle_setup_host_to_device (not supported), or
+    /// handle_setup_no_data_phase.
+    
     fn handle_setup(&self, transfer_type: TableCase) {
         // Assuming `ep0_out_buffers` was properly set in `init`, this will
         // always succeed.
-        print!("Handle setup, case {:?}\n", transfer_type);
+        usb_debug!("Handle setup, case {:?}\n", transfer_type);
         self.ep0_out_buffers.get().map(|bufs| {
             let idx =  self.cur_out_idx.get();
             for i in 0..4 {
-                print!("[{:02x}] ", (bufs[idx][i]) as u8);
-                print!("[{:02x}] ", (bufs[idx][i] >> 8) as u8);
-                print!("[{:02x}] ", (bufs[idx][i] >> 16) as u8);
-                print!("[{:02x}] ", (bufs[idx][i] >> 24) as u8);
+                usb_debug!("[{:02x}] ", (bufs[idx][i]) as u8);
+                usb_debug!("[{:02x}] ", (bufs[idx][i] >> 8) as u8);
+                usb_debug!("[{:02x}] ", (bufs[idx][i] >> 16) as u8);
+                usb_debug!("[{:02x}] ", (bufs[idx][i] >> 24) as u8);
             }
-            print!("\n");
+            usb_debug!("\n");
             let mut req = SetupRequest::new(&bufs[idx]);
-            print!("  - type={:?} recip={:?} dir={:?} request={:?}\n", req.req_type(), req.recipient(), req.data_direction(), req.request());
+            usb_debug!("  - type={:?} recip={:?} dir={:?} request={:?}\n", req.req_type(), req.recipient(), req.data_direction(), req.request());
             if req.req_type() == SetupRequestClass::Standard &&
                req.recipient() == SetupRecipient::Device {
                 // Standard device request: host-to-device to device
@@ -528,7 +556,7 @@ impl USB {
                 // TODO
                 panic!("Recipient is interface");
             } else {
-//                print!("  - unknown case.\n");
+//                usb_debug!("  - unknown case.\n");
             }
         });
     }
@@ -563,13 +591,13 @@ impl USB {
                             descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
                                               DescFlag::SHORT | DescFlag::IOC).bytes(len as u16);
                         });
-                        print!("Trying to send device descriptor: ");
+                        usb_debug!("Trying to send device descriptor: ");
                         self.ep0_in_buffers.map(|buf| {
                             for i in 0..4 {
-                                print!("[{:08x}] ", buf[i]);
+                                usb_debug!("[{:08x}] ", buf[i]);
                             }
                         });
-                        print!("\n");
+                        usb_debug!("\n");
                         self.expect_data_phase_in(transfer_type);
                     },
                     GET_DESCRIPTOR_CONFIGURATION => {
@@ -578,13 +606,13 @@ impl USB {
                         self.ep0_in_buffers.map(|buf| {
                             len = c.into_buf(buf);
                         });
-                        print!("USB: Trying to send configuration descriptor, len {}: {:?}\n  ", len, c);
+                        usb_debug!("USB: Trying to send configuration descriptor, len {}: {:?}\n  ", len, c);
                         self.ep0_in_buffers.map(|buf| {
                             for i in 0..4 {
-                                print!("[{:08x}] ", buf[i]);
+                                usb_debug!("[{:08x}] ", buf[i]);
                             }
                         });
-                        print!("\n");
+                        usb_debug!("\n");
                         len = ::core::cmp::min(len, req.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
                             descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
@@ -593,7 +621,7 @@ impl USB {
                         self.expect_data_phase_in(transfer_type);
                     },
                     GET_DESCRIPTOR_DEVICE_QUALIFIER => {
-                        print!("Trying to send device qualifier: stall both fifos.\n");
+                        usb_debug!("Trying to send device qualifier: stall both fifos.\n");
                         self.stall_both_fifos();
                     }
                     _ => {
@@ -621,33 +649,32 @@ impl USB {
     }
 
     fn handle_setup_host_to_device(&self, _transfer_type: TableCase, _req: &SetupRequest) {
-//        print!("  - host to device.\n");
         // TODO(alevy): don't support any of these yet...
         unimplemented!();
     }
 
     fn handle_setup_no_data_phase(&self, transfer_type: TableCase, req: &SetupRequest) {
         use self::types::SetupRequestType::*;
-        print!(" - setup (no data): {:?}\n", req.request());
+        usb_debug!(" - setup (no data): {:?}\n", req.request());
         match req.request() {
             GetStatus => {
                 panic!("USB: GET_STATUS no data setup packet.");
             }
             SetAddress => {
-                print!("Setting address: {:#x}.\n", req.w_value & 0x7f);
+                usb_debug!("Setting address: {:#x}.\n", req.w_value & 0x7f);
                 // Even though USB wants the address to be set after the
                 // IN packet handshake, the hardware knows to wait, so
                 // we should just set it now.
                 let mut dcfg = self.registers.device_config.get();
                 dcfg &= !(0x7f << 4); // Strip address from config
-                dcfg |= ((req.w_value & 0x7f) as u32) << 4;
+                dcfg |= ((req.w_value & 0x7f) as u32) << 4; // Put in addr
                 self.registers
                     .device_config
                     .set(dcfg);
                 self.expect_status_phase_in(transfer_type);
             }
             SetConfiguration => {
-                print!("SetConfiguration: {:?} Type {:?} transfer\n", req.w_value, transfer_type);
+                usb_debug!("SetConfiguration: {:?} Type {:?} transfer\n", req.w_value, transfer_type);
                 self.configuration_value.set(req.w_value as u8);
                 self.expect_status_phase_in(transfer_type);
             }
@@ -657,20 +684,24 @@ impl USB {
         }
     }
 
+
+    /// Call to send data to the host; assumes that the data has already
+    /// been put in the IN0 descriptors.
     fn expect_data_phase_in(&self, transfer_type: TableCase) {
         self.state.set(USBState::DataStageIn);
-        print!("USB: expect_data_phase_in, case: {:?}\n", transfer_type);
+        usb_debug!("USB: expect_data_phase_in, case: {:?}\n", transfer_type);
         self.ep0_in_descriptors.map(|descs| {
             // 2. Flush fifos
             self.flush_tx_fifo(0);
 
             // 3. Set EP0 in DMA
             self.registers.in_endpoints[0].dma_address.set(&descs[0]);
-            print!("USB: expect_data_phase_in: endpoint 0 descriptor: flags={:08x} addr={:08x} \n", descs[0].flags.0, descs[0].addr);
+            usb_debug!("USB: expect_data_phase_in: endpoint 0 descriptor: flags={:08x} addr={:08x} \n", descs[0].flags.0, descs[0].addr);
 
-            // If we clear the NAK (write CNAK) then this responds to a non-setup packet, leading
-            // to failure as the code needs to first respond to a setup packet.
-            if transfer_type == TableCase::C && true {
+            // If we clear the NAK (write CNAK) then this responds to
+            // a non-setup packet, leading to failure as the code
+            // needs to first respond to a setup packet.
+            if transfer_type == TableCase::C {
                 self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
             } else {
                 self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
@@ -682,14 +713,15 @@ impl USB {
                     (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
             });
 
-            // If we clear the NAK (write CNAK) then this responds to a non-setup packet, leading
-            // to failure as the code needs to first respond to a setup packet.
-            if transfer_type == TableCase::C && true {
+            // If we clear the NAK (write CNAK) then this responds to
+            // a non-setup packet, leading to failure as the code
+            // needs to first respond to a setup packet.
+            if transfer_type == TableCase::C {
                 self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
             } else {
                 self.registers.out_endpoints[0].control.set(EpCtl::ENABLE);
             }
-            print!("Registering for IN0 and OUT0 interrupts.\n");
+            usb_debug!("Registering for IN0 and OUT0 interrupts.\n");
             self.registers
                 .device_all_ep_interrupt_mask
                 .set(self.registers.device_all_ep_interrupt_mask.get() |
@@ -701,7 +733,7 @@ impl USB {
     /// Setup endpoint 0 for a status phase with no data phase.
     fn expect_status_phase_in(&self, transfer_type: TableCase) {
         self.state.set(USBState::NoDataStage);
-        print!("USB: expect_status_phase_in, case: {:?}\n", transfer_type);
+        usb_debug!("USB: expect_status_phase_in, case: {:?}\n", transfer_type);
 
         self.ep0_in_descriptors.map(|descs| {
             // 1. Expect a zero-length in for the status phase
@@ -719,7 +751,7 @@ impl USB {
             // 3. Set EP0 in DMA
             self.registers.in_endpoints[0].dma_address.set(&descs[0]);
 
-            if transfer_type == TableCase::C && true {
+            if transfer_type == TableCase::C {
                 self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
             } else {
                 self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
@@ -731,7 +763,7 @@ impl USB {
                     (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
             });
 
-            if transfer_type == TableCase::C && true {
+            if transfer_type == TableCase::C {
                 self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
             } else {
                 self.registers.out_endpoints[0].control.set(EpCtl::ENABLE);
@@ -739,7 +771,9 @@ impl USB {
 
             self.registers
                 .device_all_ep_interrupt_mask
-                .set(self.registers.device_all_ep_interrupt_mask.get() | 1 | 1 << 16);
+                .set(self.registers.device_all_ep_interrupt_mask.get() |
+                     AllEndpointInterruptMask::IN0 as u32 |
+                     AllEndpointInterruptMask::OUT0 as u32);
         });
     }
 
@@ -750,10 +784,10 @@ impl USB {
     /// Only call this when  transaction is not underway and data from this FIFO
     /// is not being copied.
     fn flush_rx_fifo(&self) {
-        self.registers.reset.set(1 << 4); // TxFFlsh
+        self.registers.reset.set(Reset::TxFFlsh as u32); // TxFFlsh
 
         // Wait for TxFFlsh to clear
-        while self.registers.reset.get() & 1 << 4 != 0 {}
+        while self.registers.reset.get() & (Reset::TxFFlsh as u32) != 0 {}
     }
 
     /// Flush endpoint 0's TX FIFO
@@ -766,10 +800,10 @@ impl USB {
     /// is not being copied.
     fn flush_tx_fifo(&self, fifo_num: u8) {
         self.registers.reset.set((fifo_num as u32) << 6 | // TxFIFO number: 0
-            1 << 5);                 // TxFFlsh
+            (Reset::TxFFlsh as u32));                 // TxFFlsh
 
         // Wait for TxFFlsh to clear
-        while self.registers.reset.get() & 1 << 5 != 0 {}
+        while self.registers.reset.get() & (Reset:TxFFlsh as u32) != 0 {}
     }
 
     /// Initialize hardware data fifos
@@ -795,21 +829,26 @@ impl USB {
 
     }
 
-    /// Perform a soft reset on the USB core. May timeout if the reset takes too
-    /// long.
+    /// Perform a soft reset on the USB core. May timeout if the reset
+    /// takes too long.
     fn soft_reset(&self) {
-        self.registers.reset.set(1);
+        // Reset
+        self.registers.reset.set(Reset::CSftRst as u32);
 
         let mut timeout = 10000;
-        while self.registers.reset.get() & 1 == 1 && timeout > 0 {
+        // Wait until reset flag is cleared or timeout
+        while self.registers.reset.get() & (Reset::CSftRst as u32) == 1 &&
+            timeout > 0 {
             timeout -= 1;
         }
         if timeout == 0 {
             return;
         }
 
+        // Wait until Idle flag is set or timeout
         let mut timeout = 10000;
-        while self.registers.reset.get() & 1 << 31 == 0 && timeout > 0 {
+        while self.registers.reset.get() & (Reset::AHBIdle as u32) == 0 &&
+            timeout > 0 {
             timeout -= 1;
         }
         if timeout == 0 {

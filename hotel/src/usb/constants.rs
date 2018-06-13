@@ -47,6 +47,14 @@ pub enum Interrupt {
     ResumeWakeup      = 1 << 31,
 }
 
+pub enum Reset {
+    CSftRst          = 1 <<  0,
+    RxFFlsh          = 1 <<  4,
+    TxFFlsh          = 1 <<  5,
+    DMAReq           = 1 << 30,
+    AHBIdle          = 1 << 31,
+}
+
 pub enum AllEndpointInterruptMask {
     IN0   = 1 <<  0,
     IN1   = 1 <<  1,
