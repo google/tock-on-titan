@@ -18,14 +18,15 @@ pub use self::registers::DMADescriptor;
 use self::types::{SetupRequest, DeviceDescriptor, ConfigurationDescriptor};
 use self::types::{SetupDirection, SetupRequestClass, SetupRecipient};
 
-/// A pointer to statically allocated mutable data such as memory mapped I/O
-/// registers.
+/// A StaticRef is a pointer to statically allocated mutable data such
+/// as memory mapped I/O registers.
 ///
-/// This is a simple wrapper around a raw pointer that encapsulates an unsafe
-/// dereference in a safe manner. It serve the role of creating a `&'static T`
-/// given a raw address and acts similarly to `extern` definitions, except
-/// `StaticRef` is subject to module and crate bounderies, while `extern`
-/// definitions can be imported anywhere.
+/// It is a simple wrapper around a raw pointer that encapsulates an
+/// unsafe dereference in a safe manner. It serves the role of
+/// creating a `&'static T` given a raw address and acts similarly to
+/// `extern` definitions, except `StaticRef` is subject to module and
+/// crate bounderies, while `extern` definitions can be imported
+/// anywhere.
 ///
 /// TODO(alevy): move into `common` crate or replace with other mechanism.
 struct StaticRef<T> {
@@ -51,7 +52,8 @@ impl<T> Deref for StaticRef<T> {
     }
 }
 
-/// Encodes the current state of the USB driver's state machine
+/// USBState encodes the current state of the USB driver's state
+/// machine
 #[derive(Clone,Copy,PartialEq,Eq)]
 enum USBState {
     WaitingForSetupPacket,
@@ -59,10 +61,19 @@ enum USBState {
     NoDataStage,
 }
 
-/// USB driver for the Synopsis controller
+/// Driver for the Synopsys DesignWare Cores USB 2.0 Hi-Speed
+/// On-The-Go (OTG) controller.
 ///
-/// The driver operates as a device in Scatter-Gather DMA mode and
-/// performs the initial handshake with the host on endpoint 0.
+/// Page/figure references are for the Synopsys DesignWare Cores USB
+/// 2.0 Hi-Speed On-The-Go (OTG) Programmer's Guide.
+///
+/// The driver can enumerate (appear as a device to a host OS) but
+/// cannot perform any other operations (yet). The driver operates as
+/// a device in Scatter-Gather DMA mode (Figure 1-1) and performs the
+/// initial handshakes with the host on endpoint 0. It appears as an
+/// "Unknown counterfeit flash drive" (ID 0011:7788) under Linux; this
+/// was chosen as it won't collide with other valid devices and Linux
+/// doesn't expect anything.
 ///
 /// Scatter-gather mode operates using lists of descriptors. Each
 /// descriptor points to a 64 byte memory buffer. A transfer larger
@@ -177,16 +188,19 @@ impl USB {
             next_out_idx: Cell::new(0),
             cur_out_idx: Cell::new(0),
             device_class: Cell::new(0x00),
-            vendor_id: Cell::new(0x0011),
-            product_id: Cell::new(0x7788),
+            vendor_id: Cell::new(0x0011),    // unknown counterfeit flash drive
+            product_id: Cell::new(0x7788),   // unknown counterfeit flash drive
             configuration_value: Cell::new(0),
         }
     }
 
-    /// Sets up EP0 OUT to receive a setup packet from the host.
+    /// Set up endpoint 0 OUT descriptors to receive a setup packet
+    /// from the host, whose reception will trigger an interrupt.
     ///
-    /// The SETUP packet is less than 64 bytes, so we only need one descriptor.
-    /// Sets the Last and Interrupt-on-completion bits and max size to 64 bytes.
+    /// A SETUP packet is less than 64 bytes, so only one OUT
+    /// descriptor is needed. This function sets the max size of
+    /// the packet to 64 bytes the Last and
+    /// Interrupt-on-completion bits and max size to 64 bytes.
     ///
     /// In preparation for a SETUP packet we only want to receive interrupts for
     /// OUT, not IN.
@@ -201,11 +215,11 @@ impl USB {
         // EP0 OUT interrupts on
         self.registers
             .device_all_ep_interrupt_mask
-            .set(self.registers.device_all_ep_interrupt_mask.get() | (1 << 16));
+            .set(self.registers.device_all_ep_interrupt_mask.get() | AllEndpointInterruptMask::OUT0 as u32);
         // EP0 IN interrupts off
         self.registers
             .device_all_ep_interrupt_mask
-            .set(self.registers.device_all_ep_interrupt_mask.get() & !1);
+            .set(self.registers.device_all_ep_interrupt_mask.get() & !(AllEndpointInterruptMask::IN0 as u32));
 
         // Enable OUT endpoint 0 and clear NAK bit
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
@@ -224,11 +238,11 @@ impl USB {
         // EP0 OUT interrupts on
         self.registers
             .device_all_ep_interrupt_mask
-            .set(self.registers.device_all_ep_interrupt_mask.get() | (1 << 16));
+            .set(self.registers.device_all_ep_interrupt_mask.get() | AllEndpointInterruptMask::OUT0 as u32);
         // EP0 IN interrupts off
         self.registers
             .device_all_ep_interrupt_mask
-            .set(self.registers.device_all_ep_interrupt_mask.get() & !1);
+            .set(self.registers.device_all_ep_interrupt_mask.get() & !(AllEndpointInterruptMask::IN0 as u32));
 
         // Enable OUT endpoint 0 and clear NAK bit
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
@@ -454,7 +468,7 @@ impl USB {
                 }
             }
             USBState::NoDataStage => {
-                if inter_in && ep_in_interrupts & 1 != 0 {
+                if inter_in && ep_in_interrupts & (AllEndpointInterruptMask::IN0 as u32) != 0 {
                     self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                 }
 
@@ -525,7 +539,6 @@ impl USB {
         match req.request() {
             GetDescriptor => {
                 let descriptor_type: u32 = (req.w_value >> 8) as u32;
-                print!("USB: GetDescriptor {:?}\n", descriptor_type);
                 match descriptor_type {
                     GET_DESCRIPTOR_DEVICE => {
                         let mut len = self.ep0_in_buffers.map(|buf|
@@ -595,8 +608,8 @@ impl USB {
 
                 len = ::core::cmp::min(len, req.w_length as usize);
                 self.ep0_in_descriptors.map(|descs| {
-                    descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::SHORT |
-                                      DescFlag::IOC)
+                    descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
+                                      DescFlag::SHORT | DescFlag::IOC)
                         .bytes(len as u16);
                 });
                 self.expect_data_phase_in(transfer_type);
@@ -625,10 +638,12 @@ impl USB {
                 // Even though USB wants the address to be set after the
                 // IN packet handshake, the hardware knows to wait, so
                 // we should just set it now.
-                let dcfg = self.registers.device_config.get();
+                let mut dcfg = self.registers.device_config.get();
+                dcfg &= !(0x7f << 4); // Strip address from config
+                dcfg |= ((req.w_value & 0x7f) as u32) << 4;
                 self.registers
                     .device_config
-                    .set((dcfg & !(0x7f << 4)) | (((req.w_value & 0x7f) as u32) << 4));
+                    .set(dcfg);
                 self.expect_status_phase_in(transfer_type);
             }
             SetConfiguration => {
