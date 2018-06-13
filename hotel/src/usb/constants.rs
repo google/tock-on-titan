@@ -47,6 +47,7 @@ pub enum Interrupt {
     ResumeWakeup      = 1 << 31,
 }
 
+#[allow(dead_code)]
 pub enum Reset {
     CSftRst          = 1 <<  0,
     RxFFlsh          = 1 <<  4,
@@ -55,6 +56,7 @@ pub enum Reset {
     AHBIdle          = 1 << 31,
 }
 
+#[allow(dead_code)]
 pub enum AllEndpointInterruptMask {
     IN0   = 1 <<  0,
     IN1   = 1 <<  1,

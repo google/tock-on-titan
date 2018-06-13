@@ -5,7 +5,7 @@ use kernel::hil::rng::{Continue, RNG, Client};
 use kernel::common::volatile_cell::VolatileCell;
 
 #[allow(dead_code)]
-#[repr(C, packed)]
+#[repr(C)]
 struct Registers {
     /// TRNG version.  Defaults to 0x2d013316.
     _version: VolatileCell<u32>,

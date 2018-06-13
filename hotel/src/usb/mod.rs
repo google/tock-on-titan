@@ -1,5 +1,3 @@
-#![feature(const_fn)]
-
 use core::cell::Cell;
 use core::ops::Deref;
 use kernel::common::take_cell::TakeCell;
@@ -529,14 +527,7 @@ impl USB {
         usb_debug!("Handle setup, case {:?}\n", transfer_type);
         self.ep0_out_buffers.get().map(|bufs| {
             let idx =  self.cur_out_idx.get();
-            for i in 0..4 {
-                usb_debug!("[{:02x}] ", (bufs[idx][i]) as u8);
-                usb_debug!("[{:02x}] ", (bufs[idx][i] >> 8) as u8);
-                usb_debug!("[{:02x}] ", (bufs[idx][i] >> 16) as u8);
-                usb_debug!("[{:02x}] ", (bufs[idx][i] >> 24) as u8);
-            }
-            usb_debug!("\n");
-            let mut req = SetupRequest::new(&bufs[idx]);
+            let req = SetupRequest::new(&bufs[idx]);
             usb_debug!("  - type={:?} recip={:?} dir={:?} request={:?}\n", req.req_type(), req.recipient(), req.data_direction(), req.request());
             if req.req_type() == SetupRequestClass::Standard &&
                req.recipient() == SetupRecipient::Device {
@@ -591,13 +582,7 @@ impl USB {
                             descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
                                               DescFlag::SHORT | DescFlag::IOC).bytes(len as u16);
                         });
-                        usb_debug!("Trying to send device descriptor: ");
-                        self.ep0_in_buffers.map(|buf| {
-                            for i in 0..4 {
-                                usb_debug!("[{:08x}] ", buf[i]);
-                            }
-                        });
-                        usb_debug!("\n");
+                        usb_debug!("Trying to send device descriptor.\n");
                         self.expect_data_phase_in(transfer_type);
                     },
                     GET_DESCRIPTOR_CONFIGURATION => {
@@ -607,12 +592,6 @@ impl USB {
                             len = c.into_buf(buf);
                         });
                         usb_debug!("USB: Trying to send configuration descriptor, len {}: {:?}\n  ", len, c);
-                        self.ep0_in_buffers.map(|buf| {
-                            for i in 0..4 {
-                                usb_debug!("[{:08x}] ", buf[i]);
-                            }
-                        });
-                        usb_debug!("\n");
                         len = ::core::cmp::min(len, req.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
                             descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
@@ -803,7 +782,7 @@ impl USB {
             (Reset::TxFFlsh as u32));                 // TxFFlsh
 
         // Wait for TxFFlsh to clear
-        while self.registers.reset.get() & (Reset:TxFFlsh as u32) != 0 {}
+        while self.registers.reset.get() & (Reset::TxFFlsh as u32) != 0 {}
     }
 
     /// Initialize hardware data fifos

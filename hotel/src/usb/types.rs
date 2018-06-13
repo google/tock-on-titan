@@ -134,7 +134,8 @@ impl SetupRequest {
             w_length:       ((buf[1] & 0xffff0000) >> 16) as u16,
         }
     }
-   
+
+#[allow(dead_code)]
     pub fn parse(buf: &[u32; 16], req: &mut SetupRequest) {
         req.bm_request_type = (buf[0] & 0xff) as u8;
         req.b_request =      ((buf[0] & 0x0000ff00) >> 8) as u8;
