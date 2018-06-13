@@ -220,17 +220,13 @@ impl USB {
                 (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
         });
 
-        // Enable EP0 OUT interrupts
-        self.registers
-            .device_all_ep_interrupt_mask
-            .set(self.registers.device_all_ep_interrupt_mask.get() | AllEndpointInterruptMask::OUT0 as u32);
-        // Disable EP0 IN interrupts 
-        self.registers
-            .device_all_ep_interrupt_mask
-            .set(self.registers.device_all_ep_interrupt_mask.get() & !(AllEndpointInterruptMask::IN0 as u32));
+        // Enable OUT and disable IN interrupts
+        let mut interrupts = self.registers.device_all_ep_interrupt_mask.get();
+        interrupts |= AllEndpointInterruptMask::OUT0 as u32;
+        interrupts &= !(AllEndpointInterruptMask::IN0 as u32);
+        self.registers.device_all_ep_interrupt_mask.set(interrupts);
 
-        // Enable OUT endpoint 0 and clear NAK bit; clearing the NAK
-        // bit tells host that device is ready to receive.
+        // Clearing the NAK bit tells host that device is ready to receive.
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
     }
     
@@ -426,7 +422,7 @@ impl USB {
 
         // Prepare next OUT descriptor if XferCompl
         if inter_out &&
-            ep_out_interrupts & (OutEndpointInterruptMask::XferComplMsk as u32) != 0 {
+            ep_out_interrupts & (OutInterruptMask::XferComplMsk as u32) != 0 {
             self.got_rx_packet();
         }
 
@@ -468,7 +464,7 @@ impl USB {
             USBState::DataStageIn => {
                 usb_debug!("USB: state is data stage in\n");
                 if inter_in &&
-                    ep_in_interrupts & (InEndpointInterruptMask::XferComplMsk as u32) != 0 {
+                    ep_in_interrupts & (InInterruptMask::XferComplMsk as u32) != 0 {
                     self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                 }
 
@@ -1047,10 +1043,11 @@ pub enum PHY {
     B,
 }
 
-/// Combinations of OUT endpoint interrupts for control transfers
+/// Combinations of OUT endpoint interrupts for control transfers denote
+/// different transfer cases.
 ///
-/// Encodes the cases in from Table 10.7 in the Programming Guide (pages
-/// 279-230).
+/// TableCase encodes the cases from Table 10.7 in the OTG Programming
+/// Guide (pages 279-230).
 #[derive(Copy,Clone,PartialEq,Eq,Debug)]
 pub enum TableCase {
     /// Case A
@@ -1092,20 +1089,16 @@ impl TableCase {
     /// Only properly decodes values with the combinations shown in the
     /// programming guide.
     pub fn decode_interrupt(device_out_int: u32) -> TableCase {
-        if device_out_int & (1 << 0) != 0 {
-            // XferCompl
-            if device_out_int & (1 << 3) != 0 {
-                // Setup
+        if device_out_int & (OutInterruptMask::XferComplMsk as u32) != 0 {
+            if device_out_int & (OutInterruptMask::SetUPMsk as u32) != 0 {
                 TableCase::C
-            } else if device_out_int & (1 << 5) != 0 {
-                // StsPhseRcvd
+            } else if device_out_int & (OutInterruptMask::StsPhseRcvdMsk as u32) != 0 {
                 TableCase::E
             } else {
                 TableCase::A
             }
         } else {
-            if device_out_int & (1 << 3) != 0 {
-                // Setup
+            if device_out_int & (OutInterruptMask::SetUPMsk as u32) != 0 {
                 TableCase::B
             } else {
                 TableCase::D

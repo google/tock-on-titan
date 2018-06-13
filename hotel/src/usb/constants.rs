@@ -22,29 +22,29 @@ pub const TX_FIFO_SIZE: u16 = 2 * MAX_PACKET_SIZE / 4;
 
 #[derive(PartialEq)]
 pub enum Interrupt {
-    HostMode         = 1 <<  0,
-    Mismatch         = 1 <<  1,
-    OTG              = 1 <<  2,
-    SOF              = 1 <<  3,
-    RxFIFO           = 1 <<  4,
-    GlobalInNak      = 1 <<  6,
-    OutNak           = 1 <<  7,
-    EarlySuspend     = 1 << 10,
-    Suspend          = 1 << 11,
-    Reset            = 1 << 12,
-    EnumDone         = 1 << 13,
-    OutISOCDrop      = 1 << 14,
-    EOPF             = 1 << 15,
-    EndpointMismatch = 1 << 17,
-    InEndpoints      = 1 << 18,
-    OutEndpoints     = 1 << 19,
-    InISOCIncomplete = 1 << 20,
+    HostMode           = 1 <<  0,
+    Mismatch           = 1 <<  1,
+    OTG                = 1 <<  2,
+    SOF                = 1 <<  3,
+    RxFIFO             = 1 <<  4,
+    GlobalInNak        = 1 <<  6,
+    OutNak             = 1 <<  7,
+    EarlySuspend       = 1 << 10,
+    Suspend            = 1 << 11,
+    Reset              = 1 << 12,
+    EnumDone           = 1 << 13,
+    OutISOCDrop        = 1 << 14,
+    EOPF               = 1 << 15,
+    EndpointMismatch   = 1 << 17,
+    InEndpoints        = 1 << 18,
+    OutEndpoints       = 1 << 19,
+    InISOCIncomplete   = 1 << 20,
     IncompletePeriodic = 1 << 21,
     FetchSuspend       = 1 << 22,
     ResetDetected      = 1 << 23,
     ConnectIDChange    = 1 << 28,
     SessionRequest     = 1 << 30,
-    ResumeWakeup      = 1 << 31,
+    ResumeWakeup       = 1 << 31,
 }
 
 #[allow(dead_code)]
@@ -111,7 +111,7 @@ pub enum AllEndpointInterruptMask {
 
 // OTG Databook, Table 5-58
 #[allow(dead_code)]
-pub enum OutEndpointInterruptMask {
+pub enum OutInterruptMask {
     XferComplMsk =         1 <<  0,    
     EPDisbldMsg =          1 <<  1,
     AHBErrMsk =            1 <<  2,
@@ -131,7 +131,7 @@ pub enum OutEndpointInterruptMask {
 
 // OTG Databook, Table 5-57
 #[allow(dead_code)]
-pub enum InEndpointInterruptMask {
+pub enum InInterruptMask {
     XferComplMsk =         1 <<  0,    
     EPDisbldMsg =          1 <<  1,
     AHBErrMsk =            1 <<  2,
