@@ -6,7 +6,6 @@
 
 extern crate cortexm3;
 extern crate kernel;
-extern crate aligned;
 
 #[macro_use]
 pub mod io;
@@ -22,6 +21,8 @@ pub mod timeus;
 pub mod trng;
 pub mod uart;
 pub mod usb;
+
+pub mod test_rng;
 
 unsafe extern "C" fn unhandled_interrupt() {
     let mut interrupt_number: u32;

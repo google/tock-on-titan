@@ -81,4 +81,5 @@ impl Chip for Hotel {
     fn systick(&self) -> &Self::SysTick {
         &self.systick
     }
+
 }

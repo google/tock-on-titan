@@ -57,7 +57,7 @@ impl<'a> AesDriver<'a> {
                     (KeySize::KeySize192, 24) => {}
                     (KeySize::KeySize256, 32) => {}
                     _ => {
-                        println!("Key size is wrong. Given {}, expected {:?}",
+                        debug!("Key size is wrong. Given {}, expected {:?}",
                                  raw_key.len() * 8,
                                  key_size);
                         return ReturnCode::EINVAL;

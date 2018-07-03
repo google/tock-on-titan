@@ -1,6 +1,7 @@
-use capsules::test::rng::TestRng;
+use test_rng::TestRng;
 use kernel::hil::rng::RNG;
 use hotel::trng;
+use hotel::test_rng;
 
 pub unsafe fn run_rng() {
     let r = static_init_test_rng();

@@ -1,10 +1,12 @@
+#![allow(dead_code)]
+
 //! Driver for the True Random Number Generator (TRNG).
 
 use core::cell::Cell;
-use kernel::hil::rng::{Continue, RNG, Client};
+use hil::rng::{Continue, RNG, Client};
 use kernel::common::volatile_cell::VolatileCell;
 
-#[allow(dead_code)]
+
 #[repr(C)]
 struct Registers {
     /// TRNG version.  Defaults to 0x2d013316.
@@ -145,13 +147,6 @@ impl<'a> Trng<'a> {
             }
         });
     }
-}
-
-impl<'a> RNG<'a> for Trng<'a> {
-    
-    fn set_client(&self, client: &'a Client) {
-        self.client.set(Some(client));
-    }
 
     fn init(&self) {
         let regs = unsafe { &*self.regs };
@@ -166,7 +161,13 @@ impl<'a> RNG<'a> for Trng<'a> {
         regs.go_event.set(1);
     }
 
+}
 
+impl<'a> RNG<'a> for Trng<'a> {
+
+    fn set_client(&self, client: &'a Client) {
+        self.client.set(Some(client));
+    }
     
     fn get(&self) {
         let regs = unsafe { &*self.regs };

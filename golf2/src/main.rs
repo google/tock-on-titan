@@ -5,20 +5,19 @@
 extern crate capsules;
 extern crate compiler_builtins;
 extern crate hotel;
-#[macro_use(static_init)]
+#[macro_use(static_init,debug)]
 extern crate kernel;
 
 #[macro_use]
 pub mod io;
 
-pub mod rng_test;
 pub mod digest;
 pub mod aes;
 
 use kernel::{Chip, Platform};
 use kernel::mpu::MPU;
 use kernel::hil::uart::UART;
-use kernel::hil::rng::RNG;
+//use kernel::hil::rng::RNG;
 
 // State for loading apps
 const NUM_PROCS: usize = 2;
@@ -38,7 +37,7 @@ pub struct Golf {
     ipc: kernel::ipc::IPC,
     digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
-    rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::Trng<'static>>,
+    //rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::Trng<'static>>,
 }
 
 #[no_mangle]
@@ -85,7 +84,7 @@ pub unsafe fn reset_handler() {
     console.initialize();
     let kc = static_init!(capsules::console::App, capsules::console::App::default());
     kernel::debug::assign_console_driver(Some(console), kc);
-    
+
     let gpio_pins = static_init!(
         [&'static hotel::gpio::GPIOPin; 2],
         [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]],
@@ -119,12 +118,12 @@ pub unsafe fn reset_handler() {
         16);
     hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
 
-    hotel::trng::TRNG0.init();
+/*    hotel::trng::TRNG0.init();
     let rng = static_init!(
         capsules::rng::SimpleRng<'static, hotel::trng::Trng>,
         capsules::rng::SimpleRng::new(&mut hotel::trng::TRNG0, kernel::grant::Grant::create()),
         8);
-    hotel::trng::TRNG0.set_client(rng);
+    hotel::trng::TRNG0.set_client(rng);*/
  
     let golf2 = static_init!(Golf, Golf {
         console: console,
@@ -133,7 +132,7 @@ pub unsafe fn reset_handler() {
         ipc: kernel::ipc::IPC::new(),
         digest: digest,
         aes: aes,
-        rng: rng,
+//        rng: rng,
     }, 8);
 
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
@@ -148,7 +147,7 @@ pub unsafe fn reset_handler() {
 
     let end = timerhs.now();
 
-    println!("Tock 1.0 booting. Initialization took {} tics.\r",
+    println!("Tock 1.0 booting. Initialization took {} tics.",
               end.wrapping_sub(start));
 
 
@@ -169,7 +168,8 @@ pub unsafe fn reset_handler() {
         FAULT_RESPONSE,
     );
 
-    //debug!("Loaded processes: finish boot sequence.\r");
+    debug!("Start main loop.");
+    debug!("");
     kernel::main(golf2, &mut chip, &mut PROCESSES, &golf2.ipc);
 }
 
@@ -183,7 +183,7 @@ impl Platform for Golf {
             digest::DRIVER_NUM             => f(Some(self.digest)),
             capsules::alarm::DRIVER_NUM => f(Some(self.timer)),
             aes::DRIVER_NUM   => f(Some(self.aes)),
-            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
+//            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
             kernel::ipc::DRIVER_NUM     => f(Some(&self.ipc)),
             _ => f(None),
         }
