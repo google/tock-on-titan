@@ -126,6 +126,7 @@ impl BitAnd for EpCtl {
 }
 
 #[repr(C)]
+#[repr(align(4))]
 #[derive(Clone, Copy, Debug)]
 pub struct DMADescriptor {
     pub flags: DescFlag,
@@ -178,5 +179,9 @@ impl DescFlag {
     /// Set the number of bytes to transmit
     pub const fn bytes(self, bytes: u16) -> DescFlag {
         DescFlag(self.0 | bytes as u32)
+    }
+
+    pub const fn to_u32(self) -> u32 {
+        self.0
     }
 }

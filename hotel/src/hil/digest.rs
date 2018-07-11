@@ -38,13 +38,13 @@ impl From<DigestError> for SyscallError {
 
 pub trait DigestEngine {
     /// Initializes the digest engine for the given mode.
-    fn initialize(&mut self, mode: DigestMode) -> Result<(), DigestError>;
+    fn initialize(&self, mode: DigestMode) -> Result<(), DigestError>;
 
     /// Feeds data into the digest. Returns the number of bytes that were actually consumed from
     /// the input.
-    fn update(&mut self, data: &[u8]) -> Result<usize, DigestError>;
+    fn update(&self, data: &[u8]) -> Result<usize, DigestError>;
 
     /// Finalizes the digest, and stores it in the `output` buffer. Returns the number of bytes
     /// stored.
-    fn finalize(&mut self, output: &mut [u8]) -> Result<usize, DigestError>;
+    fn finalize(&self, output: &mut [u8]) -> Result<usize, DigestError>;
 }

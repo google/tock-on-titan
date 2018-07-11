@@ -12,7 +12,8 @@ panic = "abort"
 lto = true
 
 [dependencies]
-rust-libcore = "*"
 capsules = { path = "../tock/capsules" }
 hotel = { path = "../hotel" }
 kernel = { path = "../tock/kernel" }
+aligned="0.2.0"
+

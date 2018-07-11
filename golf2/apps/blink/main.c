@@ -1,12 +1,13 @@
-#include <firestorm.h>
 #include <gpio.h>
+int x;
 
 int main(void) {
-    gpio_enable_output(LED_0);
+  printf("Booted Blink app.\n");
+  gpio_enable_output(0);
 
-    while(1) {
-      gpio_toggle(LED_0);
-      delay_ms(500);
-    }
+  while(1) {
+    gpio_toggle(0);
+    for (int i = 0; i < 1000000; i++) {x+=i;}
+  }
 }
 

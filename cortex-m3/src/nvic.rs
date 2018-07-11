@@ -2,8 +2,8 @@
 
 use kernel::common::volatile_cell::VolatileCell;
 
-#[repr(C, packed)]
-// Registers for the NVIC. Each
+#[repr(C)]
+// Registers for the NVIC
 struct Registers {
     // Interrupt set-enable
     iser: [VolatileCell<u32>; 8],
@@ -50,18 +50,23 @@ pub unsafe fn disable_all() {
 pub unsafe fn next_pending() -> Option<u32> {
     let nvic: &Registers = &*BASE_ADDRESS;
 
-    for block in 0..nvic.ispr.len() {
-
-        let ispr = nvic.ispr[block].get();
+    for (block, ispr) in nvic.ispr.iter().enumerate() {
+        let ispr = ispr.get();
 
         // If there are any high bits there is a pending interrupt
-        if ispr.count_ones() > 0 {
+        if ispr != 0 {
             // trailing_zeros == index of first high bit
             let bit = ispr.trailing_zeros();
             return Some(block as u32 * 32 + bit);
         }
     }
     None
+}
+
+pub unsafe fn has_pending() -> bool {
+    let nvic: &Registers = &*BASE_ADDRESS;
+
+    nvic.ispr.iter().fold(0, |i, ispr| ispr.get() | i) != 0
 }
 
 /// An opaque wrapper for a single NVIC interrupt.

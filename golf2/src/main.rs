@@ -1,66 +1,43 @@
 #![no_std]
 #![no_main]
-#![feature(lang_items)]
+#![feature(asm, const_fn, lang_items, compiler_builtins_lib, const_cell_new)]
 
 extern crate capsules;
+extern crate compiler_builtins;
 extern crate hotel;
-#[macro_use(static_init)]
+#[macro_use(static_init,debug)]
 extern crate kernel;
 
 #[macro_use]
 pub mod io;
-pub mod rng;
 
 pub mod digest;
 pub mod aes;
 
-use kernel::{Chip, MPU, Platform};
+use kernel::{Chip, Platform};
+use kernel::mpu::MPU;
+use kernel::hil::uart::UART;
+//use kernel::hil::rng::RNG;
 
-unsafe fn load_processes() -> &'static mut [Option<kernel::process::Process<'static>>] {
-    extern "C" {
-        /// Beginning of the ROM region containing app images.
-        static _sapps: u8;
-    }
+// State for loading apps
+const NUM_PROCS: usize = 2;
 
-    const NUM_PROCS: usize = 2;
+// how should the kernel respond when a process faults
+const FAULT_RESPONSE: kernel::process::FaultResponse = kernel::process::FaultResponse::Panic;
 
-    #[link_section = ".app_memory"]
-    static mut MEMORIES: [[u8; 8192]; NUM_PROCS] = [[0; 8192]; NUM_PROCS];
+#[link_section = ".app_memory"]
+static mut APP_MEMORY: [u8; 16384] = [0; 16384];
 
-    static mut processes: [Option<kernel::process::Process<'static>>; NUM_PROCS] = [None, None];
-
-    let mut addr = &_sapps as *const u8;
-    for i in 0..NUM_PROCS {
-        // The first member of the LoadInfo header contains the total size of each process image. A
-        // sentinel value of 0 (invalid because it's smaller than the header itself) is used to
-        // mark the end of the list of processes.
-        let total_size = *(addr as *const usize);
-        if total_size == 0 {
-            break;
-        }
-
-        let process = &mut processes[i];
-        let memory = &mut MEMORIES[i];
-        *process = Some(kernel::process::Process::create(addr, total_size, memory));
-        // TODO: panic if loading failed?
-
-        addr = addr.offset(total_size as isize);
-    }
-
-    if *(addr as *const usize) != 0 {
-        panic!("Exceeded maximum NUM_PROCS.");
-    }
-
-    &mut processes
-}
+static mut PROCESSES: [Option<kernel::Process<'static>>; NUM_PROCS] = [None, None];
 
 pub struct Golf {
     console: &'static capsules::console::Console<'static, hotel::uart::UART>,
-    gpio: &'static capsules::gpio::GPIO<'static, hotel::gpio::Pin>,
-    timer: &'static capsules::timer::TimerDriver<'static, hotel::timels::Timels>,
+    gpio: &'static capsules::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+    timer: &'static capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
+    ipc: kernel::ipc::IPC,
     digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
-    rng: &'static rng::RngDriver<'static, hotel::trng::TRNG>,
+    //rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::Trng<'static>>,
 }
 
 #[no_mangle]
@@ -99,19 +76,22 @@ pub unsafe fn reset_handler() {
     let console = static_init!(
         capsules::console::Console<'static, hotel::uart::UART>,
         capsules::console::Console::new(&hotel::uart::UART0,
+                                        115200,
                                        &mut capsules::console::WRITE_BUF,
-                                       kernel::container::Container::create()),
+                                       kernel::grant::Grant::create()),
         24);
     hotel::uart::UART0.set_client(console);
     console.initialize();
+    let kc = static_init!(capsules::console::App, capsules::console::App::default());
+    kernel::debug::assign_console_driver(Some(console), kc);
 
     let gpio_pins = static_init!(
-        [&'static hotel::gpio::Pin; 2],
+        [&'static hotel::gpio::GPIOPin; 2],
         [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]],
         8);
 
     let gpio = static_init!(
-        capsules::gpio::GPIO<'static, hotel::gpio::Pin>,
+        capsules::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
         capsules::gpio::GPIO::new(gpio_pins),
         20);
     for pin in gpio_pins.iter() {
@@ -119,40 +99,41 @@ pub unsafe fn reset_handler() {
     }
 
     let timer = static_init!(
-        capsules::timer::TimerDriver<'static, hotel::timels::Timels>,
-        capsules::timer::TimerDriver::new(
-            &hotel::timels::Timels0, kernel::container::Container::create()),
+        capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
+        capsules::alarm::AlarmDriver::new(
+            &hotel::timels::TIMELS0, kernel::Grant::create()),
         12);
-    hotel::timels::Timels0.set_client(timer);
+    hotel::timels::TIMELS0.set_client(timer);
 
     let digest = static_init!(
         digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
         digest::DigestDriver::new(
                 &mut hotel::crypto::sha::KEYMGR0_SHA,
-                kernel::Container::create()),
+                kernel::Grant::create()),
         16);
 
     let aes = static_init!(
         aes::AesDriver,
-        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel::Container::create()),
+        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel::Grant::create()),
         16);
     hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
 
-    hotel::trng::TRNG0.init();
+/*    hotel::trng::TRNG0.init();
     let rng = static_init!(
-        rng::RngDriver<'static, hotel::trng::TRNG>,
-        rng::RngDriver::new(&mut hotel::trng::TRNG0, kernel::Container::create()),
+        capsules::rng::SimpleRng<'static, hotel::trng::Trng>,
+        capsules::rng::SimpleRng::new(&mut hotel::trng::TRNG0, kernel::grant::Grant::create()),
         8);
-    hotel::trng::TRNG0.set_client(rng);
-
-    let platform = static_init!(Golf, Golf {
+    hotel::trng::TRNG0.set_client(rng);*/
+ 
+    let golf2 = static_init!(Golf, Golf {
         console: console,
         gpio: gpio,
         timer: timer,
+        ipc: kernel::ipc::IPC::new(),
         digest: digest,
         aes: aes,
-        rng: rng,
-    }, 24);
+//        rng: rng,
+    }, 8);
 
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
@@ -166,27 +147,44 @@ pub unsafe fn reset_handler() {
 
     let end = timerhs.now();
 
-    println!("Hello from Rust! Initialization took {} tics.",
-             end.wrapping_sub(start));
+    println!("Tock 1.0 booting. Initialization took {} tics.",
+              end.wrapping_sub(start));
+
 
     let mut chip = hotel::chip::Hotel::new();
     chip.mpu().enable_mpu();
 
+//    rng_test::run_rng();
 
-    kernel::main(platform, &mut chip, load_processes());
+    extern "C" {
+        /// Beginning of the ROM region containing app images.
+        static _sapps: u8;
+    }
+
+    kernel::process::load_processes(
+        &_sapps as *const u8,
+        &mut APP_MEMORY,
+        &mut PROCESSES,
+        FAULT_RESPONSE,
+    );
+
+    debug!("Start main loop.");
+    debug!("");
+    kernel::main(golf2, &mut chip, &mut PROCESSES, &golf2.ipc);
 }
 
 impl Platform for Golf {
-    fn with_driver<F, R>(&mut self, driver_num: usize, f: F) -> R
+    fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
         where F: FnOnce(Option<&kernel::Driver>) -> R
     {
         match driver_num {
-            0 => f(Some(self.console)),
-            1 => f(Some(self.gpio)),
-            2 => f(Some(self.digest)),
-            3 => f(Some(self.timer)),
-            4 => f(Some(self.aes)),
-            5 => f(Some(self.rng)),
+            capsules::console::DRIVER_NUM => f(Some(self.console)),
+            capsules::gpio::DRIVER_NUM    => f(Some(self.gpio)),
+            digest::DRIVER_NUM             => f(Some(self.digest)),
+            capsules::alarm::DRIVER_NUM => f(Some(self.timer)),
+            aes::DRIVER_NUM   => f(Some(self.aes)),
+//            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
+            kernel::ipc::DRIVER_NUM     => f(Some(&self.ipc)),
             _ => f(None),
         }
     }

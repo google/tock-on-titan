@@ -10,9 +10,9 @@ impl Write for Writer {
         unsafe {
             let uart = &uart::UART0;
 
-            static mut initialized: bool = false;
-            if !initialized {
-                initialized = true;
+            static mut INITIALIZED: bool = false;
+            if !INITIALIZED {
+                INITIALIZED = true;
 
                 let pinmux = &mut *pinmux::PINMUX;
                 // Drive DIOA0 from TX
@@ -22,7 +22,7 @@ impl Write for Writer {
             }
 
             uart.send_bytes_sync(s.as_bytes());
-
+ 
             Ok(())
         }
     }

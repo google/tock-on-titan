@@ -9,7 +9,7 @@ use usb;
 
 pub struct Hotel {
     mpu: cortexm3::mpu::MPU,
-    systick: &'static cortexm3::systick::SysTick,
+    systick: cortexm3::systick::SysTick,
 }
 
 impl Hotel {
@@ -38,8 +38,8 @@ impl Chip for Hotel {
                     110 => (), // KEYMGR0_DSHA_INT, currently polled
                     111 => (), // KEYMGR0_SHA_WFIFO_FULL
 
-                    159 => timels::Timels0.handle_interrupt(),
-                    160 => timels::Timels1.handle_interrupt(),
+                    159 => timels::TIMELS0.handle_interrupt(),
+                    160 => timels::TIMELS1.handle_interrupt(),
 
                     169 => trng::TRNG0.handle_interrupt(),
 
@@ -50,7 +50,9 @@ impl Chip for Hotel {
                     188 => uart::UART2.handle_rx_interrupt(),
                     191 => uart::UART2.handle_tx_interrupt(),
 
-                    193 => usb::USB0.handle_interrupt(),
+                    193 => {
+                        usb::USB0.handle_interrupt()
+                    },
 
                     pin @ 65...80 => {
                         gpio::PORT0.pins[(pin - 65) as usize].handle_interrupt();
@@ -79,4 +81,5 @@ impl Chip for Hotel {
     fn systick(&self) -> &Self::SysTick {
         &self.systick
     }
+
 }

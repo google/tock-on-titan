@@ -212,10 +212,10 @@ impl Clock {
         let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
         match self.clock {
             PeripheralClock::Bank0(clock) => {
-                pmu.peripheral_clocks0_enable.set(1 << (clock as u32));
+                unsafe {pmu.peripheral_clocks0_enable.set(1 << (clock as u32))};
             }
             PeripheralClock::Bank1(clock) => {
-                pmu.peripheral_clocks1_enable.set(1 << (clock as u32));
+                unsafe {pmu.peripheral_clocks1_enable.set(1 << (clock as u32))};
             }
         }
     }
@@ -224,10 +224,10 @@ impl Clock {
         let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
         match self.clock {
             PeripheralClock::Bank0(clock) => {
-                pmu.peripheral_clocks0_disable.set(1 << (clock as u32));
+                unsafe {pmu.peripheral_clocks0_disable.set(1 << (clock as u32))};
             }
             PeripheralClock::Bank1(clock) => {
-                pmu.peripheral_clocks1_disable.set(1 << (clock as u32));
+                unsafe {pmu.peripheral_clocks1_disable.set(1 << (clock as u32))};
             }
         }
     }

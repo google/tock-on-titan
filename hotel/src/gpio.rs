@@ -1,8 +1,8 @@
+use self::Pin::*;
 use core::cell::Cell;
 use core::mem::transmute;
-use kernel::common::take_cell::TakeCell;
 use kernel::common::volatile_cell::VolatileCell;
-use kernel::hil::gpio::{Client, GPIOPin, InputMode, InterruptMode};
+use kernel::hil;
 
 pub struct PortRegisters {
     pub data_in: VolatileCell<u32>,
@@ -24,49 +24,49 @@ pub const GPIO0_BASE: *mut PortRegisters = 0x40200000 as *mut PortRegisters;
 pub const GPIO1_BASE: *mut PortRegisters = 0x40210000 as *mut PortRegisters;
 
 pub struct Port {
-    pub pins: [Pin; 16],
+    pub pins: [GPIOPin; 16],
 }
 
 pub static mut PORT0: Port = Port {
-    pins: [Pin::new(GPIO0_BASE, PinNum::P0),
-           Pin::new(GPIO0_BASE, PinNum::P1),
-           Pin::new(GPIO0_BASE, PinNum::P2),
-           Pin::new(GPIO0_BASE, PinNum::P3),
-           Pin::new(GPIO0_BASE, PinNum::P4),
-           Pin::new(GPIO0_BASE, PinNum::P5),
-           Pin::new(GPIO0_BASE, PinNum::P6),
-           Pin::new(GPIO0_BASE, PinNum::P7),
-           Pin::new(GPIO0_BASE, PinNum::P8),
-           Pin::new(GPIO0_BASE, PinNum::P9),
-           Pin::new(GPIO0_BASE, PinNum::P10),
-           Pin::new(GPIO0_BASE, PinNum::P11),
-           Pin::new(GPIO0_BASE, PinNum::P12),
-           Pin::new(GPIO0_BASE, PinNum::P13),
-           Pin::new(GPIO0_BASE, PinNum::P14),
-           Pin::new(GPIO0_BASE, PinNum::P15)],
+    pins: [GPIOPin::new(GPIO0_BASE, P0),
+           GPIOPin::new(GPIO0_BASE, P1),
+           GPIOPin::new(GPIO0_BASE, P2),
+           GPIOPin::new(GPIO0_BASE, P3),
+           GPIOPin::new(GPIO0_BASE, P4),
+           GPIOPin::new(GPIO0_BASE, P5),
+           GPIOPin::new(GPIO0_BASE, P6),
+           GPIOPin::new(GPIO0_BASE, P7),
+           GPIOPin::new(GPIO0_BASE, P8),
+           GPIOPin::new(GPIO0_BASE, P9),
+           GPIOPin::new(GPIO0_BASE, P10),
+           GPIOPin::new(GPIO0_BASE, P11),
+           GPIOPin::new(GPIO0_BASE, P12),
+           GPIOPin::new(GPIO0_BASE, P13),
+           GPIOPin::new(GPIO0_BASE, P14),
+           GPIOPin::new(GPIO0_BASE, P15)],
 };
 
 pub static mut PORT1: Port = Port {
-    pins: [Pin::new(GPIO1_BASE, PinNum::P0),
-           Pin::new(GPIO1_BASE, PinNum::P1),
-           Pin::new(GPIO1_BASE, PinNum::P2),
-           Pin::new(GPIO1_BASE, PinNum::P3),
-           Pin::new(GPIO1_BASE, PinNum::P4),
-           Pin::new(GPIO1_BASE, PinNum::P5),
-           Pin::new(GPIO1_BASE, PinNum::P6),
-           Pin::new(GPIO1_BASE, PinNum::P7),
-           Pin::new(GPIO1_BASE, PinNum::P8),
-           Pin::new(GPIO1_BASE, PinNum::P9),
-           Pin::new(GPIO1_BASE, PinNum::P10),
-           Pin::new(GPIO1_BASE, PinNum::P11),
-           Pin::new(GPIO1_BASE, PinNum::P12),
-           Pin::new(GPIO1_BASE, PinNum::P13),
-           Pin::new(GPIO1_BASE, PinNum::P14),
-           Pin::new(GPIO1_BASE, PinNum::P15)],
+    pins: [GPIOPin::new(GPIO1_BASE, P0),
+           GPIOPin::new(GPIO1_BASE, P1),
+           GPIOPin::new(GPIO1_BASE, P2),
+           GPIOPin::new(GPIO1_BASE, P3),
+           GPIOPin::new(GPIO1_BASE, P4),
+           GPIOPin::new(GPIO1_BASE, P5),
+           GPIOPin::new(GPIO1_BASE, P6),
+           GPIOPin::new(GPIO1_BASE, P7),
+           GPIOPin::new(GPIO1_BASE, P8),
+           GPIOPin::new(GPIO1_BASE, P9),
+           GPIOPin::new(GPIO1_BASE, P10),
+           GPIOPin::new(GPIO1_BASE, P11),
+           GPIOPin::new(GPIO1_BASE, P12),
+           GPIOPin::new(GPIO1_BASE, P13),
+           GPIOPin::new(GPIO1_BASE, P14),
+           GPIOPin::new(GPIO1_BASE, P15)],
 };
 
 #[derive(Clone,Copy,Debug)]
-pub enum PinNum {
+pub enum Pin {
     P0 = 0,
     P1,
     P2,
@@ -85,22 +85,22 @@ pub enum PinNum {
     P15,
 }
 
-pub struct Pin {
+pub struct GPIOPin {
     port: *mut PortRegisters,
-    pin: PinNum,
+    pin: Pin,
     client_data: Cell<usize>,
     change: Cell<bool>,
-    client: TakeCell<&'static Client>,
+    client: Cell<Option<&'static hil::gpio::Client>>,
 }
 
-impl Pin {
-    const fn new(port: *mut PortRegisters, pin: PinNum) -> Pin {
-        Pin {
+impl GPIOPin {
+    const fn new(port: *mut PortRegisters, pin: Pin) -> GPIOPin {
+        GPIOPin {
             port: port,
             pin: pin,
             change: Cell::new(false),
             client_data: Cell::new(0),
-            client: TakeCell::empty(),
+            client: Cell::new(None),
         }
     }
 
@@ -120,29 +120,24 @@ impl Pin {
             }
         }
 
-        self.client.map(|client| {
+        self.client.get().map(|client| {
             client.fired(self.client_data.get());
         });
     }
 
-    pub fn set_client(&self, client: &'static Client) {
-        self.client.put(Some(client));
+    pub fn set_client(&self, client: &'static hil::gpio::Client) {
+        self.client.set(Some(client));
     }
 }
 
-impl GPIOPin for Pin {
-    fn enable_output(&self) {
+impl hil::gpio::Pin for GPIOPin {
+    fn make_output(&self) {
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         port.output_enable.set(1 << (self.pin as u32));
     }
 
-    fn enable_input(&self, _mode: InputMode) {
+    fn make_input(&self) {
         // Noop, input is always enabled on this chip
-
-        // InputMode equivilant is actually set in the Pinmux. It actually kind of
-        // makes sense to have this be something that's setup by the platform
-        // initialization, rather than chosen by the client of a particular GPIO
-        // pin.
     }
 
     fn disable(&self) {
@@ -176,21 +171,21 @@ impl GPIOPin for Pin {
     // `InterruptMode::Change` is not implemented in hardware, so we simulate it
     // in software. This could lead to missing events if a toggle happens before
     // we install the new events.
-    fn enable_interrupt(&self, identifier: usize, mode: InterruptMode) {
+    fn enable_interrupt(&self, identifier: usize, mode: hil::gpio::InterruptMode) {
         self.client_data.set(identifier);
 
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         let mask = 1 << (self.pin as u32);
         match mode {
-            InterruptMode::RisingEdge => {
+            hil::gpio::InterruptMode::RisingEdge => {
                 port.interrupt_pol_set.set(mask);
                 self.change.set(false);
             }
-            InterruptMode::FallingEdge => {
+            hil::gpio::InterruptMode::FallingEdge => {
                 port.interrupt_pol_clear.set(mask);
                 self.change.set(false);
             }
-            InterruptMode::Change => {
+            hil::gpio::InterruptMode::EitherEdge => {
                 self.change.set(true);
                 // Set the interrupt polarity based on whatever the current
                 // state of the pin is.
@@ -209,5 +204,19 @@ impl GPIOPin for Pin {
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         let mask = 1 << (self.pin as u32);
         port.interrupt_disable.set(mask);
+    }
+}
+
+impl hil::gpio::PinCtl for GPIOPin {
+    // InputMode equivilent is set in the Pinmux.
+    fn set_input_mode(&self, mode: hil::gpio::InputMode) {
+        match mode {
+            hil::gpio::InputMode::PullUp => {
+            }
+            hil::gpio::InputMode::PullDown => {
+            }
+            hil::gpio::InputMode::PullNone => {
+            }
+        }
     }
 }

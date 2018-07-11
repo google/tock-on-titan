@@ -1,11 +1,13 @@
+#![allow(dead_code)]
+
 //! Driver for the True Random Number Generator (TRNG).
 
-use hil::rng::{Continue, Rng, RngClient};
-use kernel::common::take_cell::TakeCell;
+use core::cell::Cell;
+use hil::rng::{Continue, RNG, Client};
 use kernel::common::volatile_cell::VolatileCell;
 
-#[allow(dead_code)]
-#[repr(C, packed)]
+
+#[repr(C)]
 struct Registers {
     /// TRNG version.  Defaults to 0x2d013316.
     _version: VolatileCell<u32>,
@@ -116,22 +118,37 @@ struct Registers {
 
 const TRNG0_BASE: *mut Registers = 0x40410000 as *mut Registers;
 
-pub static mut TRNG0: TRNG = unsafe { TRNG::new(TRNG0_BASE) };
+pub static mut TRNG0: Trng<'static> = unsafe { Trng::new(TRNG0_BASE) };
 
-pub struct TRNG {
+pub struct Trng<'a> {
     regs: *mut Registers,
-    client: TakeCell<&'static RngClient>,
+    client: Cell<Option<&'a Client>>,
 }
 
-impl TRNG {
-    const unsafe fn new(trng: *mut Registers) -> TRNG {
-        TRNG {
+impl<'a> Trng<'a> {
+    const unsafe fn new(trng: *mut Registers) -> Trng<'a> {
+        Trng {
             regs: trng,
-            client: TakeCell::empty(),
+            client: Cell::new(None),
         }
     }
 
-    pub fn init(&self) {
+    pub fn handle_interrupt(&self) {
+        let regs = unsafe { &*self.regs };
+
+        // Disable and clear the interrupt.
+        regs.interrupt_enable.set(0);
+        regs.interrupt_state.set(0x1);
+
+        self.client.get().map(|client| {
+            if let Continue::More = client.randomness_available(&mut Iter(self)) {
+                // Re-enable the interrupt since the client needs more data.
+                regs.interrupt_enable.set(0x1);
+            }
+        });
+    }
+
+    fn init(&self) {
         let regs = unsafe { &*self.regs };
 
         // Enable bit shuffling and churn mode.  Disable XOR and Von Neumann processing.
@@ -144,28 +161,15 @@ impl TRNG {
         regs.go_event.set(1);
     }
 
-    pub fn set_client<C: RngClient>(&mut self, client: &'static C) {
-        self.client.put(Some(client));
-    }
-
-    pub fn handle_interrupt(&self) {
-        let regs = unsafe { &*self.regs };
-
-        // Disable and clear the interrupt.
-        regs.interrupt_enable.set(0);
-        regs.interrupt_state.set(0x1);
-
-        self.client.map(|client| {
-            if let Continue::More = client.random_data_available(&mut Iter(self)) {
-                // Re-enable the interrupt since the client needs more data.
-                regs.interrupt_enable.set(0x1);
-            }
-        });
-    }
 }
 
-impl Rng for TRNG {
-    fn get_data(&self) {
+impl<'a> RNG<'a> for Trng<'a> {
+
+    fn set_client(&self, client: &'a Client) {
+        self.client.set(Some(client));
+    }
+    
+    fn get(&self) {
         let regs = unsafe { &*self.regs };
 
         if regs.empty.get() > 0 {
@@ -179,8 +183,8 @@ impl Rng for TRNG {
             // Enable interrupts so we know when there is random data ready.
             regs.interrupt_enable.set(0x1);
         } else {
-            self.client.map(|client| {
-                if let Continue::More = client.random_data_available(&mut Iter(self)) {
+            self.client.get().map(|client| {
+                if let Continue::More = client.randomness_available(&mut Iter(self)) {
                     regs.interrupt_enable.set(0x1);
                 }
             });
@@ -188,9 +192,9 @@ impl Rng for TRNG {
     }
 }
 
-struct Iter<'a>(&'a TRNG);
+struct Iter<'a, 'b: 'a>(&'a Trng<'b>);
 
-impl<'a> Iterator for Iter<'a> {
+impl<'a, 'b> Iterator for Iter<'a, 'b> {
     type Item = u32;
 
     fn next(&mut self) -> Option<u32> {
