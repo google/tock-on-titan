@@ -1,6 +1,41 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
+//! Software interface to the dcrypto peripheral of the Hotel chip
+//! for the Tock operating system.
+//!
+//! dcrypto is a processor designed to offload the SC300 CPU and
+//! accelerate cryptographic algorithms. The primary applications are
+//! public key cryptography algorithms such as Elliptic Curve (ECC)
+//! and RSA , both over over GF(P) prime finite fields. There is no
+//! specific support for accelerated processing over GF(2^m) binary
+//! extension fields. dcrypto offers a number of features to defend
+//! against side channel analysis (SCA) and fault injection attacks.
+//!
+//! The engine is fully programmable and thus offers the flexibility
+//! to support various algorithms and implementation alternatives. For
+//! example, the ECC scalar point multiplication algorithm may be
+//! modified in a number of ways in order to reduce secret data
+//! leakage on side channels. It is easy to support different curve
+//! parameters and prime field moduli. Cryptographic hash algorithms
+//! such as SHA512 have also been implemented on dcrypto and run
+//! efficiently.
+//!
+//! The dcrypto processor has a native data wordlength of 256 bits and
+//! is optimized for supporting ECC algorithms using prime moduli of
+//! size 256 bits or smaller. There are also features in the
+//! instruction set which enable support for algorithms using wider
+//! operands such as RSA-2048.
+//!
+//! dcrypto has a custom instruction set and 3 memory banks:
+//!    - drom: data read-only memory for constants
+//!    - dmem: data memory for input/output (readable/writeable from software)
+//!    - imem: instruction memory
+//!
+//! The standard use case is to load input data into dmem, load instructions
+//! into imem, then tell the peripheral to execute an instruction that jumps
+//! to the first instruction of the program in imem.
+    
 use core::cell::Cell;
 use core::mem;
 use kernel::common::take_cell::TakeCell;
@@ -10,9 +45,8 @@ use kernel::returncode::ReturnCode;
 use pmu::{Clock, PeripheralClock, PeripheralClock0, reset_dcrypto};
 
 
-// NOTE! The manual says this is address 0x4044000, but the Cr50 reference
-// code uses 0x4042000, with 0x4044000 being RDD0; the manual does not
-// name the address for RDD0.
+// NOTE! The manual says this is address 0x40440000, but the Cr50 reference
+// code uses 0x40420000 and the system memory map says 0x40420000.
 const DCRYPTO_BASE_ADDR: u32 = 0x40420000;
 const DCRYPTO_BASE: *mut Registers = DCRYPTO_BASE_ADDR as *mut Registers;
 
@@ -46,17 +80,17 @@ pub enum State {
 
 #[derive(Debug)]
 pub enum ProgramFault {
-    Break,
+    Break,           // Breakpoint reached
     DataAccess,      // Data pointer overflow
     LoopOverflow,    // Loop nesting too deep
     LoopUnderflow,   // Popped when loop depth was 0
     ModOperandRange, // Mod operand out of range
-    StackOverflow,
+    StackOverflow,   // 
     Fault,           // ?
-    Trap,            // ?
+    Trap,            // Invalid instruction
     Unknown, 
 }
-
+/// Trait that a module using dcrypto implements for callbacks on operations.
 pub trait DcryptoClient<'a> {
     /// Called when an execution completes (Dcrypto engine transitions
     /// from the Running to the Halt state). If error is Success, the
@@ -72,6 +106,7 @@ pub trait DcryptoClient<'a> {
     fn secret_wipe_complete(&self, error: ReturnCode);
 }
 
+/// Interface to dcrypto peripheral.
 pub trait Dcrypto<'a> {
 
     /// Set the client to receive callbacks from the engine.
@@ -98,16 +133,22 @@ pub trait Dcrypto<'a> {
     /// when done.
     fn write_instructions(&self, instructions: &'a [u32], offset: u32, length: u32) -> ReturnCode;
     
-    /// Call to an instruction in instruction memory (IMEM).
-    /// Note that the address is an address, not an instruction index:
-    /// it should be word aligned. Address should be a valid instruction
-    /// address (inbetween 0 and IMEM_SIZE - 4).
+    /// Call to an instruction in instruction memory (IMEM).  Note
+    /// that the address is an address, not an instruction index: it
+    /// should be word aligned. Address should be a valid instruction
+    /// address (inbetween 0 and IMEM_SIZE - 4). If this returns
+    /// SUCCESS there will be a completion callback.
     fn call_imem(&self, address: u32) -> ReturnCode;
     
-    /// Execute an instruction: a call instruction into instruction memory
-    /// can execute a program. Issues execution_complete callback when
-    /// done.
-    fn execute_instruction(&self, instruction: u32) -> ReturnCode;
+    /// Low-level method to execute an instruction. If the
+    /// instruction is a call instruction, the `is_call` parameter
+    /// should be true; this tells the peripheral that it should wait
+    /// for an interrupt and signal a completion event when the
+    /// program finishes. If the instruction is not a call
+    /// instruction, the `is_call` parameter should be false; this
+    /// tells the driver that it can return immediately and there will
+    /// not be a completion callback.
+    fn execute_instruction(&self, instruction: u32, is_call: bool) -> ReturnCode;
 
     /// Returns the current execution state of the Dcrypto engine.
     /// Note that since Dcrypto is a co-processor this value is
@@ -166,9 +207,8 @@ impl<'a> DcryptoEngine<'a> {
             imem: TakeCell::empty(),
         }
     }
-
+    
     pub fn initialize(&mut self) -> ReturnCode {
-        println!("Initializing dcrypto.");
         unsafe {
             self.drom = TakeCell::new(mem::transmute(DCRYPTO_BASE_ADDR + DROM_OFFSET));
             self.dmem = TakeCell::new(mem::transmute(DCRYPTO_BASE_ADDR + DMEM_OFFSET));
@@ -219,6 +259,8 @@ impl<'a> DcryptoEngine<'a> {
             // registers.int_enable.set(0xffffffff);
 
             // Clear all interrupts then enable done interrupt
+            // Note: implementation currently does not handle start
+            // interrupt due to NVIC re-ordering.
             registers.int_state.set(0xffffffff);
             registers.int_enable.set(0x2);
             
@@ -250,7 +292,6 @@ impl<'a> DcryptoEngine<'a> {
         if self.state.get() != State::Starting {
             panic!("DCRYPTO state is fatally wrong; program receive interrupt but driver in state {:?}.", self.state.get());
         } else {
-            println!("DCRYPTO interrupt that program received, go to Running state.");
             let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
             // Clear interrupt
             registers.int_state.set(0x1);
@@ -262,9 +303,8 @@ impl<'a> DcryptoEngine<'a> {
         if self.state.get() != State::Running {
             panic!("DCRYPTO state is fatally wrong; program complete interrupt but driver in state {:?}.", self.state.get());
         } else {
-            println!("DCRYPTO interrupt that program completed, go to Halt state.");
-            // Clear interrupt
             let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
+            // Clear interrupt
             registers.int_state.set(0x2);
 
             self.state.set(State::Halt);
@@ -353,28 +393,30 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         ReturnCode::SUCCESS
     }
 
-
     fn call_imem(&self, address: u32) -> ReturnCode {
         if address > (IMEM_SIZE - 4) as u32 {
             return ReturnCode::ESIZE;
         }
         // 0x08000000 is an opcode of 6'h02, which is the call
         // instruction (DCRYPTO reference).
-        self.execute_instruction(0x08000000 + address)
+        self.execute_instruction(0x08000000 + address, true)
     }
-    
-    fn execute_instruction(&self, instruction: u32) -> ReturnCode {
+
+    fn execute_instruction(&self, instruction: u32, is_call: bool) -> ReturnCode {
         let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
         if self.state.get() != State::Halt {
             return ReturnCode::EBUSY;
         }
+        // Clear any outstanding start or done interrupts
         while {
             registers.int_state.set(0xffffffff);
             registers.int_state.get() & 0x3 != 0
         }{}
         
         registers.host_cmd.set(instruction);
-        self.state.set(State::Running);
+        if is_call {
+            self.state.set(State::Running);
+        }
         ReturnCode::SUCCESS
     }
 
