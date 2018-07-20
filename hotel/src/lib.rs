@@ -23,6 +23,7 @@ pub mod uart;
 pub mod usb;
 
 pub mod test_rng;
+pub mod test_dcrypto;
 
 unsafe extern "C" fn unhandled_interrupt() {
     let mut interrupt_number: u32;
@@ -112,6 +113,12 @@ pub unsafe fn init() {
     cortexm3::nvic::disable_all();
     cortexm3::nvic::clear_all_pending();
     cortexm3::nvic::enable_all();
+
+    // Disable DCRYPTO program receive interrupt
+    let received = cortexm3::nvic::Nvic::new(5);
+    received.disable();
+    let received2 = cortexm3::nvic::Nvic::new(6);
+    received2.disable();
 }
 
 unsafe extern "C" fn hard_fault_handler() {

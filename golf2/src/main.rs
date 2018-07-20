@@ -13,6 +13,7 @@ pub mod io;
 
 pub mod digest;
 pub mod aes;
+pub mod dcrypto_test;
 
 use kernel::{Chip, Platform};
 use kernel::mpu::MPU;
@@ -118,7 +119,10 @@ pub unsafe fn reset_handler() {
         16);
     hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
 
-/*    hotel::trng::TRNG0.init();
+
+    
+    
+    /*    hotel::trng::TRNG0.init();
     let rng = static_init!(
         capsules::rng::SimpleRng<'static, hotel::trng::Trng>,
         capsules::rng::SimpleRng::new(&mut hotel::trng::TRNG0, kernel::grant::Grant::create()),
@@ -135,6 +139,8 @@ pub unsafe fn reset_handler() {
 //        rng: rng,
     }, 8);
 
+    hotel::crypto::dcrypto::DCRYPTO.initialize();
+    
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
                           &mut hotel::usb::IN_DESCRIPTORS,
@@ -154,6 +160,7 @@ pub unsafe fn reset_handler() {
     let mut chip = hotel::chip::Hotel::new();
     chip.mpu().enable_mpu();
 
+    dcrypto_test::run_dcrypto();
 //    rng_test::run_rng();
 
     extern "C" {
