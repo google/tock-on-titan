@@ -1,6 +1,5 @@
 //! Test DCRYPTO hardware
 
-
 use kernel::returncode::ReturnCode;
 #[allow(unused_imports)]
 use crypto::dcrypto::{Dcrypto, DcryptoClient, DcryptoEngine};
@@ -25,7 +24,7 @@ impl<'a> TestDcrypto<'a> {
 
 impl<'a> DcryptoClient<'a> for TestDcrypto<'a> {
     fn execution_complete(&self, error: ReturnCode) {
-        println!("Execution of program completed with ReturnCode {:?}.", error);
+        println!("Execution of DCRYPTO toy program completed with ReturnCode {:?}.", error);
     }
 
     fn reset_complete(&self, _error: ReturnCode) {

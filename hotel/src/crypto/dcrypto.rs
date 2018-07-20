@@ -114,23 +114,22 @@ pub trait Dcrypto<'a> {
     
     /// Read the Dcrypto dmem. length is the number of words and must
     /// be <= data.len. Offset is the offset (in words) at which to
-    /// read. Issues read_data_complete callback when done.
+    /// read.
     fn read_data(&self, data: &'a mut [u32], offset: u32, length: u32) -> ReturnCode;
     
     /// Write to the Dcrypto dmem. length is the number of words and
     /// must be <= data.len. offset is the offset (in words) at which
-    /// to perform the write. Issues write_data_complete callback when done.
+    /// to perform the write. 
     fn write_data(&self, data: &'a [u32], offset: u32, length: u32) -> ReturnCode;
 
     /// Read the Dcrypto imem. length is the number of words and must
     /// be <= data.len. offset is the offset (in words) at which to
-    /// read. Issues read_instructions_complete callback when done.
+    /// read. 
     fn read_instructions(&self, data: &'a mut [u32], offset: u32, length: u32) -> ReturnCode;
     
     /// Write to the Dcrypto imem. length is the number of words and
     /// must be <= data.len. offset is the offset (in words) at which
-    /// to perform the write. Issues write_instructions_complete callback
-    /// when done.
+    /// to perform the write.
     fn write_instructions(&self, instructions: &'a [u32], offset: u32, length: u32) -> ReturnCode;
     
     /// Call to an instruction in instruction memory (IMEM).  Note
@@ -147,7 +146,11 @@ pub trait Dcrypto<'a> {
     /// program finishes. If the instruction is not a call
     /// instruction, the `is_call` parameter should be false; this
     /// tells the driver that it can return immediately and there will
-    /// not be a completion callback.
+    /// not be a completion callback. Therefore the logic is:
+    ///   - is_call: true, ReturnCode::SUCCCESS -- callback
+    ///   - is_call: true, ReturnCode not SUCCESS -- no callback
+    ///   - is_call: false, ReturnCode::SUCCCESS -- no callback
+    ///   - is_call: false, ReturnCode not SUCCCESS -- no callback
     fn execute_instruction(&self, instruction: u32, is_call: bool) -> ReturnCode;
 
     /// Returns the current execution state of the Dcrypto engine.
@@ -214,8 +217,7 @@ impl<'a> DcryptoEngine<'a> {
             self.dmem = TakeCell::new(mem::transmute(DCRYPTO_BASE_ADDR + DMEM_OFFSET));
             self.imem = TakeCell::new(mem::transmute(DCRYPTO_BASE_ADDR + IMEM_OFFSET));
         }
-        
-        
+                
         let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
         
         // Note: this is a re-implementation of the C code for
@@ -254,7 +256,9 @@ impl<'a> DcryptoEngine<'a> {
                 }
             });
 
-            // Clear then enable all interrupts
+            // Clear then enable all interrupts: the Cr52 implementation
+            // does this but also handles interrupts differently, so we
+            // selectively enable below. Left here for reference.
             // registers.int_state.set(0xffffffff);
             // registers.int_enable.set(0xffffffff);
 
