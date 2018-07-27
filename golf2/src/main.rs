@@ -13,11 +13,15 @@ pub mod io;
 
 pub mod digest;
 pub mod aes;
+pub mod dcrypto;
 pub mod dcrypto_test;
 
 use kernel::{Chip, Platform};
 use kernel::mpu::MPU;
 use kernel::hil::uart::UART;
+
+use hotel::crypto::dcrypto::Dcrypto;
+
 //use kernel::hil::rng::RNG;
 
 // State for loading apps
@@ -39,6 +43,7 @@ pub struct Golf {
     digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
     //rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::Trng<'static>>,
+    dcrypto: &'static dcrypto::DcryptoDriver<'static>,
 }
 
 #[no_mangle]
@@ -119,9 +124,14 @@ pub unsafe fn reset_handler() {
         16);
     hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
 
-
+    hotel::crypto::dcrypto::DCRYPTO.initialize();
+    let dcrypto = static_init!(
+        dcrypto::DcryptoDriver,
+        dcrypto::DcryptoDriver::new(&mut hotel::crypto::dcrypto::DCRYPTO),
+    24);
     
-    
+    //hotel::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
+        
     /*    hotel::trng::TRNG0.init();
     let rng = static_init!(
         capsules::rng::SimpleRng<'static, hotel::trng::Trng>,
@@ -136,10 +146,11 @@ pub unsafe fn reset_handler() {
         ipc: kernel::ipc::IPC::new(),
         digest: digest,
         aes: aes,
+        dcrypto: dcrypto
 //        rng: rng,
     }, 8);
 
-    hotel::crypto::dcrypto::DCRYPTO.initialize();
+
     
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,

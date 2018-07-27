@@ -31,10 +31,10 @@ impl<'a> TestDcrypto<'a> {
     fn start_test_exec(&self) {
         self.case.set(TestCase::SuccessfulExecution);
         println!("DCRYPTO Testing single-instruction program that returns.");
-        static INSTRUCTIONS: [u32; 1] = [
-            0x0c000000, // RET
+        static INSTRUCTIONS: [u8; 4] = [
+            0x00, 0x00, 0x00, 0x0c, // RET
         ];
-        self.dcrypto.write_instructions(&INSTRUCTIONS, 0, 1);
+        self.dcrypto.write_instructions(&INSTRUCTIONS, 0, 4);
         self.dcrypto.call_imem(0);
     }
 
@@ -49,13 +49,13 @@ impl<'a> TestDcrypto<'a> {
     fn start_test_stack(&self) {
         self.case.set(TestCase::StackError);
         println!("DCRYPTO Testing program that overflows call stack.");
-        static INSTRUCTIONS: [u32; 2] = [
+        static INSTRUCTIONS: [u8; 8] = [
             // This instruction just calls itself: it's an infinitely
             // recursive program.
-            0x08000000, // CALL 0
-            0x08000000, // CALL 0
+            0x00, 0x00, 0x00, 0x08, // CALL 0
+            0x00, 0x00, 0x00, 0x08  // CALL 0
         ];
-        self.dcrypto.write_instructions(&INSTRUCTIONS, 0, 2);
+        self.dcrypto.write_instructions(&INSTRUCTIONS, 0, 8);
         self.dcrypto.call_imem(0);
     }
 

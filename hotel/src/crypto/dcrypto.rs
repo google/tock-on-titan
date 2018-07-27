@@ -54,11 +54,11 @@ pub static mut DCRYPTO: DcryptoEngine<'static> = unsafe {DcryptoEngine::new(DCRY
 
 
 const DROM_OFFSET: u32 = 0x2000;
-const DROM_SIZE: usize = 1024;
+const DROM_SIZE: usize = 1024 * 4;
 const DMEM_OFFSET: u32 = 0x4000;
-const DMEM_SIZE: usize = 1024;
+const DMEM_SIZE: usize = 1024 * 4;
 const IMEM_OFFSET: u32 = 0x8000;
-const IMEM_SIZE: usize = 1024;
+const IMEM_SIZE: usize = 1024 * 4;
 
 const RAND_STALL_EN: u32 = 0x1;
 const RAND_STALL_EN_MASK: u32 = !RAND_STALL_EN;
@@ -90,6 +90,23 @@ pub enum ProgramFault {
     Trap,            // Invalid instruction
     Unknown, 
 }
+
+impl From<ProgramFault> for usize {
+    fn from(original: ProgramFault) -> usize {
+        match original {
+            ProgramFault::Break           => 7,
+            ProgramFault::DataAccess      => 5,
+            ProgramFault::LoopOverflow    => 3,
+            ProgramFault::LoopUnderflow   => 4,
+            ProgramFault::ModOperandRange => 11,
+            ProgramFault::StackOverflow   => 2,
+            ProgramFault::Fault           => 10,
+            ProgramFault::Trap            => 8,
+            ProgramFault::Unknown         => 12,
+        }
+    }
+}
+
 
 #[derive(Debug, Copy, Clone)]
 enum InterruptFlag {
@@ -133,25 +150,25 @@ pub trait Dcrypto<'a> {
     /// Set the client to receive callbacks from the engine.
     fn set_client(&self, client: &'a DcryptoClient<'a>);
     
-    /// Read the Dcrypto dmem. length is the number of words and must
-    /// be <= data.len. Offset is the offset (in words) at which to
+    /// Read the Dcrypto dmem. length is the number of bytes: it must
+    /// be <= data.len. Offset is the offset at which to
     /// read.
-    fn read_data(&self, data: &'a mut [u32], offset: u32, length: u32) -> ReturnCode;
+    fn read_data(&self, data: &mut [u8], offset: u32, length: u32) -> ReturnCode;
     
-    /// Write to the Dcrypto dmem. length is the number of words and
-    /// must be <= data.len. offset is the offset (in words) at which
-    /// to perform the write. 
-    fn write_data(&self, data: &'a [u32], offset: u32, length: u32) -> ReturnCode;
-
-    /// Read the Dcrypto imem. length is the number of words and must
-    /// be <= data.len. offset is the offset (in words) at which to
-    /// read. 
-    fn read_instructions(&self, data: &'a mut [u32], offset: u32, length: u32) -> ReturnCode;
-    
-    /// Write to the Dcrypto imem. length is the number of words and
-    /// must be <= data.len. offset is the offset (in words) at which
+    /// Write to the Dcrypto dmem. length is the number of bytes: it
+    /// must be <= data.len. offset is the offset at which
     /// to perform the write.
-    fn write_instructions(&self, instructions: &'a [u32], offset: u32, length: u32) -> ReturnCode;
+    fn write_data(&self, data: &[u8], offset: u32, length: u32) -> ReturnCode;
+
+    /// Read the Dcrypto imem. length is the number of bytes and must
+    /// be <= data.len. offset is the offset at which to
+    /// read. 
+    fn read_instructions(&self, data: &mut [u8], offset: u32, length: u32) -> ReturnCode;
+    
+    /// Write to the Dcrypto imem. length is the number of bytes and
+    /// must be <= data.len. offset is the offset at which
+    /// to perform the write.
+    fn write_instructions(&self, instructions: &[u8], offset: u32, length: u32) -> ReturnCode;
     
     /// Call to an instruction in instruction memory (IMEM).  Note
     /// that the address is an address, not an instruction index: it
@@ -215,9 +232,9 @@ pub struct DcryptoEngine<'a> {
     registers: *mut Registers,
     client: Cell<Option<&'a DcryptoClient<'a>>>,
     state: Cell<State>,
-    drom: TakeCell<'static, [u32; DROM_SIZE]>,
-    dmem: TakeCell<'static, [u32; DMEM_SIZE]>,
-    imem: TakeCell<'static, [u32; IMEM_SIZE]>
+    drom: TakeCell<'static, [u8; DROM_SIZE]>,
+    dmem: TakeCell<'static, [u8; DMEM_SIZE]>,
+    imem: TakeCell<'static, [u8; IMEM_SIZE]>
 }
 
 impl<'a> DcryptoEngine<'a> {
@@ -267,13 +284,13 @@ impl<'a> DcryptoEngine<'a> {
             // Initialize dmem
             self.dmem.map(|mem| {
                 for i in 0..DMEM_SIZE {
-                    mem[i] = 0xdddddddd;
+                    mem[i] = 0xdd;
                 }
             });
             // Initialize imem
             self.imem.map(|mem| {
                 for i in 0..IMEM_SIZE {
-                    mem[i] = 0xdddddddd;
+                    mem[i] = 0xdd;
                 }
             });
 
@@ -393,7 +410,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         self.client.set(Some(client));
     }
    
-    fn read_data(&self, data: &'a mut [u32], offset: u32, length: u32) -> ReturnCode {
+    fn read_data(&self, data: &mut [u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > DMEM_SIZE as u32) ||
             (length > DMEM_SIZE as u32) ||
             (offset + length > DMEM_SIZE as u32) ||
@@ -409,7 +426,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         ReturnCode::SUCCESS
     }
     
-    fn write_data(&self, data: &'a [u32], offset: u32, length: u32) -> ReturnCode {
+    fn write_data(&self, data: &[u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > DMEM_SIZE as u32) ||
             (length > DMEM_SIZE as u32) ||
             (offset + length > DMEM_SIZE as u32) ||
@@ -429,7 +446,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         ReturnCode::SUCCESS
     }
 
-    fn read_instructions(&self, instructions: &'a mut [u32], offset: u32, length: u32) -> ReturnCode {
+    fn read_instructions(&self, instructions: &mut [u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > IMEM_SIZE as u32) ||
             (length > IMEM_SIZE as u32) ||
             (offset + length > IMEM_SIZE as u32) ||
@@ -445,7 +462,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         ReturnCode::SUCCESS
     }
     
-    fn write_instructions(&self, instructions: &'a [u32], offset: u32, length: u32) -> ReturnCode {
+    fn write_instructions(&self, instructions: &[u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > IMEM_SIZE as u32) ||
             (length > IMEM_SIZE as u32) ||
             (offset + length > IMEM_SIZE as u32) ||
