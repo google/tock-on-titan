@@ -78,7 +78,7 @@ pub enum State {
     Wiping,            // WIPE_SEC
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ProgramFault {
     Break,           // Breakpoint reached
     DataAccess,      // Data pointer overflow
@@ -90,19 +90,40 @@ pub enum ProgramFault {
     Trap,            // Invalid instruction
     Unknown, 
 }
+
+#[derive(Debug, Copy, Clone)]
+enum InterruptFlag {
+    CommandReceive       = 1 << 0,
+    CommandDone          = 1 << 1,
+    PCStackOverflow      = 1 << 2,
+    LoopStackOverflow    = 1 << 3,
+    LoopStackUnderflow   = 1 << 4,
+    DMemPointersOverflow = 1 << 5,
+    DrfPointersOverflow  = 1 << 6,
+    Break                = 1 << 7,
+    Trap                 = 1 << 8,
+    DoneWipeSecrets      = 1 << 9,
+    ProgramFault         = 1 << 10,
+    OperandOutofRange    = 1 << 11,
+}
+
 /// Trait that a module using dcrypto implements for callbacks on operations.
 pub trait DcryptoClient<'a> {
     /// Called when an execution completes (Dcrypto engine transitions
-    /// from the Running to the Halt state). If error is Success, the
-    /// engine is now in the Halt state.
-    fn execution_complete(&self, error: ReturnCode);
-
-    /// Called when a reset completes. If error is Success, the engine
-    /// is now in the Halt state.
+    /// from the Running to the Halt state). If error is SUCCESS, the
+    /// engine is now in the Halt state and the fault argument is meaningless.
+    /// If error is not SUCCESS, fault contains the underlying dcrypto
+    /// error.  
+    fn execution_complete(&self, error: ReturnCode, fault: ProgramFault);
+    
+    /// Called when a reset completes. If error is SUCCESS, the engine
+    /// is now in the Halt state. If error is not SUCCESS, the state is
+    /// undefined.
     fn reset_complete(&self, error: ReturnCode);
 
-    /// Called when a secret wipe completes. If error is Success, the
-    /// engine is now in the Halt state.
+    /// Called when a secret wipe completes. If error is SUCCESS, the
+    /// engine is now in the Halt state. If error is not SUCCESS, the state
+    /// is undefined.
     fn secret_wipe_complete(&self, error: ReturnCode);
 }
 
@@ -266,7 +287,21 @@ impl<'a> DcryptoEngine<'a> {
             // Note: implementation currently does not handle start
             // interrupt due to NVIC re-ordering.
             registers.int_state.set(0xffffffff);
-            registers.int_enable.set(0x2);
+            let interrupts =
+                InterruptFlag::CommandDone as u32 |
+                InterruptFlag::DMemPointersOverflow as u32 |
+                InterruptFlag::DrfPointersOverflow as u32 |
+                InterruptFlag::LoopStackOverflow as u32 |
+                InterruptFlag::LoopStackUnderflow as u32 |
+                InterruptFlag::OperandOutofRange as u32 |
+                InterruptFlag::PCStackOverflow as u32 |
+                InterruptFlag::ProgramFault as u32 |
+                InterruptFlag::Trap as u32;
+                
+                
+            registers.int_enable.set(interrupts);
+            //InterruptFlag::CommandDone as u32);
+            //registers.int_enable.set(InterruptFlag::CommandDone as u32);
             
             // Reset
             registers.control.set(1);
@@ -278,6 +313,7 @@ impl<'a> DcryptoEngine<'a> {
     }
 
     pub fn handle_error_interrupt(&self, nvic: u32) {
+        let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
         let cause = match nvic {
             1 => ProgramFault::DataAccess,
             3 => ProgramFault::DataAccess,
@@ -289,16 +325,45 @@ impl<'a> DcryptoEngine<'a> {
             11 => ProgramFault::Trap,
             _ => ProgramFault::Unknown,
         };
-        panic!("DCRYPTO engine had a fatal error: {:?}", cause);
+        println!("DCRYPTO handling {:?} error interrupt.", cause);
+
+        // Clear the corresponding interrupt flag
+        let flag = match nvic {
+            1 =>  InterruptFlag::DMemPointersOverflow,
+            3 =>  InterruptFlag::DrfPointersOverflow,
+            6 =>  InterruptFlag::LoopStackOverflow,
+            7 =>  InterruptFlag::LoopStackUnderflow,
+            8 =>  InterruptFlag::OperandOutofRange,
+            9 =>  InterruptFlag::PCStackOverflow,
+            10 => InterruptFlag::ProgramFault,
+            11 => InterruptFlag::Trap,
+            _ => {
+                panic!("DCRYPTO engine handled unknown interrupt, NVIC number is {}", nvic);
+            },
+        };
+        
+        registers.int_state.set(flag as u32);
+        let prior_state = self.state.get();
+        self.state.set(State::Break);
+        if prior_state == State::Running || prior_state == State::Break {
+            println!("DCRYPTO engine had a {:?} error, now in Break state.", flag);
+            self.client.get().map(|client| {
+                client.execution_complete(ReturnCode::FAIL, cause);
+            });
+        } else {
+            panic!("DCRYPTO engine had a {:?} error but was not running! State is fatally wrong.", cause);
+        }
+
+        
     }
 
     pub fn handle_receive_interrupt(&self) {
         if self.state.get() != State::Starting {
-            panic!("DCRYPTO state is fatally wrong; program receive interrupt but driver in state {:?}.", self.state.get());
+            panic!("DCRYPTO state is wrong; receive interrupt, driver in state {:?}.", self.state.get());
         } else {
             let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
             // Clear interrupt
-            registers.int_state.set(0x1);
+            registers.int_state.set(InterruptFlag::CommandReceive as u32);
             self.state.set(State::Running);
         }
     }
@@ -309,15 +374,18 @@ impl<'a> DcryptoEngine<'a> {
         } else {
             let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
             // Clear interrupt
-            registers.int_state.set(0x2);
+            registers.int_state.set(InterruptFlag::CommandDone as u32);
 
             self.state.set(State::Halt);
             self.client.get().map(|client| {
-                client.execution_complete(ReturnCode::SUCCESS);
+                client.execution_complete(ReturnCode::SUCCESS, ProgramFault::Unknown);
             });
         }
     }
 
+    pub fn handle_break_interrupt(&self) {
+        panic!("DCRYPTO threw a break interrupt but no code should trigger this.");
+    }
 }
 
 impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
