@@ -33,6 +33,10 @@ impl Chip for Hotel {
         unsafe {
             while let Some(nvic_num) = cortexm3::nvic::next_pending() {
                 match nvic_num {
+                    1 | 3 | 6 | 7 | 8 | 9 | 10 | 11 => crypto::dcrypto::DCRYPTO.handle_error_interrupt(nvic_num),
+                    4 => crypto::dcrypto::DCRYPTO.handle_done_interrupt(),
+                    5 => crypto::dcrypto::DCRYPTO.handle_receive_interrupt(),
+                    
                     104...109 => crypto::aes::KEYMGR0_AES.handle_interrupt(nvic_num),
 
                     110 => (), // KEYMGR0_DSHA_INT, currently polled

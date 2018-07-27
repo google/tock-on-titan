@@ -34,7 +34,7 @@ use kernel::common::volatile_cell::VolatileCell;
 // Non-public fields prefixed with "_" mark unused registers
 #[repr(C, packed)]
 pub struct PMURegisters {
-    _reset: VolatileCell<u32>,
+    reset: VolatileCell<u32>,
     _set_reset: VolatileCell<u32>,
 
     /// Clear register for the reset source
@@ -126,6 +126,23 @@ pub struct PMURegisters {
     ///
     /// Each bit corresponds to a different peripheral clock.
     pub peripheral_clocks1_disable: VolatileCell<u32>,
+
+    pub _peripheral_clocks0_ro_mask: VolatileCell<u32>,
+    pub _peripheral_clocks1_ro_mask: VolatileCell<u32>,
+
+    pub _gate_on_sleep_set0: VolatileCell<u32>,
+    pub _gate_on_sleep_clr0: VolatileCell<u32>,
+
+    pub _gate_on_sleep_set1: VolatileCell<u32>,
+    pub _gate_on_sleep_clr1: VolatileCell<u32>,
+    
+    pub _clock0: VolatileCell<u32>,
+    pub _reset0_write_enable: VolatileCell<u32>,
+    pub reset0: VolatileCell<u32>,
+
+    pub _reset1_write_enable: VolatileCell<u32>,
+    pub _reset1: VolatileCell<u32>
+    
 }
 
 const PMU_BASE: isize = 0x40000000;
@@ -135,7 +152,7 @@ static mut PMU: *mut PMURegisters = PMU_BASE as *mut PMURegisters;
 #[derive(Clone,Copy)]
 pub enum PeripheralClock0 {
     Camo0,
-    Crpyto0,
+    Crypto0,
     Dma0,
     Flash0,
     Fuse0,
@@ -231,4 +248,10 @@ impl Clock {
             }
         }
     }
+}
+// This should be refactored to be a general reset
+pub fn reset_dcrypto() {
+    let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
+    // Clear the DCRYPTO bit, which is 0x2
+    pmu.reset.set(pmu.reset0.get() & !(0x2));
 }
