@@ -35,7 +35,7 @@
 //! The standard use case is to load input data into dmem, load instructions
 //! into imem, then tell the peripheral to execute an instruction that jumps
 //! to the first instruction of the program in imem.
-    
+
 use core::cell::Cell;
 use core::mem;
 use kernel::common::take_cell::TakeCell;
@@ -43,6 +43,7 @@ use kernel::common::volatile_cell::VolatileCell;
 use kernel::returncode::ReturnCode;
 
 use pmu::{Clock, PeripheralClock, PeripheralClock0, reset_dcrypto};
+
 
 
 // NOTE! The manual says this is address 0x40440000, but the Cr50 reference
@@ -54,11 +55,11 @@ pub static mut DCRYPTO: DcryptoEngine<'static> = unsafe {DcryptoEngine::new(DCRY
 
 
 const DROM_OFFSET: u32 = 0x2000;
-const DROM_SIZE: usize = 1024 * 4;
+const DROM_SIZE: usize = 1024;
 const DMEM_OFFSET: u32 = 0x4000;
-const DMEM_SIZE: usize = 1024 * 4;
+const DMEM_SIZE: usize = 1024;
 const IMEM_OFFSET: u32 = 0x8000;
-const IMEM_SIZE: usize = 1024 * 4;
+const IMEM_SIZE: usize = 1024;
 
 const RAND_STALL_EN: u32 = 0x1;
 const RAND_STALL_EN_MASK: u32 = !RAND_STALL_EN;
@@ -232,9 +233,9 @@ pub struct DcryptoEngine<'a> {
     registers: *mut Registers,
     client: Cell<Option<&'a DcryptoClient<'a>>>,
     state: Cell<State>,
-    drom: TakeCell<'static, [u8; DROM_SIZE]>,
-    dmem: TakeCell<'static, [u8; DMEM_SIZE]>,
-    imem: TakeCell<'static, [u8; IMEM_SIZE]>
+    drom: TakeCell<'static, [u32; DROM_SIZE]>,
+    dmem: TakeCell<'static, [u32; DMEM_SIZE]>,
+    imem: TakeCell<'static, [u32; IMEM_SIZE]>
 }
 
 impl<'a> DcryptoEngine<'a> {
@@ -284,13 +285,13 @@ impl<'a> DcryptoEngine<'a> {
             // Initialize dmem
             self.dmem.map(|mem| {
                 for i in 0..DMEM_SIZE {
-                    mem[i] = 0xdd;
+                    mem[i] = 0xdddddddd;
                 }
             });
             // Initialize imem
             self.imem.map(|mem| {
                 for i in 0..IMEM_SIZE {
-                    mem[i] = 0xdd;
+                    mem[i] = 0xdddddddd;
                 }
             });
 
@@ -363,7 +364,7 @@ impl<'a> DcryptoEngine<'a> {
         let prior_state = self.state.get();
         self.state.set(State::Break);
         if prior_state == State::Running || prior_state == State::Break {
-            println!("DCRYPTO engine had a {:?} error, now in Break state.", flag);
+            //println!("DCRYPTO engine had a {:?} error, now in Break state.", flag);
             self.client.get().map(|client| {
                 client.execution_complete(ReturnCode::FAIL, cause);
             });
@@ -420,7 +421,12 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
 
         self.dmem.map(|mem| {
             for i in 0..length {
-                data[i as usize] = mem[(offset + i) as usize];
+                let index = (i * 4) as usize;
+                let word = mem[i as usize];
+                data[index]     = (word       & 0xff) as u8;
+                data[index + 1] = (word >> 8  & 0xff) as u8;
+                data[index + 2] = (word >> 16 & 0xff) as u8;
+                data[index + 3] = (word >> 24 & 0xff) as u8;
             }
         });
         ReturnCode::SUCCESS
@@ -440,7 +446,12 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         
         self.dmem.map(|mem| {
             for i in 0..length {
-                mem[(offset + i) as usize] = data[i as usize];
+                let index = (i * 4) as usize;
+                let word = (data[index] as u32) |
+                (data[index + 1] as u32) << 8    |
+                (data[index + 2] as u32) << 16   |
+                (data[index + 3] as u32) << 24;
+                mem[(offset + i) as usize] = word;
             }
         });
         ReturnCode::SUCCESS
@@ -456,7 +467,12 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
 
         self.imem.map(|mem| {
             for i in 0..length {
-                instructions[i as usize] = mem[(offset + i) as usize];
+                let index = (i * 4) as usize;
+                let word = mem[i as usize];
+                instructions[index]     = (word       & 0xff) as u8;
+                instructions[index + 1] = (word >> 8  & 0xff) as u8;
+                instructions[index + 2] = (word >> 16 & 0xff) as u8;
+                instructions[index + 3] = (word >> 24 & 0xff) as u8;
             }
         });
         ReturnCode::SUCCESS
@@ -475,9 +491,29 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         }
         
         self.imem.map(|mem| {
+            //println!("Copying {} bytes.", length);
             for i in 0..length {
-                mem[(offset + i) as usize] = instructions[i as usize];
+                let index = (i * 4) as usize;
+                let instr = (instructions[index] as u32) |
+                (instructions[index + 1] as u32) << 8    |
+                (instructions[index + 2] as u32) << 16   |
+                (instructions[index + 3] as u32) << 24;
+                //print!("Copying {:08x}, ", instr);
+                mem[(offset + i) as usize] = instr;
+                //println!("to {:08}, ", mem[(offset + i) as usize]);
             }
+            /*
+            print!("Instruction source bytes: ");
+            for i in 0..length * 4 {
+                print!("{:02x} ", instructions[i as usize]);
+            }
+            println!("");
+            print!("Instruction result bytes: ");
+            for i in 0..length {
+                print!("{:08x} ", mem[(offset + i) as usize]);
+            }
+            println!(""); */
+
         });
         ReturnCode::SUCCESS
     }
@@ -486,8 +522,16 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         if address > (IMEM_SIZE - 4) as u32 {
             return ReturnCode::ESIZE;
         }
+        /* println!("Invoking program at {:x}.", address);
+        self.imem.map(|mem| {
+            for i in 0..4 {
+                println!(" [{}]: {:08x}", i, mem[i]);
+            }
+        });*/
+
         // 0x08000000 is an opcode of 6'h02, which is the call
         // instruction (DCRYPTO reference).
+        
         self.execute_instruction(0x08000000 + address, true)
     }
 

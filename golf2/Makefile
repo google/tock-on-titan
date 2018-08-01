@@ -1,4 +1,4 @@
-APP ?= blink
+APP ?= dcrypto_test
 TOCK_ARCH = cortex-m3
 TARGET = thumbv7m-none-eabi
 PLATFORM = golf2

@@ -51,9 +51,13 @@ impl<'a> TestDcrypto<'a> {
         println!("DCRYPTO Testing program that overflows call stack.");
         static INSTRUCTIONS: [u8; 8] = [
             // This instruction just calls itself: it's an infinitely
-            // recursive program.
+            // recursive program. It should trigger a PC stack overflow
+            // error.
+            //
+            // Following it with a BREAK instruction prevents
+            // a subsequent TRAP interrupt, I do not know why. -pal
             0x00, 0x00, 0x00, 0x08, // CALL 0
-            0x00, 0x00, 0x00, 0x08  // CALL 0
+            0x00, 0x00, 0x00, 0x00, // BREAK
         ];
         self.dcrypto.write_instructions(&INSTRUCTIONS, 0, 8);
         self.dcrypto.call_imem(0);

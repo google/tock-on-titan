@@ -126,11 +126,11 @@ pub unsafe fn reset_handler() {
 
     hotel::crypto::dcrypto::DCRYPTO.initialize();
     let dcrypto = static_init!(
-        dcrypto::DcryptoDriver,
+        dcrypto::DcryptoDriver<'static>,
         dcrypto::DcryptoDriver::new(&mut hotel::crypto::dcrypto::DCRYPTO),
     24);
     
-    //hotel::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
+    hotel::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
         
     /*    hotel::trng::TRNG0.init();
     let rng = static_init!(
@@ -171,7 +171,7 @@ pub unsafe fn reset_handler() {
     let mut chip = hotel::chip::Hotel::new();
     chip.mpu().enable_mpu();
 
-    dcrypto_test::run_dcrypto();
+// dcrypto_test::run_dcrypto();
 //    rng_test::run_rng();
 
     extern "C" {
@@ -198,12 +198,13 @@ impl Platform for Golf {
         match driver_num {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
             capsules::gpio::DRIVER_NUM    => f(Some(self.gpio)),
-            digest::DRIVER_NUM             => f(Some(self.digest)),
-            capsules::alarm::DRIVER_NUM => f(Some(self.timer)),
-            aes::DRIVER_NUM   => f(Some(self.aes)),
+            digest::DRIVER_NUM            => f(Some(self.digest)),
+            capsules::alarm::DRIVER_NUM   => f(Some(self.timer)),
+            aes::DRIVER_NUM               => f(Some(self.aes)),
 //            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
-            kernel::ipc::DRIVER_NUM     => f(Some(&self.ipc)),
-            _ => f(None),
+            kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
+            dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
+            _ =>  f(None),
         }
     }
 }
