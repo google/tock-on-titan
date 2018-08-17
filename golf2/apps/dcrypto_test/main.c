@@ -36,17 +36,17 @@ int main(void) {
   
   printf("==== Running DCRYPTO ====\n");
 
-  printf("Testing simple return program: should succeed.\n");
+  printf("1. Testing simple return program: should succeed.\n");
   ret = tock_dcrypto_run(data, 10, program_return, 4);
   printf("Return value: %i.\n", ret);
   printf("\n");
-  delay_ms(500);
+  delay_ms(1000);
     
-  printf("Testing infinite recursion program: should terminate with overflow.\n");
+  printf("2. Testing infinite recursion: should overflow.\n");
   ret = tock_dcrypto_run(data, 10, program_recursion, 8);
-  printf("Return value: %i.\n", ret);
-  printf("\n");
-  delay_ms(500);
+  //printf("Return value: %i.\n", ret);
+  //printf("\n");
+
   /*
   printf("Expecting [%d]: 0x", sizeof(expected));
   print_buffer(expected, sizeof(expected), "%02x");

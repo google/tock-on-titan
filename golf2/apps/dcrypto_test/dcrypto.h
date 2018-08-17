@@ -13,7 +13,16 @@
 
 #define TOCK_DCRYPTO_RUN_DONE 0
 
-
+#define TOCK_DCRYPTO_FAULT_STACK_OVERFLOW  2
+#define TOCK_DCRYPTO_FAULT_LOOP_OVERFLOW   3
+#define TOCK_DCRYPTO_FAULT_LOOP_UNDERFLOW  4
+#define TOCK_DCRYPTO_FAULT_DATA_ACCESS     5
+#define TOCK_DCRYPTO_FAULT_BREAK           7
+#define TOCK_DCRYPTO_FAULT_TRAP            8
+#define TOCK_DCRYPTO_FAULT_FAULT          10
+#define TOCK_DCRYPTO_FAULT_LOOP_MODRANGE  11
+#define TOCK_DCRYPTO_FAULT_UNKNOWN        12
+			       
 // Run the program pointed to by program with the data pointed to by
 // data as data memory. The lengths are in bytes, but only whole
 // 4-byte words are used: partial words are not used. For example,

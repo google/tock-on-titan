@@ -343,7 +343,7 @@ impl<'a> DcryptoEngine<'a> {
             11 => ProgramFault::Trap,
             _ => ProgramFault::Unknown,
         };
-        println!("DCRYPTO handling {:?} error interrupt.", cause);
+//        println!("DCRYPTO handling {:?} error interrupt.", cause);
 
         // Clear the corresponding interrupt flag
         let flag = match nvic {

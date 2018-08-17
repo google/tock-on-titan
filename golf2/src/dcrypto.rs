@@ -95,7 +95,7 @@ impl<'a> Driver for DcryptoDriver<'a> {
                 if self.busy.get() { 
                     ReturnCode::EBUSY
                 } else {
-                    self.app.map_or(ReturnCode::FAIL, |app| {
+                    self.app.map_or(ReturnCode::EBUSY, |app| {
                         self.busy.set(true);
                         self.run_program(app)
                     })
