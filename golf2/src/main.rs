@@ -13,11 +13,15 @@ pub mod io;
 
 pub mod digest;
 pub mod aes;
+pub mod dcrypto;
 pub mod dcrypto_test;
 
 use kernel::{Chip, Platform};
 use kernel::mpu::MPU;
 use kernel::hil::uart::UART;
+
+use hotel::crypto::dcrypto::Dcrypto;
+
 //use kernel::hil::rng::RNG;
 
 // State for loading apps
@@ -39,6 +43,7 @@ pub struct Golf {
     digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
     //rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::Trng<'static>>,
+    dcrypto: &'static dcrypto::DcryptoDriver<'static>,
 }
 
 #[no_mangle]
@@ -119,9 +124,14 @@ pub unsafe fn reset_handler() {
         16);
     hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
 
-
+    hotel::crypto::dcrypto::DCRYPTO.initialize();
+    let dcrypto = static_init!(
+        dcrypto::DcryptoDriver<'static>,
+        dcrypto::DcryptoDriver::new(&mut hotel::crypto::dcrypto::DCRYPTO),
+    24);
     
-    
+    hotel::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
+        
     /*    hotel::trng::TRNG0.init();
     let rng = static_init!(
         capsules::rng::SimpleRng<'static, hotel::trng::Trng>,
@@ -136,10 +146,11 @@ pub unsafe fn reset_handler() {
         ipc: kernel::ipc::IPC::new(),
         digest: digest,
         aes: aes,
+        dcrypto: dcrypto
 //        rng: rng,
     }, 8);
 
-    hotel::crypto::dcrypto::DCRYPTO.initialize();
+
     
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
@@ -160,7 +171,7 @@ pub unsafe fn reset_handler() {
     let mut chip = hotel::chip::Hotel::new();
     chip.mpu().enable_mpu();
 
-    dcrypto_test::run_dcrypto();
+// dcrypto_test::run_dcrypto();
 //    rng_test::run_rng();
 
     extern "C" {
@@ -187,12 +198,13 @@ impl Platform for Golf {
         match driver_num {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
             capsules::gpio::DRIVER_NUM    => f(Some(self.gpio)),
-            digest::DRIVER_NUM             => f(Some(self.digest)),
-            capsules::alarm::DRIVER_NUM => f(Some(self.timer)),
-            aes::DRIVER_NUM   => f(Some(self.aes)),
+            digest::DRIVER_NUM            => f(Some(self.digest)),
+            capsules::alarm::DRIVER_NUM   => f(Some(self.timer)),
+            aes::DRIVER_NUM               => f(Some(self.aes)),
 //            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
-            kernel::ipc::DRIVER_NUM     => f(Some(&self.ipc)),
-            _ => f(None),
+            kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
+            dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
+            _ =>  f(None),
         }
     }
 }

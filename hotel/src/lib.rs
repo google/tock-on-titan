@@ -115,10 +115,7 @@ pub unsafe fn init() {
     cortexm3::nvic::enable_all();
 
     // Disable DCRYPTO program receive interrupt
-    let received = cortexm3::nvic::Nvic::new(5);
-    received.disable();
-    let received2 = cortexm3::nvic::Nvic::new(6);
-    received2.disable();
+    cortexm3::nvic::Nvic::new(5).disable();
 }
 
 unsafe extern "C" fn hard_fault_handler() {

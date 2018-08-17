@@ -35,7 +35,7 @@
 //! The standard use case is to load input data into dmem, load instructions
 //! into imem, then tell the peripheral to execute an instruction that jumps
 //! to the first instruction of the program in imem.
-    
+
 use core::cell::Cell;
 use core::mem;
 use kernel::common::take_cell::TakeCell;
@@ -43,6 +43,7 @@ use kernel::common::volatile_cell::VolatileCell;
 use kernel::returncode::ReturnCode;
 
 use pmu::{Clock, PeripheralClock, PeripheralClock0, reset_dcrypto};
+
 
 
 // NOTE! The manual says this is address 0x40440000, but the Cr50 reference
@@ -78,7 +79,7 @@ pub enum State {
     Wiping,            // WIPE_SEC
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ProgramFault {
     Break,           // Breakpoint reached
     DataAccess,      // Data pointer overflow
@@ -90,19 +91,57 @@ pub enum ProgramFault {
     Trap,            // Invalid instruction
     Unknown, 
 }
+
+impl From<ProgramFault> for usize {
+    fn from(original: ProgramFault) -> usize {
+        match original {
+            ProgramFault::Break           => 7,
+            ProgramFault::DataAccess      => 5,
+            ProgramFault::LoopOverflow    => 3,
+            ProgramFault::LoopUnderflow   => 4,
+            ProgramFault::ModOperandRange => 11,
+            ProgramFault::StackOverflow   => 2,
+            ProgramFault::Fault           => 10,
+            ProgramFault::Trap            => 8,
+            ProgramFault::Unknown         => 12,
+        }
+    }
+}
+
+
+#[derive(Debug, Copy, Clone)]
+enum InterruptFlag {
+    CommandReceive       = 1 << 0,
+    CommandDone          = 1 << 1,
+    PCStackOverflow      = 1 << 2,
+    LoopStackOverflow    = 1 << 3,
+    LoopStackUnderflow   = 1 << 4,
+    DMemPointersOverflow = 1 << 5,
+    DrfPointersOverflow  = 1 << 6,
+    Break                = 1 << 7,
+    Trap                 = 1 << 8,
+    DoneWipeSecrets      = 1 << 9,
+    ProgramFault         = 1 << 10,
+    OperandOutofRange    = 1 << 11,
+}
+
 /// Trait that a module using dcrypto implements for callbacks on operations.
 pub trait DcryptoClient<'a> {
     /// Called when an execution completes (Dcrypto engine transitions
-    /// from the Running to the Halt state). If error is Success, the
-    /// engine is now in the Halt state.
-    fn execution_complete(&self, error: ReturnCode);
-
-    /// Called when a reset completes. If error is Success, the engine
-    /// is now in the Halt state.
+    /// from the Running to the Halt state). If error is SUCCESS, the
+    /// engine is now in the Halt state and the fault argument is meaningless.
+    /// If error is not SUCCESS, fault contains the underlying dcrypto
+    /// error.  
+    fn execution_complete(&self, error: ReturnCode, fault: ProgramFault);
+    
+    /// Called when a reset completes. If error is SUCCESS, the engine
+    /// is now in the Halt state. If error is not SUCCESS, the state is
+    /// undefined.
     fn reset_complete(&self, error: ReturnCode);
 
-    /// Called when a secret wipe completes. If error is Success, the
-    /// engine is now in the Halt state.
+    /// Called when a secret wipe completes. If error is SUCCESS, the
+    /// engine is now in the Halt state. If error is not SUCCESS, the state
+    /// is undefined.
     fn secret_wipe_complete(&self, error: ReturnCode);
 }
 
@@ -112,25 +151,25 @@ pub trait Dcrypto<'a> {
     /// Set the client to receive callbacks from the engine.
     fn set_client(&self, client: &'a DcryptoClient<'a>);
     
-    /// Read the Dcrypto dmem. length is the number of words and must
-    /// be <= data.len. Offset is the offset (in words) at which to
+    /// Read the Dcrypto dmem. length is the number of bytes: it must
+    /// be <= data.len. Offset is the offset at which to
     /// read.
-    fn read_data(&self, data: &'a mut [u32], offset: u32, length: u32) -> ReturnCode;
+    fn read_data(&self, data: &mut [u8], offset: u32, length: u32) -> ReturnCode;
     
-    /// Write to the Dcrypto dmem. length is the number of words and
-    /// must be <= data.len. offset is the offset (in words) at which
-    /// to perform the write. 
-    fn write_data(&self, data: &'a [u32], offset: u32, length: u32) -> ReturnCode;
-
-    /// Read the Dcrypto imem. length is the number of words and must
-    /// be <= data.len. offset is the offset (in words) at which to
-    /// read. 
-    fn read_instructions(&self, data: &'a mut [u32], offset: u32, length: u32) -> ReturnCode;
-    
-    /// Write to the Dcrypto imem. length is the number of words and
-    /// must be <= data.len. offset is the offset (in words) at which
+    /// Write to the Dcrypto dmem. length is the number of bytes: it
+    /// must be <= data.len. offset is the offset at which
     /// to perform the write.
-    fn write_instructions(&self, instructions: &'a [u32], offset: u32, length: u32) -> ReturnCode;
+    fn write_data(&self, data: &[u8], offset: u32, length: u32) -> ReturnCode;
+
+    /// Read the Dcrypto imem. length is the number of bytes and must
+    /// be <= data.len. offset is the offset at which to
+    /// read. 
+    fn read_instructions(&self, data: &mut [u8], offset: u32, length: u32) -> ReturnCode;
+    
+    /// Write to the Dcrypto imem. length is the number of bytes and
+    /// must be <= data.len. offset is the offset at which
+    /// to perform the write.
+    fn write_instructions(&self, instructions: &[u8], offset: u32, length: u32) -> ReturnCode;
     
     /// Call to an instruction in instruction memory (IMEM).  Note
     /// that the address is an address, not an instruction index: it
@@ -266,7 +305,21 @@ impl<'a> DcryptoEngine<'a> {
             // Note: implementation currently does not handle start
             // interrupt due to NVIC re-ordering.
             registers.int_state.set(0xffffffff);
-            registers.int_enable.set(0x2);
+            let interrupts =
+                InterruptFlag::CommandDone as u32 |
+                InterruptFlag::DMemPointersOverflow as u32 |
+                InterruptFlag::DrfPointersOverflow as u32 |
+                InterruptFlag::LoopStackOverflow as u32 |
+                InterruptFlag::LoopStackUnderflow as u32 |
+                InterruptFlag::OperandOutofRange as u32 |
+                InterruptFlag::PCStackOverflow as u32 |
+                InterruptFlag::ProgramFault as u32 |
+                InterruptFlag::Trap as u32;
+                
+                
+            registers.int_enable.set(interrupts);
+            //InterruptFlag::CommandDone as u32);
+            //registers.int_enable.set(InterruptFlag::CommandDone as u32);
             
             // Reset
             registers.control.set(1);
@@ -278,6 +331,7 @@ impl<'a> DcryptoEngine<'a> {
     }
 
     pub fn handle_error_interrupt(&self, nvic: u32) {
+        let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
         let cause = match nvic {
             1 => ProgramFault::DataAccess,
             3 => ProgramFault::DataAccess,
@@ -289,16 +343,45 @@ impl<'a> DcryptoEngine<'a> {
             11 => ProgramFault::Trap,
             _ => ProgramFault::Unknown,
         };
-        panic!("DCRYPTO engine had a fatal error: {:?}", cause);
+//        println!("DCRYPTO handling {:?} error interrupt.", cause);
+
+        // Clear the corresponding interrupt flag
+        let flag = match nvic {
+            1 =>  InterruptFlag::DMemPointersOverflow,
+            3 =>  InterruptFlag::DrfPointersOverflow,
+            6 =>  InterruptFlag::LoopStackOverflow,
+            7 =>  InterruptFlag::LoopStackUnderflow,
+            8 =>  InterruptFlag::OperandOutofRange,
+            9 =>  InterruptFlag::PCStackOverflow,
+            10 => InterruptFlag::ProgramFault,
+            11 => InterruptFlag::Trap,
+            _ => {
+                panic!("DCRYPTO engine handled unknown interrupt, NVIC number is {}", nvic);
+            },
+        };
+        
+        registers.int_state.set(flag as u32);
+        let prior_state = self.state.get();
+        self.state.set(State::Break);
+        if prior_state == State::Running || prior_state == State::Break {
+            //println!("DCRYPTO engine had a {:?} error, now in Break state.", flag);
+            self.client.get().map(|client| {
+                client.execution_complete(ReturnCode::FAIL, cause);
+            });
+        } else {
+            panic!("DCRYPTO engine had a {:?} error but was not running! State is fatally wrong.", cause);
+        }
+
+        
     }
 
     pub fn handle_receive_interrupt(&self) {
         if self.state.get() != State::Starting {
-            panic!("DCRYPTO state is fatally wrong; program receive interrupt but driver in state {:?}.", self.state.get());
+            panic!("DCRYPTO state is wrong; receive interrupt, driver in state {:?}.", self.state.get());
         } else {
             let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
             // Clear interrupt
-            registers.int_state.set(0x1);
+            registers.int_state.set(InterruptFlag::CommandReceive as u32);
             self.state.set(State::Running);
         }
     }
@@ -309,15 +392,18 @@ impl<'a> DcryptoEngine<'a> {
         } else {
             let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
             // Clear interrupt
-            registers.int_state.set(0x2);
+            registers.int_state.set(InterruptFlag::CommandDone as u32);
 
             self.state.set(State::Halt);
             self.client.get().map(|client| {
-                client.execution_complete(ReturnCode::SUCCESS);
+                client.execution_complete(ReturnCode::SUCCESS, ProgramFault::Unknown);
             });
         }
     }
 
+    pub fn handle_break_interrupt(&self) {
+        panic!("DCRYPTO threw a break interrupt but no code should trigger this.");
+    }
 }
 
 impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
@@ -325,7 +411,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         self.client.set(Some(client));
     }
    
-    fn read_data(&self, data: &'a mut [u32], offset: u32, length: u32) -> ReturnCode {
+    fn read_data(&self, data: &mut [u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > DMEM_SIZE as u32) ||
             (length > DMEM_SIZE as u32) ||
             (offset + length > DMEM_SIZE as u32) ||
@@ -335,13 +421,18 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
 
         self.dmem.map(|mem| {
             for i in 0..length {
-                data[i as usize] = mem[(offset + i) as usize];
+                let index = (i * 4) as usize;
+                let word = mem[i as usize];
+                data[index]     = (word       & 0xff) as u8;
+                data[index + 1] = (word >> 8  & 0xff) as u8;
+                data[index + 2] = (word >> 16 & 0xff) as u8;
+                data[index + 3] = (word >> 24 & 0xff) as u8;
             }
         });
         ReturnCode::SUCCESS
     }
     
-    fn write_data(&self, data: &'a [u32], offset: u32, length: u32) -> ReturnCode {
+    fn write_data(&self, data: &[u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > DMEM_SIZE as u32) ||
             (length > DMEM_SIZE as u32) ||
             (offset + length > DMEM_SIZE as u32) ||
@@ -355,13 +446,18 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         
         self.dmem.map(|mem| {
             for i in 0..length {
-                mem[(offset + i) as usize] = data[i as usize];
+                let index = (i * 4) as usize;
+                let word = (data[index] as u32) |
+                (data[index + 1] as u32) << 8    |
+                (data[index + 2] as u32) << 16   |
+                (data[index + 3] as u32) << 24;
+                mem[(offset + i) as usize] = word;
             }
         });
         ReturnCode::SUCCESS
     }
 
-    fn read_instructions(&self, instructions: &'a mut [u32], offset: u32, length: u32) -> ReturnCode {
+    fn read_instructions(&self, instructions: &mut [u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > IMEM_SIZE as u32) ||
             (length > IMEM_SIZE as u32) ||
             (offset + length > IMEM_SIZE as u32) ||
@@ -371,13 +467,18 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
 
         self.imem.map(|mem| {
             for i in 0..length {
-                instructions[i as usize] = mem[(offset + i) as usize];
+                let index = (i * 4) as usize;
+                let word = mem[i as usize];
+                instructions[index]     = (word       & 0xff) as u8;
+                instructions[index + 1] = (word >> 8  & 0xff) as u8;
+                instructions[index + 2] = (word >> 16 & 0xff) as u8;
+                instructions[index + 3] = (word >> 24 & 0xff) as u8;
             }
         });
         ReturnCode::SUCCESS
     }
     
-    fn write_instructions(&self, instructions: &'a [u32], offset: u32, length: u32) -> ReturnCode {
+    fn write_instructions(&self, instructions: &[u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > IMEM_SIZE as u32) ||
             (length > IMEM_SIZE as u32) ||
             (offset + length > IMEM_SIZE as u32) ||
@@ -390,9 +491,29 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         }
         
         self.imem.map(|mem| {
+            //println!("Copying {} bytes.", length);
             for i in 0..length {
-                mem[(offset + i) as usize] = instructions[i as usize];
+                let index = (i * 4) as usize;
+                let instr = (instructions[index] as u32) |
+                (instructions[index + 1] as u32) << 8    |
+                (instructions[index + 2] as u32) << 16   |
+                (instructions[index + 3] as u32) << 24;
+                //print!("Copying {:08x}, ", instr);
+                mem[(offset + i) as usize] = instr;
+                //println!("to {:08}, ", mem[(offset + i) as usize]);
             }
+            /*
+            print!("Instruction source bytes: ");
+            for i in 0..length * 4 {
+                print!("{:02x} ", instructions[i as usize]);
+            }
+            println!("");
+            print!("Instruction result bytes: ");
+            for i in 0..length {
+                print!("{:08x} ", mem[(offset + i) as usize]);
+            }
+            println!(""); */
+
         });
         ReturnCode::SUCCESS
     }
@@ -401,8 +522,16 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         if address > (IMEM_SIZE - 4) as u32 {
             return ReturnCode::ESIZE;
         }
+        /* println!("Invoking program at {:x}.", address);
+        self.imem.map(|mem| {
+            for i in 0..4 {
+                println!(" [{}]: {:08x}", i, mem[i]);
+            }
+        });*/
+
         // 0x08000000 is an opcode of 6'h02, which is the call
         // instruction (DCRYPTO reference).
+        
         self.execute_instruction(0x08000000 + address, true)
     }
 
