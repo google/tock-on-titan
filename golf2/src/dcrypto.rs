@@ -24,7 +24,6 @@ impl Default for App {
 pub struct DcryptoDriver<'a> {
     device: &'a Dcrypto<'a>,
     app: MapCell<App>,
-    current_user: Cell<Option<AppId>>,
     busy: Cell<bool>,
 }
 
@@ -32,7 +31,6 @@ impl<'a> DcryptoDriver<'a> {
     pub fn new(device: &'a mut Dcrypto<'a>) -> DcryptoDriver<'a> {
         DcryptoDriver {
             device: device,
-            current_user: Cell::new(None),
             app: MapCell::new(App::default()),
             busy: Cell::new(false),
        }
@@ -43,7 +41,7 @@ impl<'a> DcryptoDriver<'a> {
             return ReturnCode::ENOMEM;
         }
         
-        let mut rval = ReturnCode::SUCCESS;
+        let mut rval: ReturnCode;
         let data_slice = app.data_buffer.take().unwrap();
         let program_slice = app.program.take().unwrap();
         {
@@ -88,7 +86,7 @@ impl<'a> Driver for DcryptoDriver<'a> {
         }
     }
 
-    fn command(&self, command_num: usize, arg1: usize, _: usize, caller_id: AppId) -> ReturnCode {
+    fn command(&self, command_num: usize, _: usize, _: usize, _: AppId) -> ReturnCode {
         match command_num {
             0 /* Check if present */ => ReturnCode::SUCCESS,            
             1 /* run program */ => {
@@ -105,7 +103,7 @@ impl<'a> Driver for DcryptoDriver<'a> {
         }
     }
     
-    fn allow(&self, app_id: AppId, minor_num: usize, slice: AppSlice<Shared, u8>) -> ReturnCode {
+    fn allow(&self, _: AppId, minor_num: usize, slice: AppSlice<Shared, u8>) -> ReturnCode {
         match minor_num {
             0 => {
                 // Data memory
