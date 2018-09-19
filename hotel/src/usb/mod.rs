@@ -650,7 +650,7 @@ impl USB {
                         usb_debug!("USB: requesting string descriptor {}, len: {}: {:?}", index, len, str);
                     }
                     _ => {
-                        // Send request error response
+                        // Send request error response? Cr52 just stalls, this seems to work.
                         self.stall_both_fifos();
                         usb_debug!("USB: unhandled setup descriptor type: {}", descriptor_type);
                     }
@@ -667,7 +667,7 @@ impl USB {
                                       DescFlag::SHORT | DescFlag::IOC)
                         .bytes(len as u16);
                 });
-                self.expect_status_phase_in(transfer_type);
+                self.expect_data_phase_in(transfer_type);
             }
             GetStatus => {
                 self.ep0_in_buffers.map(|buf| {
@@ -678,7 +678,7 @@ impl USB {
                                       DescFlag::SHORT | DescFlag::IOC)
                         .bytes(2);
                 });
-                self.expect_data_phase_in(transfer_type);
+                self.expect_status_phase_in(transfer_type);
             }
             _ => {
                 panic!("USB: unhandled device-to-host setup request code: {}", req.b_request as u8);

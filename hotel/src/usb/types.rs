@@ -66,7 +66,6 @@ impl ConfigurationDescriptor {
 }
 
 
-// Just statically allocate a 256-byte string
 #[derive(Debug)]
 pub struct StringDescriptor {
     pub b_length: u8,
@@ -82,6 +81,7 @@ impl StringDescriptor {
             b_string: str,
         }
     }
+    
     pub fn into_buf(&self, buf: &mut [u32; 64]) -> usize {
         let count = self.b_string.len();
         if count == 0 {
@@ -93,14 +93,13 @@ impl StringDescriptor {
                      (self.b_descriptor_type as u32) << 8 |
                      (self.b_string[0] as u32)       << 16;
             for i in 1..count {
-                // This is a little bit of arithmetic to copy the string wide
-                // characters properly. The first 16 bits of the message are the
+                // The first 16 bits of the message are the
                 // length and type. The next 16 bits of the message are the first
                 // wide character of the string (index 0). So this means that bits
                 // 16..31 of buf[0] are b_string[0], bits 0..15 of buf[1] are string[1],
                 // bits 16..31 of buf[1] are string[2].
                 if i % 2 == 1 {
-                    buf[(i / 2) + 1] = (self.b_string[i] as u32);
+                    buf[(i / 2) + 1] = self.b_string[i] as u32;
                 } else {
                     buf[i / 2] = buf[i / 2] | (self.b_string[i] as u32) << 16;
                 }
