@@ -158,7 +158,7 @@ pub unsafe fn reset_handler() {
                           &mut hotel::usb::IN_BUFFERS,
                           hotel::usb::PHY::A,
                           None,
-                          Some(0x0011),
+                          Some(0x18d1),
                           Some(0x7788));
 
 

@@ -1,4 +1,5 @@
 use super::serialize::Serialize;
+use usb::constants::Descriptor;
 
 #[repr(C)]
 pub struct DeviceDescriptor {
@@ -61,6 +62,51 @@ impl ConfigurationDescriptor {
                  (self.bm_attributes as u32)         << 24;
         buf[2] = (self.b_max_power as u32) << 0;
         9
+    }
+}
+
+
+// Just statically allocate a 256-byte string
+#[derive(Debug)]
+pub struct StringDescriptor {
+    pub b_length: u8,
+    pub b_descriptor_type: u8,
+    pub b_string: &'static [u16],
+}
+
+impl StringDescriptor {
+    pub fn new(str: &'static [u16]) -> StringDescriptor {
+        StringDescriptor {
+            b_length: (str.len() * 2 + 2) as u8,
+            b_descriptor_type: Descriptor::String as u8,
+            b_string: str,
+        }
+    }
+    pub fn into_buf(&self, buf: &mut [u32; 64]) -> usize {
+        let count = self.b_string.len();
+        if count == 0 {
+            buf[0] = (self.b_length as u32)          << 0 |
+                     (self.b_descriptor_type as u32) << 8;
+            2
+        } else {
+            buf[0] = (self.b_length as u32)          << 0 |
+                     (self.b_descriptor_type as u32) << 8 |
+                     (self.b_string[0] as u32)       << 16;
+            for i in 1..count {
+                // This is a little bit of arithmetic to copy the string wide
+                // characters properly. The first 16 bits of the message are the
+                // length and type. The next 16 bits of the message are the first
+                // wide character of the string (index 0). So this means that bits
+                // 16..31 of buf[0] are b_string[0], bits 0..15 of buf[1] are string[1],
+                // bits 16..31 of buf[1] are string[2].
+                if i % 2 == 1 {
+                    buf[(i / 2) + 1] = (self.b_string[i] as u32);
+                } else {
+                    buf[i / 2] = buf[i / 2] | (self.b_string[i] as u32) << 16;
+                }
+            }
+            2 + 2 * count
+        }
     }
 }
 

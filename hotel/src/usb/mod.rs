@@ -12,20 +12,20 @@ use self::constants::*;
 use self::registers::{EpCtl, DescFlag, Registers};
 
 pub use self::registers::DMADescriptor;
-use self::types::{SetupRequest, DeviceDescriptor, ConfigurationDescriptor};
+use self::types::{SetupRequest};
+use self::types::{StringDescriptor, DeviceDescriptor, ConfigurationDescriptor};
 use self::types::{SetupDirection, SetupRequestClass, SetupRecipient};
-
 
 // Simple macro for USB debugging output: default definitions do nothing,
 // but you can uncomment print defintions to get detailed output on the
 // messages sent and received.
 macro_rules! usb_debug {
-//    () => ({print!();});
-//    ($fmt:expr) => ({print!($fmt);});
-//    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
-    () => ({});
-    ($fmt:expr) => ({});
-    ($fmt:expr, $($arg:tt)+) => ({});
+    () => ({print!();});
+    ($fmt:expr) => ({print!($fmt);});
+    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
+//    () => ({});
+//    ($fmt:expr) => ({});
+//    ($fmt:expr, $($arg:tt)+) => ({});
 }
 
 /// A StaticRef is a pointer to statically allocated mutable data such
@@ -138,7 +138,7 @@ pub struct USB {
     /// The `TakeCell` is never empty after a call to `init`.
     ep0_in_descriptors: TakeCell<'static, [DMADescriptor; 4]>,
     /// Endpoint 0 IN buffer
-    ///
+   ///
     /// `ep0_in_descriptors` point into the middle of this buffer but we copy
     /// into it as one big blob. This allows us to send large data (up to 256
     /// bytes) in one step by simply copying all the data into the buffer and
@@ -174,6 +174,40 @@ pub static mut IN_DESCRIPTORS: [DMADescriptor; 4] = [DMADescriptor {
 /// IN buffer to pass into `USB#init`.
 pub static mut IN_BUFFERS: [u32; 16 * 4] = [0; 16 * 4];
 
+const STRING_LANG: usize     = 0;
+const STRING_VENDOR: usize   = 1;
+const STRING_BOARD: usize    = 2;
+const STRING_PLATFORM: usize = 3;
+const STRING_U2F: usize      = 4;
+
+pub static STRINGS: [StringDescriptor; 5] = [
+    StringDescriptor {
+        b_length: 4,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0409], // English
+    },
+    StringDescriptor {
+        b_length: 24,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0047, 0x006f, 0x006f, 0x0067, 0x006c, 0x0065, 0x0020, 0x0049, 0x006e, 0x0063, 0x002e], // Google Inc.
+    },
+    StringDescriptor {
+        b_length: 14,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0070, 0x0072, 0x006f, 0x0074, 0x006f, 0x0032], // proto2
+    },
+    StringDescriptor {
+        b_length: 24,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0070, 0x0072, 0x006f, 0x0074, 0x006f, 0x0032, 0x002d, 0x0054, 0x006f, 0x0063, 0x006b], // proto2-Tock
+    },
+    StringDescriptor {
+        b_length: 20,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0048, 0x0061, 0x0076, 0x0065, 0x006E, 0x0020, 0x0055, 0x0032, 0x0046], // Haven U2F
+    }
+];
+
 impl USB {
     /// Creates a new value referencing the single USB driver.
     ///
@@ -195,7 +229,7 @@ impl USB {
             next_out_idx: Cell::new(0),
             cur_out_idx: Cell::new(0),
             device_class: Cell::new(0x00),
-            vendor_id: Cell::new(0x0011),    // unknown counterfeit flash drive
+            vendor_id: Cell::new(0x0011),    // Unknown
             product_id: Cell::new(0x7788),   // unknown counterfeit flash drive
             configuration_value: Cell::new(0),
         }
@@ -562,9 +596,9 @@ impl USB {
                                 id_vendor: self.vendor_id.get(),
                                 id_product: self.product_id.get(),
                                 bcd_device: 0x0100,
-                                i_manufacturer: 0,
-                                i_product: 0,
-                                i_serial_number: 0,
+                                i_manufacturer: STRING_VENDOR as u8,
+                                i_product: STRING_BOARD as u8,
+                                i_serial_number: STRING_PLATFORM as u8,
                                 b_num_configurations: 1
                             }.serialize(buf)).unwrap_or(0);
                         len = ::core::cmp::min(len, req.w_length as usize);
@@ -598,8 +632,27 @@ impl USB {
                         usb_debug!("Trying to send device qualifier: stall both fifos.\n");
                         self.stall_both_fifos();
                     }
+                    GET_DESCRIPTOR_STRING => {
+                        let index = (req.w_value & 0xff) as usize;
+                        let str = &STRINGS[index];
+                        let mut len = 0;
+                        self.ep0_in_buffers.map(|buf| {
+                            len = str.into_buf(buf);
+                        });
+                        len = ::core::cmp::min(len, req.w_length as usize);
+                        self.ep0_in_descriptors.map(|descs| {
+                            descs[0].flags = (DescFlag::HOST_READY |
+                                              DescFlag::LAST |
+                                              DescFlag::SHORT |
+                                              DescFlag::IOC).bytes(len as u16);
+                        });
+                        self.expect_data_phase_in(transfer_type);
+                        usb_debug!("USB: requesting string descriptor {}, len: {}: {:?}", index, len, str);
+                    }
                     _ => {
-                        panic!("USB: unhandled setup descriptor type: {}", descriptor_type);
+                        // Send request error response
+                        self.stall_both_fifos();
+                        usb_debug!("USB: unhandled setup descriptor type: {}", descriptor_type);
                     }
                 }
             }
@@ -613,6 +666,17 @@ impl USB {
                     descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
                                       DescFlag::SHORT | DescFlag::IOC)
                         .bytes(len as u16);
+                });
+                self.expect_status_phase_in(transfer_type);
+            }
+            GetStatus => {
+                self.ep0_in_buffers.map(|buf| {
+                    buf[0] = 0x0;
+                });
+                self.ep0_in_descriptors.map(|descs| {
+                    descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
+                                      DescFlag::SHORT | DescFlag::IOC)
+                        .bytes(2);
                 });
                 self.expect_data_phase_in(transfer_type);
             }
