@@ -151,20 +151,21 @@ pub enum InInterruptMask {
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(dead_code)]
 pub enum Descriptor {
-    Device          = 1,
-    Configuration   = 2,
-    String          = 3,
-    Interface       = 4,
-    Endpoint        = 5,
-    DeviceQualifier = 6,
+    Device          = 0x01,
+    Configuration   = 0x02,
+    String          = 0x03,
+    Interface       = 0x04,
+    Endpoint        = 0x05,
+    DeviceQualifier = 0x06,
+    HidDevice       = 0x21,
 }
 
 #[allow(dead_code)]
 pub const GET_DESCRIPTOR_DEVICE: u32           = 1;
 pub const GET_DESCRIPTOR_CONFIGURATION: u32    = 2;
 pub const GET_DESCRIPTOR_STRING: u32           = 3;
-//pub const GET_DESCRIPTOR_INTERFACE: u32        = 4;
-//pub const GET_DESCRIPTOR_ENDPOINT: u32         = 5;
+pub const GET_DESCRIPTOR_INTERFACE: u32        = 4;
+pub const GET_DESCRIPTOR_ENDPOINT: u32         = 5;
 pub const GET_DESCRIPTOR_DEVICE_QUALIFIER: u32 = 6;
 pub const GET_DESCRIPTOR_DEBUG: u32            = 10;
     

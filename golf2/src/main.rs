@@ -156,10 +156,11 @@ pub unsafe fn reset_handler() {
                           &mut hotel::usb::OUT_BUFFERS,
                           &mut hotel::usb::IN_DESCRIPTORS,
                           &mut hotel::usb::IN_BUFFERS,
+                          &mut hotel::usb::CONFIGURATION_BUFFER,
                           hotel::usb::PHY::A,
                           None,
                           Some(0x18d1),
-                          Some(0x7788));
+                          Some(0x5026));
 
 
     let end = timerhs.now();

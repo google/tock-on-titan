@@ -12,20 +12,22 @@ use self::constants::*;
 use self::registers::{EpCtl, DescFlag, Registers};
 
 pub use self::registers::DMADescriptor;
-use self::types::{SetupRequest};
-use self::types::{StringDescriptor, DeviceDescriptor, ConfigurationDescriptor};
+use self::types::{SetupRequest, SetupRequestType};
 use self::types::{SetupDirection, SetupRequestClass, SetupRecipient};
+use self::types::{StringDescriptor, DeviceDescriptor, ConfigurationDescriptor};
+use self::types::{InterfaceDescriptor, EndpointDescriptor, HidDeviceDescriptor};
+use self::types::{EndpointAttributes, EndpointUsageType, EndpointTransferType, EndpointSynchronizationType};
 
 // Simple macro for USB debugging output: default definitions do nothing,
 // but you can uncomment print defintions to get detailed output on the
 // messages sent and received.
 macro_rules! usb_debug {
-    () => ({print!();});
-    ($fmt:expr) => ({print!($fmt);});
-    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
-//    () => ({});
-//    ($fmt:expr) => ({});
-//    ($fmt:expr, $($arg:tt)+) => ({});
+//    () => ({print!();});
+//    ($fmt:expr) => ({print!($fmt);});
+//    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
+    () => ({});
+    ($fmt:expr) => ({});
+    ($fmt:expr, $($arg:tt)+) => ({});
 }
 
 /// A StaticRef is a pointer to statically allocated mutable data such
@@ -153,6 +155,12 @@ pub struct USB {
     product_id: Cell<u16>,
 
     configuration_value: Cell<u8>,
+
+    // This stores the full configuration descriptor. It's
+    // populated through calls to configuration_add_ helper
+    // functions.
+    configuration_descriptor: TakeCell<'static, [u8; 64]>,
+    configuration_total_length: Cell<u16>,
 }
 
 /// Hardware base address of the singleton USB controller
@@ -174,13 +182,17 @@ pub static mut IN_DESCRIPTORS: [DMADescriptor; 4] = [DMADescriptor {
 /// IN buffer to pass into `USB#init`.
 pub static mut IN_BUFFERS: [u32; 16 * 4] = [0; 16 * 4];
 
+/// CONFIGURATION_BUFFER to pass into `USB#init`
+pub static mut CONFIGURATION_BUFFER: [u8; 64] = [0; 64];
+
 const STRING_LANG: usize     = 0;
 const STRING_VENDOR: usize   = 1;
 const STRING_BOARD: usize    = 2;
 const STRING_PLATFORM: usize = 3;
 const STRING_U2F: usize      = 4;
+const STRING_SHELL: usize    = 5;
 
-pub static STRINGS: [StringDescriptor; 5] = [
+pub static STRINGS: [StringDescriptor; 6] = [
     StringDescriptor {
         b_length: 4,
         b_descriptor_type: Descriptor::String as u8,
@@ -205,6 +217,11 @@ pub static STRINGS: [StringDescriptor; 5] = [
         b_length: 20,
         b_descriptor_type: Descriptor::String as u8,
         b_string: &[0x0048, 0x0061, 0x0076, 0x0065, 0x006E, 0x0020, 0x0055, 0x0032, 0x0046], // Haven U2F
+    },
+    StringDescriptor {
+        b_length: 10,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0053, 0x0068, 0x0065, 0x006C, 0x006C], // Shell
     }
 ];
 
@@ -226,12 +243,14 @@ impl USB {
             ep0_out_buffers: Cell::new(None),
             ep0_in_descriptors: TakeCell::empty(),
             ep0_in_buffers: TakeCell::empty(),
+            configuration_descriptor: TakeCell::empty(),
             next_out_idx: Cell::new(0),
             cur_out_idx: Cell::new(0),
             device_class: Cell::new(0x00),
             vendor_id: Cell::new(0x0011),    // Unknown
-            product_id: Cell::new(0x7788),   // unknown counterfeit flash drive
+            product_id: Cell::new(0x5026),   // unknown counterfeit flash drive
             configuration_value: Cell::new(0),
+            configuration_total_length: Cell::new(0),
         }
     }
 
@@ -452,8 +471,8 @@ impl USB {
         // Prepare next OUT descriptor if XferCompl
         if inter_out &&
             ep_out_interrupts & (OutInterruptMask::XferComplMsk as u32) != 0 {
-            self.got_rx_packet();
-        }
+                self.got_rx_packet();
+            }
 
         let transfer_type = TableCase::decode_interrupt(ep_out_interrupts);
         usb_debug!("USB: handle endpoint 0, transfer type: {:?}\n", transfer_type);
@@ -471,8 +490,8 @@ impl USB {
                     } else {
                         
                         usb_debug!("Unhandled USB event out:{:#x} in:{:#x} ",
-                               ep_out_interrupts,
-                               ep_in_interrupts);
+                                   ep_out_interrupts,
+                                   ep_in_interrupts);
                         usb_debug!("flags: \n"); 
                         if (flags & DescFlag::LAST) == DescFlag::LAST                {usb_debug!(" +LAST\n");}
                         if (flags & DescFlag::SHORT) == DescFlag::SHORT              {usb_debug!(" +SHORT\n");}
@@ -494,8 +513,8 @@ impl USB {
                 usb_debug!("USB: state is data stage in\n");
                 if inter_in &&
                     ep_in_interrupts & (InInterruptMask::XferComplMsk as u32) != 0 {
-                    self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
-                }
+                        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
+                    }
 
                 if inter_out {
                     if transfer_type == TableCase::B {
@@ -567,9 +586,9 @@ impl USB {
                         self.handle_setup_no_data_phase(transfer_type, &req);
                     }
                 } else if req.recipient() == SetupRecipient::Interface {
-                    // Interface
-                    // TODO
-                    panic!("Recipient is interface");
+                    if req.request() == SetupRequestType::GetInterface { 
+                        usb_debug!("GetInterface on Interface");
+                    }
                 } else {
                     usb_debug!("  - unknown case.\n");
                 }
@@ -598,7 +617,7 @@ impl USB {
                                 bcd_device: 0x0100,
                                 i_manufacturer: STRING_VENDOR as u8,
                                 i_product: STRING_BOARD as u8,
-                                i_serial_number: STRING_PLATFORM as u8,
+                                i_serial_number: STRING_LANG as u8,
                                 b_num_configurations: 1
                             }.serialize(buf)).unwrap_or(0);
                         len = ::core::cmp::min(len, req.w_length as usize);
@@ -613,12 +632,34 @@ impl USB {
                         self.expect_data_phase_in(transfer_type);
                     },
                     GET_DESCRIPTOR_CONFIGURATION => {
-                        let c = ConfigurationDescriptor::new();
                         let mut len = 0;
                         self.ep0_in_buffers.map(|buf| {
-                            len = c.into_buf(buf);
+                            self.configuration_descriptor.map(|desc| {
+                                len = self.get_configuration_total_length();
+                                for i in 0..16 {
+                                    buf[i] = desc[4 * i + 0] as u32 |
+                                             (desc[4 * i + 1] as u32) << 8 |
+                                             (desc[4 * i + 2] as u32) << 16 |
+                                             (desc[4 * i + 3] as u32) << 24; 
+                                }
+                            });
                         });
-                        usb_debug!("USB: Trying to send configuration descriptor, len {}: {:?}\n  ", len, c);
+                        usb_debug!("USB: Trying to send configuration descriptor, len {}\n  ", len);
+                        len = ::core::cmp::min(len, req.w_length);
+                        self.ep0_in_descriptors.map(|descs| {
+                            descs[0].flags = (DescFlag::HOST_READY |
+                                              DescFlag::LAST |
+                                              DescFlag::SHORT |
+                                              DescFlag::IOC).bytes(len as u16);
+                        });
+                        self.expect_data_phase_in(transfer_type);
+                    },
+                    GET_DESCRIPTOR_INTERFACE => {
+                        let i = InterfaceDescriptor::new(STRING_U2F as u8, 0, 0x03, 0, 0);
+                        let mut len = 0;
+                        self.ep0_in_buffers.map(|buf| {
+                            len = i.into_u32_buf(buf);
+                        });
                         len = ::core::cmp::min(len, req.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
                             descs[0].flags = (DescFlag::HOST_READY |
@@ -637,7 +678,7 @@ impl USB {
                         let str = &STRINGS[index];
                         let mut len = 0;
                         self.ep0_in_buffers.map(|buf| {
-                            len = str.into_buf(buf);
+                            len = str.into_u32_buf(buf);
                         });
                         len = ::core::cmp::min(len, req.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
@@ -915,6 +956,64 @@ impl USB {
 
     }
 
+
+    fn generate_full_configuration_descriptor(&self) {
+        self.configuration_descriptor.map(|desc| {
+            let attributes_u2f_in = EndpointAttributes {
+                transfer: EndpointTransferType::Interrupt,
+                synchronization: EndpointSynchronizationType::None,
+                usage: EndpointUsageType::Data,
+            };
+            let attributes_u2f_out = EndpointAttributes {
+                transfer: EndpointTransferType::Interrupt,
+                synchronization: EndpointSynchronizationType::None,
+                usage: EndpointUsageType::Data,
+            };
+
+            let attributes_shell_in = EndpointAttributes {
+                transfer: EndpointTransferType::Bulk,
+                synchronization: EndpointSynchronizationType::None,
+                usage: EndpointUsageType::Data,
+            };
+            let attributes_shell_out = EndpointAttributes {
+                transfer: EndpointTransferType::Bulk,
+                synchronization: EndpointSynchronizationType::None,
+                usage: EndpointUsageType::Data,
+            };
+            
+            let mut config = ConfigurationDescriptor::new(2);
+            let u2f = InterfaceDescriptor::new(STRING_U2F as u8, 0, 3, 0, 0);
+            let hid = HidDeviceDescriptor::new();
+            let ep1out = EndpointDescriptor::new(0x01, attributes_u2f_out, 2);
+            let ep1in  = EndpointDescriptor::new(0x81, attributes_u2f_in, 2);
+            let shell = InterfaceDescriptor::new(STRING_SHELL as u8, 1, 0xFF, 80, 1);
+            let ep2in  = EndpointDescriptor::new(0x82, attributes_shell_in, 10);
+            let ep2out = EndpointDescriptor::new(0x02, attributes_shell_out, 0);
+            
+            let mut size: usize = config.length();
+            size += u2f.into_u8_buf(&mut desc[size..size + u2f.length()]);
+            size += hid.into_u8_buf(&mut desc[size..size + hid.length()]);
+            size += ep1out.into_u8_buf(&mut desc[size..size + ep1out.length()]);
+            size += ep1in.into_u8_buf(&mut desc[size..size + ep1in.length()]);
+            size += shell.into_u8_buf(&mut desc[size..size + shell.length()]);
+            size += ep2in.into_u8_buf(&mut desc[size..size + ep2in.length()]);
+            size += ep2out.into_u8_buf(&mut desc[size..size + ep2out.length()]);
+            
+            config.set_total_length(size as u16);
+            config.into_u8_buf(&mut desc[0..config.length()]);
+            println!("Generating full configuration_descriptor of len: {}", size);
+            self.set_configuration_total_length(size as u16);
+        });
+    }
+
+    pub fn set_configuration_total_length(&self, length: u16) {
+        self.configuration_total_length.set(length);
+    }
+
+    pub fn get_configuration_total_length(&self) -> u16 {
+        self.configuration_total_length.get()
+    }
+    
     /// Initialize the USB driver in device mode.
     ///
     /// Once complete, the driver will begin communicating with a connected
@@ -924,6 +1023,7 @@ impl USB {
                 out_buffers: &'static mut [[u32; 16]; 2],
                 in_descriptors: &'static mut [DMADescriptor; 4],
                 in_buffers: &'static mut [u32; 16 * 4],
+                configuration_buffer: &'static mut [u8; 64],
                 phy: PHY,
                 device_class: Option<u8>,
                 vendor_id: Option<u16>,
@@ -932,7 +1032,8 @@ impl USB {
         self.ep0_out_buffers.set(Some(out_buffers));
         self.ep0_in_descriptors.replace(in_descriptors);
         self.ep0_in_buffers.replace(in_buffers);
-
+        self.configuration_descriptor.replace(configuration_buffer);
+        
         if let Some(dclass) = device_class {
             self.device_class.set(dclass);
         }
@@ -945,6 +1046,8 @@ impl USB {
             self.product_id.set(pid);
         }
 
+        self.generate_full_configuration_descriptor();
+        
         // ** GLOBALSEC **
         // TODO(alevy): refactor out
         unsafe {
