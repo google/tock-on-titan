@@ -387,6 +387,15 @@ pub enum SetupRequestType {
     Undefined = 15,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
+#[repr(u8)]
+pub enum SetupClassRequestType {
+    Undefined = 0,
+    SetIdle = 10,
+}
+
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(dead_code)]
@@ -416,6 +425,7 @@ pub enum SetupRecipient {
     Reserved  = 4,
 }
 
+#[derive(Debug)]
 pub struct SetupRequest {
     pub bm_request_type: u8,
     pub b_request: u8,
@@ -478,6 +488,13 @@ impl SetupRequest {
         }
     }
 
+    pub fn class_request(&self) -> SetupClassRequestType {
+        match self.b_request {
+            10 => SetupClassRequestType::SetIdle,
+            _  => SetupClassRequestType::Undefined,
+        }
+    }
+    
     pub fn request(&self) -> SetupRequestType {
         match self.b_request {
             0 => SetupRequestType::GetStatus,
@@ -495,5 +512,17 @@ impl SetupRequest {
             12 => SetupRequestType::SynchFrame,
              _ => SetupRequestType::Undefined
         }
+    }
+
+    pub fn value(&self) -> u16 {
+        self.w_value
+    }
+
+    pub fn index(&self) -> u16 {
+        self.w_index
+    }
+
+    pub fn length(&self) -> u16 {
+        self.w_length
     }
 }

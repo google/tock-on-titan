@@ -22,12 +22,12 @@ use self::types::{EndpointAttributes, EndpointUsageType, EndpointTransferType, E
 // but you can uncomment print defintions to get detailed output on the
 // messages sent and received.
 macro_rules! usb_debug {
-//    () => ({print!();});
-//    ($fmt:expr) => ({print!($fmt);});
-//    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
-    () => ({});
-    ($fmt:expr) => ({});
-    ($fmt:expr, $($arg:tt)+) => ({});
+    () => ({print!();});
+    ($fmt:expr) => ({print!($fmt);});
+    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
+//    () => ({});
+//    ($fmt:expr) => ({});
+//    ($fmt:expr, $($arg:tt)+) => ({});
 }
 
 /// A StaticRef is a pointer to statically allocated mutable data such
@@ -189,10 +189,11 @@ const STRING_LANG: usize     = 0;
 const STRING_VENDOR: usize   = 1;
 const STRING_BOARD: usize    = 2;
 const STRING_PLATFORM: usize = 3;
-const STRING_U2F: usize      = 4;
-const STRING_SHELL: usize    = 5;
+const STRING_SHELL: usize    = 4;
+const STRING_BLAH: usize     = 5;
+const STRING_U2F: usize      = 6;
 
-pub static STRINGS: [StringDescriptor; 6] = [
+pub static STRINGS: [StringDescriptor; 7] = [
     StringDescriptor {
         b_length: 4,
         b_descriptor_type: Descriptor::String as u8,
@@ -209,20 +210,25 @@ pub static STRINGS: [StringDescriptor; 6] = [
         b_string: &[0x0070, 0x0072, 0x006f, 0x0074, 0x006f, 0x0032], // proto2
     },
     StringDescriptor {
-        b_length: 24,
+        b_length: 54,
         b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0070, 0x0072, 0x006f, 0x0074, 0x006f, 0x0032, 0x002d, 0x0054, 0x006f, 0x0063, 0x006b], // proto2-Tock
+        b_string: &[0x0070, 0x0072, 0x006F, 0x0074, 0x006F, 0x0032, 0x005F, 0x0076, 0x0031, 0x002E, 0x0031, 0x002E, 0x0038, 0x0037, 0x0031, 0x0033, 0x002D, 0x0030, 0x0031, 0x0033, 0x0032, 0x0031, 0x0037, 0x0064, 0x0039, 0x0031], // proto2-...
+    },
+    StringDescriptor {
+        b_length: 10,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0053, 0x0068, 0x0065, 0x006C, 0x006C], // Shell
+    },
+    StringDescriptor {
+        b_length: 8,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0042, 0x004C, 0x0041, 0x0048],  // BLAH
     },
     StringDescriptor {
         b_length: 20,
         b_descriptor_type: Descriptor::String as u8,
         b_string: &[0x0048, 0x0061, 0x0076, 0x0065, 0x006E, 0x0020, 0x0055, 0x0032, 0x0046], // Haven U2F
     },
-    StringDescriptor {
-        b_length: 10,
-        b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0053, 0x0068, 0x0065, 0x006C, 0x006C], // Shell
-    }
 ];
 
 impl USB {
@@ -379,7 +385,7 @@ impl USB {
         // Save current interrupt status snapshot so can clear only those at the
         // end
         let status = self.registers.interrupt_status.get();
-        usb_debug!("USB interrupt, status: {:08x}\n", status);
+        /* usb_debug!("USB interrupt, status: {:08x}\n", status);
         if (status & Interrupt::HostMode as u32) != 0           {usb_debug!("  +Host mode\n");}
         if (status & Interrupt::Mismatch as u32) != 0           {usb_debug!("  +Mismatch\n");}
         if (status & Interrupt::OTG as u32) != 0                {usb_debug!("  +OTG\n");}
@@ -403,7 +409,7 @@ impl USB {
         if (status & Interrupt::ConnectIDChange as u32) != 0    {usb_debug!("  +Connect ID change\n");}
         if (status & Interrupt::SessionRequest as u32) != 0     {usb_debug!("  +Session request\n");}
         if (status & Interrupt::ResumeWakeup as u32) != 0       {usb_debug!("  +Resume/wakeup\n");}
-
+        */
         if status & ENUM_DONE != 0 {
             // MPS default set to 0 == 64 bytes
             // "Application must read the DSTS register to obtain the
@@ -574,27 +580,66 @@ impl USB {
             
             usb_debug!("  - type={:?} recip={:?} dir={:?} request={:?}\n", req.req_type(), req.recipient(), req.data_direction(), req.request());
             
-            if req.req_type() == SetupRequestClass::Standard &&
-                req.recipient() == SetupRecipient::Device {
-                    if req.data_direction() == SetupDirection::DeviceToHost {
-                        self.handle_setup_device_to_host(transfer_type, &req);
-                    } else if req.w_length > 0 {
-                        // Host-to-device, there is data
-                        self.handle_setup_host_to_device(transfer_type, &req);
-                    } else {
-                        // Host-to-device, no data stage
-                        self.handle_setup_no_data_phase(transfer_type, &req);
-                    }
-                } else if req.recipient() == SetupRecipient::Interface {
-                    if req.request() == SetupRequestType::GetInterface { 
-                        usb_debug!("GetInterface on Interface");
-                    }
+            if req.req_type() == SetupRequestClass::Standard && req.recipient() == SetupRecipient::Device {
+                if req.data_direction() == SetupDirection::DeviceToHost {
+                    self.handle_setup_device_to_host(transfer_type, &req);
+                } else if req.w_length > 0 {
+                    // Host-to-device, there is data
+                   self.handle_setup_host_to_device(transfer_type, &req);
                 } else {
-                    usb_debug!("  - unknown case.\n");
+                    // Host-to-device, no data stage
+                    self.handle_setup_no_data_phase(transfer_type, &req);
                 }
+            } else if req.req_type() == SetupRequestClass::Standard && req.recipient() == SetupRecipient::Interface {
+                usb_debug!("Standard request on interface.\n");
+                if req.data_direction() == SetupDirection::DeviceToHost {
+                    self.handle_setup_interface_device_to_host(transfer_type, &req);
+                } else {
+                    self.handle_setup_interface_host_to_device(transfer_type, &req);
+                }
+            } else if req.req_type() == SetupRequestClass::Class && req.recipient() == SetupRecipient::Interface {
+                if req.data_direction() == SetupDirection::DeviceToHost {
+                    self.handle_setup_class_device_to_host(transfer_type, &req);
+                } else {
+                    self.handle_setup_class_host_to_device(transfer_type, &req);
+                }
+            } else {
+                usb_debug!("  - unknown case.\n");
+            }
         });
     }
+    
+    fn handle_setup_interface_device_to_host(&self, transfer_type: TableCase, req: &SetupRequest) {
+        usb_debug!("Handle setup interface, device to host.\n");
+    }
 
+    fn handle_setup_interface_host_to_device(&self, transfer_type: TableCase, req: &SetupRequest) {
+        usb_debug!("Handle setup interface, host to device.\n");
+    }
+
+    fn handle_setup_class_device_to_host(&self, transfer_type: TableCase, req: &SetupRequest) {
+        usb_debug!("Handle setup class, device to host.\n");
+    }
+
+    fn handle_setup_class_host_to_device(&self, transfer_type: TableCase, req: &SetupRequest) {
+        use self::types::SetupClassRequestType;
+        use self::serialize::Serialize;
+        usb_debug!("Handle setup class, host to device.\n");
+        match req.class_request() {
+            SetIdle => {
+                let val = req.value();
+                let interval: u8 = (val & 0xff) as u8;
+                let id: u8 = (val >> 8) as u8;
+                usb_debug!("SetIdle: {} to {}, stall fifos.", id, interval);
+                self.stall_both_fifos();
+            }
+            _ => {
+                panic!("Unknown handle setup case: {:?}.\n", req.class_request());
+            }
+        }
+    }
+
+    
     fn handle_setup_device_to_host(&self, transfer_type: TableCase, req: &SetupRequest) {
         use self::types::SetupRequestType::*;
         use self::serialize::Serialize;
@@ -785,7 +830,6 @@ impl USB {
             } else {
                 self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
             }
-
 
             self.ep0_out_descriptors.map(|descs| {
                 descs[self.next_out_idx.get()].flags =
