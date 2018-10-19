@@ -37,12 +37,15 @@ macro_rules! usb_debug {
 
 
 /// USBState encodes the current state of the USB driver's state
-/// machine
-#[derive(Clone,Copy,PartialEq,Eq)]
+/// machine. It can be in three states: waiting for a message from
+/// the host, sending data in reply to a query from the host, or sending
+/// a status response (no data) in reply to a command from the host.
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum USBState {
-    WaitingForSetupPacket,
-    DataStageIn,
-    NoDataStage,
+    WaitingForSetupPacket,   // Waiting for message from host
+    DataStageIn,             // Sending data to host
+    NoDataStage,             // Sending status (not data) to host,
+                             // e.g. in response to set command
 }
 
 /// Driver for the Synopsys DesignWare Cores USB 2.0 Hi-Speed
@@ -209,6 +212,7 @@ impl USB {
         self.registers.device_in_ep_interrupt_mask.set(0);
         self.registers.device_out_ep_interrupt_mask.set(0);
 
+        // This code below still needs significant cleanup -pal
         let sel_phy = match phy {
             PHY::A => 0b100, // USB PHY0
             PHY::B => 0b101, // USB PHY1
@@ -443,7 +447,7 @@ impl USB {
             let inter_ep0_out = daint & 1 << 16 != 0;
             let inter_ep0_in = daint & 1 != 0;
             if inter_ep0_out || inter_ep0_in {
-                self.handle_ep0(inter_ep0_out, inter_ep0_in);
+                self.handle_endpoint0_events(inter_ep0_out, inter_ep0_in);
             }
         }
 
@@ -482,10 +486,11 @@ impl USB {
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
     }
     
-
-    
-    /// Handle all endpoint 0 IN/OUT events
-    fn handle_ep0(&self, inter_out: bool, inter_in: bool) {
+    /// Handle all endpoint 0 IN/OUT events; clear pending interrupt
+    /// flags, swap buffers if needed, then either stall, dispatch to
+    /// `handle_setup`, or dispatch to `expect_setup_packet` depending
+    /// on whether the setup packet is ready.
+    fn handle_endpoint0_events(&self, inter_out: bool, inter_in: bool) {
         let ep_out = &self.registers.out_endpoints[0];
         let ep_out_interrupts = ep_out.interrupt.get();
         if inter_out {
@@ -498,12 +503,12 @@ impl USB {
             ep_in.interrupt.set(ep_in_interrupts);
         }
 
-        // Prepare next OUT descriptor if XferCompl
-        if inter_out &&
-            ep_out_interrupts & (OutInterruptMask::XferComplMsk as u32) != 0 {
-                self.swap_ep0_out_descriptors();
-            }
-
+        // If the transfer is compelte (XferCompl), swap which EP0
+        // OUT descriptor to use so stack can immediately receive again.
+        if inter_out && ep_out_interrupts & (OutInterruptMask::XferComplMsk as u32) != 0 {
+            self.swap_ep0_out_descriptors();
+        }
+        
         let transfer_type = TableCase::decode_interrupt(ep_out_interrupts);
         usb_debug!("USB: handle endpoint 0, transfer type: {:?}\n", transfer_type);
         let flags = self.ep0_out_descriptors
@@ -584,7 +589,10 @@ impl USB {
         }
     }
 
-    /// Handle a SETUP packet to endpoint 0 OUT.
+    /// Handle a SETUP packet to endpoint 0 OUT, dispatching to a
+    /// helper function depending on what kind of a request it is;
+    /// currently supports Standard requests to Device and Interface,
+    /// or Class requests to Interface.
     ///
     /// `transfer_type` is the `TableCase` found by inspecting
     /// endpoint-0's interrupt register. Currently only Standard
@@ -593,122 +601,129 @@ impl USB {
     /// size, this function calls one of handle_setup_device_to_host,
     /// handle_setup_host_to_device (not supported), or
     /// handle_setup_no_data_phase.
-    
     fn handle_setup(&self, transfer_type: TableCase) {
         // Assuming `ep0_out_buffers` was properly set in `init`, this will
         // always succeed.
         usb_debug!("Handle setup, case {:?}\n", transfer_type);
         self.ep0_out_buffers.get().map(|bufs| {
-            let idx =  self.last_out_idx.get();
-            let req = SetupRequest::new(&bufs[idx]);
+            let request = SetupRequest::new(&bufs[self.last_out_idx.get()]);
+            usb_debug!("  - type={:?} recip={:?} dir={:?} request={:?}\n", request.req_type(), request.recipient(), request.data_direction(), request.request());
             
-            usb_debug!("  - type={:?} recip={:?} dir={:?} request={:?}\n", req.req_type(), req.recipient(), req.data_direction(), req.request());
-            
-            if req.req_type() == SetupRequestClass::Standard {
-                if req.recipient() == SetupRecipient::Device {
+            if request.req_type() == SetupRequestClass::Standard {
+                if request.recipient() == SetupRecipient::Device {
                     usb_debug!("Standard request on device.\n");
-                    if req.data_direction() == SetupDirection::DeviceToHost {
-                        self.handle_setup_device_to_host(transfer_type, &req);
-                    } else if req.w_length > 0 {
-                        // Host-to-device, there is data
-                        self.handle_setup_host_to_device(transfer_type, &req);
-                    } else {
-                        // Host-to-device, no data stage
-                        self.handle_setup_no_data_phase(transfer_type, &req);
+                    if request.data_direction() == SetupDirection::DeviceToHost {
+                        self.handle_setup_device_to_host(transfer_type, &request);
+                    } else if request.w_length > 0 { // Data requested
+                        self.handle_setup_host_to_device(transfer_type, &request);
+                    } else { // No data requested
+                        self.handle_setup_no_data_phase(transfer_type, &request);
                     }
-                } else if req.recipient() == SetupRecipient::Interface {
+                } else if request.recipient() == SetupRecipient::Interface {
                     usb_debug!("Standard request on interface.\n");
-                    if req.data_direction() == SetupDirection::DeviceToHost {
-                        self.handle_setup_interface_device_to_host(transfer_type, &req);
+                    if request.data_direction() == SetupDirection::DeviceToHost {
+                        self.handle_setup_interface_device_to_host(transfer_type, &request);
                     } else {
-                        self.handle_setup_interface_host_to_device(transfer_type, &req);
+                        self.handle_setup_interface_host_to_device(transfer_type, &request);
                     }
                 }
-            } else if req.req_type() == SetupRequestClass::Class && req.recipient() == SetupRecipient::Interface {
-                if req.data_direction() == SetupDirection::DeviceToHost {
-                    self.handle_setup_class_device_to_host(transfer_type, &req);
+            } else if request.req_type() == SetupRequestClass::Class && request.recipient() == SetupRecipient::Interface {
+                if request.data_direction() == SetupDirection::DeviceToHost {
+                    self.handle_setup_class_device_to_host(transfer_type, &request);
                 } else {
-                    self.handle_setup_class_host_to_device(transfer_type, &req);
+                    self.handle_setup_class_host_to_device(transfer_type, &request);
                 }
             } else {
                 usb_debug!("  - unknown case.\n");
             }
         });
     }
-    
-    fn handle_setup_interface_device_to_host(&self, transfer_type: TableCase, req: &SetupRequest) {
+
+    /// Responds to a SETUP message destined to an interface. Currently
+    /// only handles GetDescriptor requests for Report descriptors, otherwise
+    /// panics.
+    fn handle_setup_interface_device_to_host(&self, transfer_type: TableCase, request: &SetupRequest) {
         usb_debug!("Handle setup interface, device to host.\n");
-        let request_type = req.request();
+        let request_type = request.request();
         match request_type {
             SetupRequestType::GetDescriptor => {
-                let value      = req.value();
+                let value      = request.value();
                 let descriptor = Descriptor::from_u8((value >> 8) as u8);
                 let index      = (value & 0xff) as u8;
-                let len        = req.length() as usize;
+                let len        = request.length() as usize;
                 usb_debug!("  - Descriptor: {:?}, index: {}, length: {}\n", descriptor, index, len);
-                
-                if U2F_REPORT_DESCRIPTOR.len() != len {
-                    panic!("Requested report of length {} but length is {}", req.length(), U2F_REPORT_DESCRIPTOR.len());
+                match descriptor {
+                    Descriptor::Report => {
+                        if U2F_REPORT_DESCRIPTOR.len() != len {
+                            panic!("Requested report of length {} but length is {}", request.length(), U2F_REPORT_DESCRIPTOR.len());
+                        }
+                        
+                        self.ep0_in_buffers.map(|buf| {
+                            for i in 0..len {
+                                buf[i / 4] = (U2F_REPORT_DESCRIPTOR[i] as u32) << ((3 - (i % 4))  * 8);
+                            }
+                            self.ep0_in_descriptors.map(|descs| {
+                                descs[0].flags = (DescFlag::HOST_READY |
+                                                  DescFlag::LAST |
+                                                  DescFlag::SHORT |
+                                                  DescFlag::IOC).bytes(len as u16);
+                            });
+                            self.expect_data_phase_in(transfer_type);
+                        });
+                    },
+                    _ => panic!("Interface device to host, unhandled request")
                 }
-
-                self.ep0_in_buffers.map(|buf| {
-                    for i in 0..len {
-                        buf[i / 4] = (U2F_REPORT_DESCRIPTOR[i] as u32) << ((3 - (i % 4))  * 8);
-                    }
-                    self.ep0_in_descriptors.map(|descs| {
-                        descs[0].flags = (DescFlag::HOST_READY |
-                                          DescFlag::LAST |
-                                          DescFlag::SHORT |
-                                          DescFlag::IOC).bytes(len as u16);
-                    });
-                    self.expect_data_phase_in(transfer_type);
-                });
             },
             _ => panic!("Interface device to host, unhandled request: {:?}", request_type)
         }
-        // The wValue field specifies the Descriptor Type in the high
-        // byte and the Descriptor Index in the low byte. 
     }
 
-    fn handle_setup_interface_host_to_device(&self, _transfer_type: TableCase, _req: &SetupRequest) {
-        usb_debug!("Handle setup interface, host to device.\n");
+    /// Handles a setup message to an interface, host-to-device communication.
+    /// Currently not supported: panics.
+    fn handle_setup_interface_host_to_device(&self, _transfer_type: TableCase, _request: &SetupRequest) {
+        panic!("Unhandled setup: interface, host to device!");
     }
 
-    fn handle_setup_class_device_to_host(&self, _transfer_type: TableCase, _req: &SetupRequest) {
-        usb_debug!("Handle setup class, device to host.\n");
+    /// Handles a setup message to a class, device-to-host communication.
+    /// Currently not supported: panics.
+    fn handle_setup_class_device_to_host(&self, _transfer_type: TableCase, _request: &SetupRequest) {
+        panic!("Unhandled setup: class, device to host.!");
     }
-
-    fn handle_setup_class_host_to_device(&self, _transfer_type: TableCase, req: &SetupRequest) {
+    
+    /// Handles a setup message to a class, host-to-device
+    /// communication.  Currently supports only SetIdle commands,
+    /// otherwise panics.
+    fn handle_setup_class_host_to_device(&self, _transfer_type: TableCase, request: &SetupRequest) {
         use self::types::SetupClassRequestType;
         usb_debug!("Handle setup class, host to device.\n");
-        match req.class_request() {
+        match request.class_request() {
             SetupClassRequestType::SetIdle => {
-                let val = req.value();
+                let val = request.value();
                 let interval: u8 = (val & 0xff) as u8;
                 let id: u8 = (val >> 8) as u8;
                 usb_debug!("SetIdle: {} to {}, stall fifos.", id, interval);
                 self.stall_both_fifos();
             },
             _ => {
-                panic!("Unknown handle setup case: {:?}.\n", req.class_request());
+                panic!("Unknown handle setup case: {:?}.\n", request.class_request());
             }
         }
     }
 
     
-    fn handle_setup_device_to_host(&self, transfer_type: TableCase, req: &SetupRequest) {
+    fn handle_setup_device_to_host(&self, transfer_type: TableCase, request: &SetupRequest) {
         use self::types::SetupRequestType::*;
         use self::serialize::Serialize;
-        match req.request() {
+        match request.request() {
             GetDescriptor => {
-                let descriptor_type: u32 = (req.w_value >> 8) as u32;
+                let descriptor_type: u32 = (request.w_value >> 8) as u32;
                 match descriptor_type {
                     GET_DESCRIPTOR_DEVICE => {
                         let mut len = self.ep0_in_buffers.map(|buf| {
                             self.generate_device_descriptor().serialize(buf)
                         }).unwrap_or(0);
                         
-                        len = ::core::cmp::min(len, req.w_length as usize);
+                        len = ::core::cmp::min(len, request.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
                             descs[0].flags = (DescFlag::HOST_READY |
                                               DescFlag::LAST |
@@ -733,7 +748,7 @@ impl USB {
                             });
                         });
                         usb_debug!("USB: Trying to send configuration descriptor, len {}\n  ", len);
-                        len = ::core::cmp::min(len, req.w_length);
+                        len = ::core::cmp::min(len, request.w_length);
                         self.ep0_in_descriptors.map(|descs| {
                             descs[0].flags = (DescFlag::HOST_READY |
                                               DescFlag::LAST |
@@ -748,7 +763,7 @@ impl USB {
                         self.ep0_in_buffers.map(|buf| {
                             len = i.into_u32_buf(buf);
                         });
-                        len = ::core::cmp::min(len, req.w_length as usize);
+                        len = ::core::cmp::min(len, request.w_length as usize);
                         self.ep0_in_descriptors.map(|descs| {
                             descs[0].flags = (DescFlag::HOST_READY |
                                               DescFlag::LAST |
@@ -762,14 +777,14 @@ impl USB {
                         self.stall_both_fifos();
                     }
                     GET_DESCRIPTOR_STRING => {
-                        let index = (req.w_value & 0xff) as usize;
+                        let index = (request.w_value & 0xff) as usize;
                         self.strings.map(|strs| {
                             let str = &strs[index];
                             let mut len = 0;
                             self.ep0_in_buffers.map(|buf| {
                                 len = str.into_u32_buf(buf);
                             });
-                            len = ::core::cmp::min(len, req.w_length as usize);
+                            len = ::core::cmp::min(len, request.w_length as usize);
                             self.ep0_in_descriptors.map(|descs| {
                                 descs[0].flags = (DescFlag::HOST_READY |
                                               DescFlag::LAST |
@@ -793,7 +808,7 @@ impl USB {
                     .map(|buf| self.configuration_current_value.get().serialize(buf))
                     .unwrap_or(0);
 
-                len = ::core::cmp::min(len, req.w_length as usize);
+                len = ::core::cmp::min(len, request.w_length as usize);
                 self.ep0_in_descriptors.map(|descs| {
                     descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
                                       DescFlag::SHORT | DescFlag::IOC)
@@ -813,43 +828,43 @@ impl USB {
                 self.expect_status_phase_in(transfer_type);
             }
             _ => {
-                panic!("USB: unhandled device-to-host setup request code: {}", req.b_request as u8);
+                panic!("USB: unhandled device-to-host setup request code: {}", request.b_request as u8);
             }
         }
     }
 
-    fn handle_setup_host_to_device(&self, _transfer_type: TableCase, _req: &SetupRequest) {
+    fn handle_setup_host_to_device(&self, _transfer_type: TableCase, _request: &SetupRequest) {
         // TODO(alevy): don't support any of these yet...
         unimplemented!();
     }
 
-    fn handle_setup_no_data_phase(&self, transfer_type: TableCase, req: &SetupRequest) {
+    fn handle_setup_no_data_phase(&self, transfer_type: TableCase, request: &SetupRequest) {
         use self::types::SetupRequestType::*;
-        usb_debug!(" - setup (no data): {:?}\n", req.request());
-        match req.request() {
+        usb_debug!(" - setup (no data): {:?}\n", request.request());
+        match request.request() {
             GetStatus => {
                 panic!("USB: GET_STATUS no data setup packet.");
             }
             SetAddress => {
-                usb_debug!("Setting address: {:#x}.\n", req.w_value & 0x7f);
+                usb_debug!("Setting address: {:#x}.\n", request.w_value & 0x7f);
                 // Even though USB wants the address to be set after the
                 // IN packet handshake, the hardware knows to wait, so
                 // we should just set it now.
                 let mut dcfg = self.registers.device_config.get();
                 dcfg &= !(0x7f << 4); // Strip address from config
-                dcfg |= ((req.w_value & 0x7f) as u32) << 4; // Put in addr
+                dcfg |= ((request.w_value & 0x7f) as u32) << 4; // Put in addr
                 self.registers
                     .device_config
                     .set(dcfg);
                 self.expect_status_phase_in(transfer_type);
             }
             SetConfiguration => {
-                usb_debug!("SetConfiguration: {:?} Type {:?} transfer\n", req.w_value, transfer_type);
-                self.configuration_current_value.set(req.w_value as u8);
+                usb_debug!("SetConfiguration: {:?} Type {:?} transfer\n", request.w_value, transfer_type);
+                self.configuration_current_value.set(request.w_value as u8);
                 self.expect_status_phase_in(transfer_type);
             }
             _ => {
-                panic!("USB: unhandled no data setup packet {}", req.b_request as u8);
+                panic!("USB: unhandled no data setup packet {}", request.b_request as u8);
             }
         }
     }
