@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use core::cell::Cell;
 use core::ops::Deref;
 use kernel::common::take_cell::TakeCell;
@@ -214,10 +216,13 @@ pub static STRINGS: [StringDescriptor; 7] = [
         b_descriptor_type: Descriptor::String as u8,
         b_string: &[0x0070, 0x0072, 0x006F, 0x0074, 0x006F, 0x0032, 0x005F, 0x0076, 0x0031, 0x002E, 0x0031, 0x002E, 0x0038, 0x0037, 0x0031, 0x0033, 0x002D, 0x0030, 0x0031, 0x0033, 0x0032, 0x0031, 0x0037, 0x0064, 0x0039, 0x0031], // proto2-...
     },
+    // Why does this need 3 l (0x6C)? Linux seems to be truncating last one.
+    // Verified GetDescriptor for the String is returning complete information.
+    // -pal
     StringDescriptor {
-        b_length: 10,
+        b_length: 12,
         b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0053, 0x0068, 0x0065, 0x006C, 0x006C], // Shell
+        b_string: &[0x0053, 0x0068, 0x0065, 0x006C, 0x006C, 0x006C], // Shell
     },
     StringDescriptor {
         b_length: 8,
@@ -580,22 +585,25 @@ impl USB {
             
             usb_debug!("  - type={:?} recip={:?} dir={:?} request={:?}\n", req.req_type(), req.recipient(), req.data_direction(), req.request());
             
-            if req.req_type() == SetupRequestClass::Standard && req.recipient() == SetupRecipient::Device {
-                if req.data_direction() == SetupDirection::DeviceToHost {
-                    self.handle_setup_device_to_host(transfer_type, &req);
-                } else if req.w_length > 0 {
-                    // Host-to-device, there is data
-                   self.handle_setup_host_to_device(transfer_type, &req);
-                } else {
-                    // Host-to-device, no data stage
-                    self.handle_setup_no_data_phase(transfer_type, &req);
-                }
-            } else if req.req_type() == SetupRequestClass::Standard && req.recipient() == SetupRecipient::Interface {
-                usb_debug!("Standard request on interface.\n");
-                if req.data_direction() == SetupDirection::DeviceToHost {
-                    self.handle_setup_interface_device_to_host(transfer_type, &req);
-                } else {
-                    self.handle_setup_interface_host_to_device(transfer_type, &req);
+            if req.req_type() == SetupRequestClass::Standard {
+                if req.recipient() == SetupRecipient::Device {
+                    usb_debug!("Standard request on device.\n");
+                    if req.data_direction() == SetupDirection::DeviceToHost {
+                        self.handle_setup_device_to_host(transfer_type, &req);
+                    } else if req.w_length > 0 {
+                        // Host-to-device, there is data
+                        self.handle_setup_host_to_device(transfer_type, &req);
+                    } else {
+                        // Host-to-device, no data stage
+                        self.handle_setup_no_data_phase(transfer_type, &req);
+                    }
+                } else if req.recipient() == SetupRecipient::Interface {
+                    usb_debug!("Standard request on interface.\n");
+                    if req.data_direction() == SetupDirection::DeviceToHost {
+                        self.handle_setup_interface_device_to_host(transfer_type, &req);
+                    } else {
+                        self.handle_setup_interface_host_to_device(transfer_type, &req);
+                    }
                 }
             } else if req.req_type() == SetupRequestClass::Class && req.recipient() == SetupRecipient::Interface {
                 if req.data_direction() == SetupDirection::DeviceToHost {
@@ -611,28 +619,57 @@ impl USB {
     
     fn handle_setup_interface_device_to_host(&self, transfer_type: TableCase, req: &SetupRequest) {
         usb_debug!("Handle setup interface, device to host.\n");
+        let request_type = req.request();
+        match request_type {
+            SetupRequestType::GetDescriptor => {
+                let value      = req.value();
+                let descriptor = Descriptor::from_u8((value >> 8) as u8);
+                let index      = (value & 0xff) as u8;
+                let len        = req.length() as usize;
+                usb_debug!("  - Descriptor: {:?}, index: {}, length: {}\n", descriptor, index, len);
+                
+                if U2F_REPORT_DESCRIPTOR.len() != len {
+                    panic!("Requested report of length {} but length is {}", req.length(), U2F_REPORT_DESCRIPTOR.len());
+                }
+
+                self.ep0_in_buffers.map(|buf| {
+                    for i in 0..len {
+                        buf[i / 4] = (U2F_REPORT_DESCRIPTOR[i] as u32) << ((3 - (i % 4))  * 8);
+                    }
+                    self.ep0_in_descriptors.map(|descs| {
+                        descs[0].flags = (DescFlag::HOST_READY |
+                                          DescFlag::LAST |
+                                          DescFlag::SHORT |
+                                          DescFlag::IOC).bytes(len as u16);
+                    });
+                    self.expect_data_phase_in(transfer_type);
+                });
+            },
+            _ => panic!("Interface device to host, unhandled request: {:?}", request_type)
+        }
+        // The wValue field specifies the Descriptor Type in the high
+        // byte and the Descriptor Index in the low byte. 
     }
 
-    fn handle_setup_interface_host_to_device(&self, transfer_type: TableCase, req: &SetupRequest) {
+    fn handle_setup_interface_host_to_device(&self, _transfer_type: TableCase, _req: &SetupRequest) {
         usb_debug!("Handle setup interface, host to device.\n");
     }
 
-    fn handle_setup_class_device_to_host(&self, transfer_type: TableCase, req: &SetupRequest) {
+    fn handle_setup_class_device_to_host(&self, _transfer_type: TableCase, _req: &SetupRequest) {
         usb_debug!("Handle setup class, device to host.\n");
     }
 
-    fn handle_setup_class_host_to_device(&self, transfer_type: TableCase, req: &SetupRequest) {
+    fn handle_setup_class_host_to_device(&self, _transfer_type: TableCase, req: &SetupRequest) {
         use self::types::SetupClassRequestType;
-        use self::serialize::Serialize;
         usb_debug!("Handle setup class, host to device.\n");
         match req.class_request() {
-            SetIdle => {
+            SetupClassRequestType::SetIdle => {
                 let val = req.value();
                 let interval: u8 = (val & 0xff) as u8;
                 let id: u8 = (val >> 8) as u8;
                 usb_debug!("SetIdle: {} to {}, stall fifos.", id, interval);
                 self.stall_both_fifos();
-            }
+            },
             _ => {
                 panic!("Unknown handle setup case: {:?}.\n", req.class_request());
             }

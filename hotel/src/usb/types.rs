@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use super::serialize::Serialize;
 use usb::constants::Descriptor;
 use usb::constants::MAX_PACKET_SIZE;

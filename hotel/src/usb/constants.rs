@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 
 pub const SOF: u32 = 1 << 3;
 pub const EARLY_SUSPEND: u32 = 1 << 10;
@@ -158,6 +159,24 @@ pub enum Descriptor {
     Endpoint        = 0x05,
     DeviceQualifier = 0x06,
     HidDevice       = 0x21,
+    Report          = 0x22,
+    Unknown         = 0xFF,
+}
+
+impl Descriptor {
+    pub fn from_u8(t: u8) -> Descriptor {
+        match t {
+            0x01 => Descriptor::Device,
+            0x02 => Descriptor::Configuration,
+            0x03 => Descriptor::String,
+            0x04 => Descriptor::Interface,
+            0x05 => Descriptor::Endpoint,
+            0x06 => Descriptor::Endpoint,
+            0x21 => Descriptor::HidDevice,
+            0x22 => Descriptor::Report,
+            _    => Descriptor::Unknown,
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -168,4 +187,25 @@ pub const GET_DESCRIPTOR_INTERFACE: u32        = 4;
 pub const GET_DESCRIPTOR_ENDPOINT: u32         = 5;
 pub const GET_DESCRIPTOR_DEVICE_QUALIFIER: u32 = 6;
 pub const GET_DESCRIPTOR_DEBUG: u32            = 10;
-    
+
+// Copied from Cr52 usb_hidu2f.c - pal
+pub const U2F_REPORT_DESCRIPTOR: [u8; 34] = [
+    0x06, 0xD0, 0xF1, /* Usage Page (FIDO Alliance), FIDO_USAGE_PAGE */
+    0x09, 0x01,       /* Usage (U2F HID Authenticator Device),
+                         FIDO_USAGE_U2FHID */
+    0xA1, 0x01,       /* Collection (Application), HID_APPLICATION */
+    0x09, 0x20,       /*   Usage (Input Report Data), FIDO_USAGE_DATA_IN */
+    0x15, 0x00,       /*   Logical Minimum (0) */
+    0x26, 0xFF, 0x00, /*   Logical Maximum (255) */
+    0x75, 0x08,       /*   Report Size (8) */
+    0x95, 0x40,       /*   Report Count (64), HID_INPUT_REPORT_BYTES */
+    0x81, 0x02,       /*   Input (Data, Var, Abs), Usage */
+    0x09, 0x21,       /*   Usage (Output Report Data), FIDO_USAGE_DATA_OUT */
+    0x15, 0x00,       /*   Logical Minimum (0) */
+    0x26, 0xFF, 0x00, /*   Logical Maximum (255) */
+    0x75, 0x08,       /*   Report Size (8) */
+    0x95, 0x40,       /*   Report Count (64), HID_OUTPUT_REPORT_BYTES */
+    0x91, 0x02,       /*   Output (Data, Var, Abs), Usage */
+    0xC0              /* End Collection */
+];
+
