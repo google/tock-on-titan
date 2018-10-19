@@ -613,25 +613,25 @@ impl USB {
                 if request.recipient() == SetupRecipient::Device {
                     usb_debug!("Standard request on device.\n");
                     if request.data_direction() == SetupDirection::DeviceToHost {
-                        self.handle_setup_device_to_host(transfer_type, &request);
+                        self.handle_standard_device_to_host(transfer_type, &request);
                     } else if request.w_length > 0 { // Data requested
-                        self.handle_setup_host_to_device(transfer_type, &request);
+                        self.handle_standard_host_to_device(transfer_type, &request);
                     } else { // No data requested
-                        self.handle_setup_no_data_phase(transfer_type, &request);
+                        self.handle_standard_no_data_phase(transfer_type, &request);
                     }
                 } else if request.recipient() == SetupRecipient::Interface {
                     usb_debug!("Standard request on interface.\n");
                     if request.data_direction() == SetupDirection::DeviceToHost {
-                        self.handle_setup_interface_device_to_host(transfer_type, &request);
+                        self.handle_standard_interface_to_host(transfer_type, &request);
                     } else {
-                        self.handle_setup_interface_host_to_device(transfer_type, &request);
+                        self.handle_standard_host_to_interface(transfer_type, &request);
                     }
                 }
             } else if request.req_type() == SetupRequestClass::Class && request.recipient() == SetupRecipient::Interface {
                 if request.data_direction() == SetupDirection::DeviceToHost {
-                    self.handle_setup_class_device_to_host(transfer_type, &request);
+                    self.handle_class_interface_to_host(transfer_type, &request);
                 } else {
-                    self.handle_setup_class_host_to_device(transfer_type, &request);
+                    self.handle_class_host_to_interface(transfer_type, &request);
                 }
             } else {
                 usb_debug!("  - unknown case.\n");
@@ -639,79 +639,13 @@ impl USB {
         });
     }
 
-    /// Responds to a SETUP message destined to an interface. Currently
-    /// only handles GetDescriptor requests for Report descriptors, otherwise
-    /// panics.
-    fn handle_setup_interface_device_to_host(&self, transfer_type: TableCase, request: &SetupRequest) {
-        usb_debug!("Handle setup interface, device to host.\n");
-        let request_type = request.request();
-        match request_type {
-            SetupRequestType::GetDescriptor => {
-                let value      = request.value();
-                let descriptor = Descriptor::from_u8((value >> 8) as u8);
-                let index      = (value & 0xff) as u8;
-                let len        = request.length() as usize;
-                usb_debug!("  - Descriptor: {:?}, index: {}, length: {}\n", descriptor, index, len);
-                match descriptor {
-                    Descriptor::Report => {
-                        if U2F_REPORT_DESCRIPTOR.len() != len {
-                            panic!("Requested report of length {} but length is {}", request.length(), U2F_REPORT_DESCRIPTOR.len());
-                        }
-                        
-                        self.ep0_in_buffers.map(|buf| {
-                            for i in 0..len {
-                                buf[i / 4] = (U2F_REPORT_DESCRIPTOR[i] as u32) << ((3 - (i % 4))  * 8);
-                            }
-                            self.ep0_in_descriptors.map(|descs| {
-                                descs[0].flags = (DescFlag::HOST_READY |
-                                                  DescFlag::LAST |
-                                                  DescFlag::SHORT |
-                                                  DescFlag::IOC).bytes(len as u16);
-                            });
-                            self.expect_data_phase_in(transfer_type);
-                        });
-                    },
-                    _ => panic!("Interface device to host, unhandled request")
-                }
-            },
-            _ => panic!("Interface device to host, unhandled request: {:?}", request_type)
-        }
+    fn handle_standard_host_to_device(&self, _transfer_type: TableCase, _request: &SetupRequest) {
+        // TODO(alevy): don't support any of these yet...
+        unimplemented!();
     }
 
-    /// Handles a setup message to an interface, host-to-device communication.
-    /// Currently not supported: panics.
-    fn handle_setup_interface_host_to_device(&self, _transfer_type: TableCase, _request: &SetupRequest) {
-        panic!("Unhandled setup: interface, host to device!");
-    }
 
-    /// Handles a setup message to a class, device-to-host communication.
-    /// Currently not supported: panics.
-    fn handle_setup_class_device_to_host(&self, _transfer_type: TableCase, _request: &SetupRequest) {
-        panic!("Unhandled setup: class, device to host.!");
-    }
-    
-    /// Handles a setup message to a class, host-to-device
-    /// communication.  Currently supports only SetIdle commands,
-    /// otherwise panics.
-    fn handle_setup_class_host_to_device(&self, _transfer_type: TableCase, request: &SetupRequest) {
-        use self::types::SetupClassRequestType;
-        usb_debug!("Handle setup class, host to device.\n");
-        match request.class_request() {
-            SetupClassRequestType::SetIdle => {
-                let val = request.value();
-                let interval: u8 = (val & 0xff) as u8;
-                let id: u8 = (val >> 8) as u8;
-                usb_debug!("SetIdle: {} to {}, stall fifos.", id, interval);
-                self.stall_both_fifos();
-            },
-            _ => {
-                panic!("Unknown handle setup case: {:?}.\n", request.class_request());
-            }
-        }
-    }
-
-    
-    fn handle_setup_device_to_host(&self, transfer_type: TableCase, request: &SetupRequest) {
+    fn handle_standard_device_to_host(&self, transfer_type: TableCase, request: &SetupRequest) {
         use self::types::SetupRequestType::*;
         use self::serialize::Serialize;
         match request.request() {
@@ -797,7 +731,8 @@ impl USB {
                         });
                     }
                     _ => {
-                        // Send request error response? Cr52 just stalls, this seems to work.
+                        // The specification says that a not-understood request should send an
+                        // error response. Cr52 just stalls, this seems to work. -pal
                         self.stall_both_fifos();
                         usb_debug!("USB: unhandled setup descriptor type: {}", descriptor_type);
                     }
@@ -833,12 +768,80 @@ impl USB {
         }
     }
 
-    fn handle_setup_host_to_device(&self, _transfer_type: TableCase, _request: &SetupRequest) {
-        // TODO(alevy): don't support any of these yet...
-        unimplemented!();
+
+
+    /// Responds to a SETUP message destined to an interface. Currently
+    /// only handles GetDescriptor requests for Report descriptors, otherwise
+    /// panics.
+    fn handle_standard_interface_to_host(&self, transfer_type: TableCase, request: &SetupRequest) {
+        usb_debug!("Handle setup interface, device to host.\n");
+        let request_type = request.request();
+        match request_type {
+            SetupRequestType::GetDescriptor => {
+                let value      = request.value();
+                let descriptor = Descriptor::from_u8((value >> 8) as u8);
+                let index      = (value & 0xff) as u8;
+                let len        = request.length() as usize;
+                usb_debug!("  - Descriptor: {:?}, index: {}, length: {}\n", descriptor, index, len);
+                match descriptor {
+                    Descriptor::Report => {
+                        if U2F_REPORT_DESCRIPTOR.len() != len {
+                            panic!("Requested report of length {} but length is {}", request.length(), U2F_REPORT_DESCRIPTOR.len());
+                        }
+                        
+                        self.ep0_in_buffers.map(|buf| {
+                            for i in 0..len {
+                                buf[i / 4] = (U2F_REPORT_DESCRIPTOR[i] as u32) << ((3 - (i % 4))  * 8);
+                            }
+                            self.ep0_in_descriptors.map(|descs| {
+                                descs[0].flags = (DescFlag::HOST_READY |
+                                                  DescFlag::LAST |
+                                                  DescFlag::SHORT |
+                                                  DescFlag::IOC).bytes(len as u16);
+                            });
+                            self.expect_data_phase_in(transfer_type);
+                        });
+                    },
+                    _ => panic!("Interface device to host, unhandled request")
+                }
+            },
+            _ => panic!("Interface device to host, unhandled request: {:?}", request_type)
+        }
     }
 
-    fn handle_setup_no_data_phase(&self, transfer_type: TableCase, request: &SetupRequest) {
+    /// Handles a setup message to an interface, host-to-device
+    /// communication.  Currently not supported: panics.
+    fn handle_standard_host_to_interface(&self, _transfer_type: TableCase, _request: &SetupRequest) {
+        panic!("Unhandled setup: interface, host to device!");
+    }
+
+    /// Handles a setup message to a class, device-to-host
+    /// communication.  Currently not supported: panics.
+    fn handle_class_interface_to_host(&self, _transfer_type: TableCase, _request: &SetupRequest) {
+        panic!("Unhandled setup: class, device to host.!");
+    }
+    
+    /// Handles a setup message to a class, host-to-device
+    /// communication.  Currently supports only SetIdle commands,
+    /// otherwise panics.
+    fn handle_class_host_to_interface(&self, _transfer_type: TableCase, request: &SetupRequest) {
+        use self::types::SetupClassRequestType;
+        usb_debug!("Handle setup class, host to device.\n");
+        match request.class_request() {
+            SetupClassRequestType::SetIdle => {
+                let val = request.value();
+                let interval: u8 = (val & 0xff) as u8;
+                let id: u8 = (val >> 8) as u8;
+                usb_debug!("SetIdle: {} to {}, stall fifos.", id, interval);
+                self.stall_both_fifos();
+            },
+            _ => {
+                panic!("Unknown handle setup case: {:?}.\n", request.class_request());
+            }
+        }
+    }
+
+    fn handle_standard_no_data_phase(&self, transfer_type: TableCase, request: &SetupRequest) {
         use self::types::SetupRequestType::*;
         usb_debug!(" - setup (no data): {:?}\n", request.request());
         match request.request() {
