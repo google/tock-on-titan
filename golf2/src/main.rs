@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(asm, const_fn, lang_items, compiler_builtins_lib, const_cell_new)]
+#![feature(core_intrinsics)]
 
 extern crate capsules;
 extern crate compiler_builtins;
@@ -21,7 +22,8 @@ use kernel::mpu::MPU;
 use kernel::hil::uart::UART;
 
 use hotel::crypto::dcrypto::Dcrypto;
-
+use hotel::usb::{Descriptor, StringDescriptor};
+    
 //use kernel::hil::rng::RNG;
 
 // State for loading apps
@@ -45,6 +47,47 @@ pub struct Golf {
     //rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::Trng<'static>>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
 }
+
+static mut STRINGS: [StringDescriptor; 7] = [
+    StringDescriptor {
+        b_length: 4,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0409], // English
+    },
+    StringDescriptor {
+        b_length: 24,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0047, 0x006f, 0x006f, 0x0067, 0x006c, 0x0065, 0x0020, 0x0049, 0x006e, 0x0063, 0x002e], // Google Inc.
+    },
+    StringDescriptor {
+        b_length: 14,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0070, 0x0072, 0x006f, 0x0074, 0x006f, 0x0032], // proto2
+    },
+    StringDescriptor {
+        b_length: 54,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0070, 0x0072, 0x006F, 0x0074, 0x006F, 0x0032, 0x005F, 0x0076, 0x0031, 0x002E, 0x0031, 0x002E, 0x0038, 0x0037, 0x0031, 0x0033, 0x002D, 0x0030, 0x0031, 0x0033, 0x0032, 0x0031, 0x0037, 0x0064, 0x0039, 0x0031], // proto2-...
+    },
+    // Why does this need 3 l (0x6C)? Linux seems to be truncating last one.
+    // Verified GetDescriptor for the String is returning complete information.
+    // -pal
+    StringDescriptor {
+        b_length: 12,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0053, 0x0068, 0x0065, 0x006C, 0x006C, 0x006C], // Shell
+    },
+    StringDescriptor {
+        b_length: 8,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0042, 0x004C, 0x0041, 0x0048],  // BLAH
+    },
+    StringDescriptor {
+        b_length: 20,
+        b_descriptor_type: Descriptor::String as u8,
+        b_string: &[0x0048, 0x0061, 0x0076, 0x0065, 0x006E, 0x0020, 0x0055, 0x0032, 0x0046], // Haven U2F
+    },
+];
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
@@ -150,6 +193,29 @@ pub unsafe fn reset_handler() {
 //        rng: rng,
     }, 8);
 
+    // ** GLOBALSEC **
+    // TODO(alevy): refactor out
+    {
+        use core::intrinsics::volatile_store as vs;
+
+        vs(0x40090000 as *mut u32, !0);
+        vs(0x40090004 as *mut u32, !0);
+        vs(0x40090008 as *mut u32, !0);
+        vs(0x4009000c as *mut u32, !0);
+
+        // GLOBALSEC_DDMA0-DDMA3
+        vs(0x40090080 as *mut u32, !0);
+        vs(0x40090084 as *mut u32, !0);
+        vs(0x40090088 as *mut u32, !0);
+        vs(0x4009008c as *mut u32, !0);
+        
+        // GLOBALSEC_DUSB_REGION0-DUSB_REGION3
+        vs(0x400900c0 as *mut u32, !0);
+        vs(0x400900c4 as *mut u32, !0);
+        vs(0x400900c8 as *mut u32, !0);
+        vs(0x400900cc as *mut u32, !0);
+    }
+
 
     
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
@@ -160,7 +226,8 @@ pub unsafe fn reset_handler() {
                           hotel::usb::PHY::A,
                           None,
                           Some(0x18d1),
-                          Some(0x5026));
+                          Some(0x5026),
+                          &mut STRINGS);
 
 
     let end = timerhs.now();

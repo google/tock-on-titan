@@ -1,8 +1,45 @@
 #![allow(dead_code)]
+
+use core::ops::Deref;
 use super::serialize::Serialize;
 use usb::constants::Descriptor;
 use usb::constants::MAX_PACKET_SIZE;
 
+/// A StaticRef is a pointer to statically allocated mutable data such
+/// as memory mapped I/O registers.
+///
+/// It is a simple wrapper around a raw pointer that encapsulates an
+/// unsafe dereference in a safe manner. It serves the role of
+/// creating a `&'static T` given a raw address and acts similarly to
+/// `extern` definitions, except `StaticRef` is subject to module and
+/// crate bounderies, while `extern` definitions can be imported
+/// anywhere.
+///
+/// TODO(alevy): move into `common` crate or replace with other mechanism.
+pub struct StaticRef<T> {
+    ptr: *const T,
+}
+
+impl<T> StaticRef<T> {
+    /// Create a new `StaticRef` from a raw pointer
+    ///
+    /// ## Safety
+    ///
+    /// Callers must pass in a reference to statically allocated memory which
+    /// does not overlap with other values.
+    pub const unsafe fn new(ptr: *const T) -> StaticRef<T> {
+        StaticRef { ptr: ptr }
+    }
+}
+
+impl<T> Deref for StaticRef<T> {
+    type Target = T;
+    fn deref(&self) -> &'static T {
+        unsafe { &*self.ptr }
+    }
+}
+
+#[derive(Debug)]
 #[repr(C)]
 pub struct DeviceDescriptor {
     pub b_length: u8,
@@ -21,9 +58,13 @@ pub struct DeviceDescriptor {
     pub b_num_configurations: u8,
 }
 
+impl DeviceDescriptor {
+}
+
 unsafe impl Serialize for DeviceDescriptor {}
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ConfigurationDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -35,21 +76,25 @@ pub struct ConfigurationDescriptor {
     pub b_max_power: u8,
 }
 
+const CONFIGURATION_DESCRIPTOR_LENGTH: u8 = 9;
 impl ConfigurationDescriptor {
-    /// Creates an empty configuration with no interface descriptors.
-    ///
-    /// `bm_attributes` set to bus powered, and not remote wakeup
-    /// `b_max_power` set to 100ma
-    pub fn new(interfaces: u8) -> ConfigurationDescriptor {
+    /// Creates a configuration with `num_interfaces` and whose string
+    /// descriptor is `i_configuration`. The value `b_max_power` sets
+    /// the maximum power of the device in 2mA increments.  The
+    /// configuration has `bm_attributes` set to bus powered (not
+    /// remote wakeup).
+    pub fn new(num_interfaces: u8,
+               i_configuration: u8,
+               b_max_power: u8) -> ConfigurationDescriptor {
         ConfigurationDescriptor {
-            b_length: 9,
-            b_descriptor_type: 2,
-            w_total_length: 9,
-            b_num_interfaces: interfaces,
+            b_length: CONFIGURATION_DESCRIPTOR_LENGTH,
+            b_descriptor_type: Descriptor::Configuration as u8,
+            w_total_length: CONFIGURATION_DESCRIPTOR_LENGTH as u16,
+            b_num_interfaces: num_interfaces,
             b_configuration_value: 1,
-            i_configuration: 3,
+            i_configuration: i_configuration,
             bm_attributes: 0b10000000,
-            b_max_power: 50,
+            b_max_power: b_max_power,
         }
     }
     
@@ -64,7 +109,7 @@ impl ConfigurationDescriptor {
                  (self.i_configuration as u32)       << 16 |
                  (self.bm_attributes as u32)         << 24;
         buf[2] = (self.b_max_power as u32) << 0;
-        9
+        CONFIGURATION_DESCRIPTOR_LENGTH as usize
     }
 
     /// Take the configuration and write it out as a bytes into
@@ -79,7 +124,7 @@ impl ConfigurationDescriptor {
         buf[6] = self.i_configuration as u8;
         buf[7] = self.bm_attributes as u8;
         buf[8] = self.b_max_power as u8;
-        9
+        CONFIGURATION_DESCRIPTOR_LENGTH as usize
     }
     
     pub fn get_total_length(&self) -> u16 {
@@ -91,7 +136,7 @@ impl ConfigurationDescriptor {
     }
 
     pub fn length(&self) -> usize {
-        9
+        CONFIGURATION_DESCRIPTOR_LENGTH as usize
     }
 }
 
