@@ -4,7 +4,6 @@
 #![feature(core_intrinsics)]
 
 extern crate capsules;
-extern crate compiler_builtins;
 extern crate hotel;
 #[macro_use(static_init,debug)]
 extern crate kernel;
@@ -30,12 +29,12 @@ use hotel::usb::{Descriptor, StringDescriptor};
 const NUM_PROCS: usize = 2;
 
 // how should the kernel respond when a process faults
-const FAULT_RESPONSE: kernel::process::FaultResponse = kernel::process::FaultResponse::Panic;
+const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultResponse::Panic;
 
 #[link_section = ".app_memory"]
 static mut APP_MEMORY: [u8; 16384] = [0; 16384];
 
-static mut PROCESSES: [Option<kernel::Process<'static>>; NUM_PROCS] = [None, None];
+static mut PROCESSES: [Option<&'static mut kernel::procs::Process<'static>>; NUM_PROCS] = [None, None];
 
 pub struct Golf {
     console: &'static capsules::console::Console<'static, hotel::uart::UART>,
@@ -126,9 +125,9 @@ pub unsafe fn reset_handler() {
         capsules::console::Console<'static, hotel::uart::UART>,
         capsules::console::Console::new(&hotel::uart::UART0,
                                         115200,
-                                       &mut capsules::console::WRITE_BUF,
-                                       kernel::grant::Grant::create()),
-        24);
+                                        &mut capsules::console::WRITE_BUF,
+                                        &mut capsules::console::READ_BUF,
+                                       kernel::Grant::create()));
     hotel::uart::UART0.set_client(console);
     console.initialize();
     let kc = static_init!(capsules::console::App, capsules::console::App::default());
@@ -136,13 +135,11 @@ pub unsafe fn reset_handler() {
 
     let gpio_pins = static_init!(
         [&'static hotel::gpio::GPIOPin; 2],
-        [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]],
-        8);
+        [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]]);
 
     let gpio = static_init!(
         capsules::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
-        capsules::gpio::GPIO::new(gpio_pins),
-        20);
+        capsules::gpio::GPIO::new(gpio_pins));
     for pin in gpio_pins.iter() {
         pin.set_client(gpio)
     }
@@ -150,28 +147,24 @@ pub unsafe fn reset_handler() {
     let timer = static_init!(
         capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
         capsules::alarm::AlarmDriver::new(
-            &hotel::timels::TIMELS0, kernel::Grant::create()),
-        12);
+            &hotel::timels::TIMELS0, kernel::Grant::create()));
     hotel::timels::TIMELS0.set_client(timer);
 
     let digest = static_init!(
         digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
         digest::DigestDriver::new(
                 &mut hotel::crypto::sha::KEYMGR0_SHA,
-                kernel::Grant::create()),
-        16);
+                kernel::Grant::create()));
 
     let aes = static_init!(
         aes::AesDriver,
-        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel::Grant::create()),
-        16);
+        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel::Grant::create()));
     hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
 
     hotel::crypto::dcrypto::DCRYPTO.initialize();
     let dcrypto = static_init!(
         dcrypto::DcryptoDriver<'static>,
-        dcrypto::DcryptoDriver::new(&mut hotel::crypto::dcrypto::DCRYPTO),
-    24);
+        dcrypto::DcryptoDriver::new(&mut hotel::crypto::dcrypto::DCRYPTO));
     
     hotel::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
         
@@ -191,7 +184,7 @@ pub unsafe fn reset_handler() {
         aes: aes,
         dcrypto: dcrypto
 //        rng: rng,
-    }, 8);
+    });
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
@@ -247,7 +240,7 @@ pub unsafe fn reset_handler() {
         static _sapps: u8;
     }
 
-    kernel::process::load_processes(
+    kernel::procs::load_processes(
         &_sapps as *const u8,
         &mut APP_MEMORY,
         &mut PROCESSES,
@@ -256,7 +249,7 @@ pub unsafe fn reset_handler() {
 
     debug!("Start main loop.");
     debug!("");
-    kernel::main(golf2, &mut chip, &mut PROCESSES, &golf2.ipc);
+    kernel::main(golf2, &mut chip, &mut PROCESSES, Some(&golf2.ipc));
 }
 
 impl Platform for Golf {

@@ -5,12 +5,14 @@ mod registers;
 mod serialize;
 mod types;
 
+use cortexm3::support;
+
 pub use self::constants::Descriptor;
 pub use self::registers::DMADescriptor;
 pub use self::types::StringDescriptor;
 
 use core::cell::Cell;
-use kernel::common::take_cell::TakeCell;
+use kernel::common::cells::TakeCell;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 use self::constants::*;
@@ -317,7 +319,7 @@ impl USB {
         // Power on programming done
         self.registers.device_control.set(self.registers.device_control.get() | 1 << 11);
         for _ in 0..10000 {
-            ::kernel::support::nop();
+            support::nop();
         }
         self.registers.device_control.set(self.registers.device_control.get() & !(1 << 11));
 

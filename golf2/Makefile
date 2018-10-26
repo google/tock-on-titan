@@ -1,7 +1,7 @@
 APP ?= dcrypto_test
-TOCK_ARCH = cortex-m3
-TARGET = thumbv7m-none-eabi
-PLATFORM = golf2
+TARGET=thumbv7em-none-eabi
+PLATFORM=golf2
+TOCK_ARCH=cortex-m3
 
 include ../tock/boards/Makefile.common
 

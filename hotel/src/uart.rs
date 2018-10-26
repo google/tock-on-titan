@@ -34,8 +34,8 @@
 //!
 
 use core::cell::Cell;
-use kernel::common::take_cell::TakeCell;
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::TakeCell;
+use kernel::common::cells::VolatileCell;
 use kernel::hil;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
@@ -306,6 +306,10 @@ impl hil::uart::UART for UART {
     }
 
     fn receive(&self, _rx_buffer: &'static mut[u8], _rx_len: usize) {
+        unimplemented!();
+    }
+
+    fn abort_receive(&self) {
         unimplemented!();
     }
 }

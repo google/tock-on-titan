@@ -28,7 +28,7 @@
 //!
 
 use core::mem::transmute;
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::VolatileCell;
 
 /// Registers for the Power Management Unit (PMU)
 // Non-public fields prefixed with "_" mark unused registers

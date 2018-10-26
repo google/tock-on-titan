@@ -1,7 +1,7 @@
 use self::Pin::*;
 use core::cell::Cell;
 use core::mem::transmute;
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::VolatileCell;
 use kernel::hil;
 
 pub struct PortRegisters {

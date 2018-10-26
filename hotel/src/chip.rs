@@ -86,4 +86,21 @@ impl Chip for Hotel {
         &self.systick
     }
 
+    fn sleep(&self) {
+        unsafe {
+                cortexm3::scb::unset_sleepdeep();
+        }
+        
+        unsafe {
+            cortexm3::support::wfi();
+        }
+    }
+
+    unsafe fn atomic<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        cortexm3::support::atomic(f)
+    }
+
 }

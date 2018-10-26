@@ -4,7 +4,7 @@
 
 use core::cell::Cell;
 use hil::rng::{Continue, RNG, Client};
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::VolatileCell;
 
 
 #[repr(C)]

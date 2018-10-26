@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use hotel::crypto::dcrypto::{Dcrypto, DcryptoClient, ProgramFault};
 use kernel::{AppId, Callback, Driver, ReturnCode, Shared, AppSlice};
-use kernel::common::take_cell::{MapCell};
+use kernel::common::cells::MapCell;
 
 pub const DRIVER_NUM: usize = 0x40004;
 
@@ -74,11 +74,15 @@ impl<'a> DcryptoDriver<'a> {
 }
 
 impl<'a> Driver for DcryptoDriver<'a> {
-    fn subscribe(&self, subscribe_num: usize, callback: Callback) -> ReturnCode {
+    fn subscribe(&self,
+                 subscribe_num: usize,
+                 callback: Option<Callback>,
+                 app_id: AppId,
+    ) -> ReturnCode {
         match subscribe_num {
             0 => {
                 self.app.map(|app| {
-                    app.callback = Some(callback);
+                    app.callback = callback;
                 });
                 ReturnCode::SUCCESS
             },
@@ -103,13 +107,16 @@ impl<'a> Driver for DcryptoDriver<'a> {
         }
     }
     
-    fn allow(&self, _: AppId, minor_num: usize, slice: AppSlice<Shared, u8>) -> ReturnCode {
+    fn allow(&self, _: AppId,
+             minor_num: usize,
+             slice: Option<AppSlice<Shared, u8>>
+    ) -> ReturnCode {
         match minor_num {
             0 => {
                 // Data memory
                 self.app
                     .map(|app_data| {
-                        app_data.data_buffer = Some(slice);
+                        app_data.data_buffer = slice;
                         ReturnCode::SUCCESS
                     })
                     .unwrap_or(ReturnCode::FAIL)
@@ -118,7 +125,7 @@ impl<'a> Driver for DcryptoDriver<'a> {
                 // Input Buffer
                 self.app
                     .map(|app_data| {
-                        app_data.program = Some(slice);
+                        app_data.program = slice;
                         ReturnCode::SUCCESS
                     })
                     .unwrap_or(ReturnCode::FAIL)

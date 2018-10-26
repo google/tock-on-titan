@@ -1,5 +1,5 @@
 use core::cell::Cell;
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::VolatileCell;
 use kernel::hil::time::{self, Alarm, Frequency};
 
 const TIMELS0_BASE: *const Registers = 0x40540000 as *const Registers;
