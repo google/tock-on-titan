@@ -1,6 +1,6 @@
 #APP ?= dcrypto_test
 APP ?= spin
-TARGET=thumbv7em-none-eabi
+TARGET=thumbv7m-none-eabi
 PLATFORM=golf2
 TOCK_ARCH=cortex-m3
 
