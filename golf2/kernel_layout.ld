@@ -27,6 +27,9 @@
  *    The `_sapps` symbol marks the beginning of application memory in flash.
  */
 
+
+/* Codesigner requires that the ELF entry point be the same as the
+   reset handler, so set it here. -pal, 11/6/18 */
 ENTRY(reset_handler)
 
 SECTIONS

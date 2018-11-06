@@ -303,7 +303,7 @@ pub unsafe fn reset_handler() {
         /// Beginning of the ROM region containing app images.
         static _sapps: u8;
     }
-
+/*
     kernel::procs::load_processes(
         kernel,
         chip,
@@ -312,11 +312,10 @@ pub unsafe fn reset_handler() {
         &mut PROCESSES,
         FAULT_RESPONSE,
         &process_mgmt_cap,
-        );
-
-    debug!("Start main loop.");
-    debug!("");
-
+    );*/
+    //loop {}
+    //debug!("Start main loop.");
+    //cortexm3::nvic::disable_all();
 
     kernel.kernel_loop(&golf2, chip, Some(&golf2.ipc), &main_cap);
 }

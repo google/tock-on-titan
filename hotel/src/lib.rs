@@ -25,7 +25,7 @@ pub mod usb;
 pub mod test_rng;
 pub mod test_dcrypto;
 
-use cortexm3::{generic_isr, svc_handler, systick_handler};
+use cortexm3::{generic_isr, hard_fault_handler, svc_handler, systick_handler};
 
 unsafe extern "C" fn unhandled_interrupt() {
     let mut interrupt_number: u32;
@@ -57,6 +57,7 @@ extern "C" {
     static mut _etext: u32;
     static mut _srelocate: u32;
     static mut _erelocate: u32;
+    static mut _sstack: u32;
 }
 
 #[link_section = ".vectors"]
@@ -83,7 +84,7 @@ pub static BASE_VECTORS: [unsafe extern "C" fn(); 16] = [
 
 #[link_section = ".vectors"]
 #[no_mangle] // Ensures that the symbol is kept until the final binary
-pub static IRQS: [unsafe extern "C" fn(); 80] = [generic_isr; 80];
+pub static IRQS: [unsafe extern "C" fn(); 255] = [generic_isr; 255];
 
 pub unsafe fn init() {
     // Relocate data segment.
@@ -114,7 +115,7 @@ pub unsafe fn init() {
     cortexm3::nvic::clear_all_pending();
     cortexm3::nvic::enable_all();
 }
-
+/*
 #[naked]
 unsafe extern "C" fn hard_fault_handler() {
     use core::intrinsics::offset;
@@ -252,7 +253,7 @@ unsafe extern "C" fn hard_fault_handler() {
             cortexm3::ipsr_isr_number_to_str(exception_number),
             faulting_stack as u32,
             (_estack as *const ()) as u32,
-            (&_ezero as *const u32) as u32,
+            (&_sstack as *const u32) as u32,
             shcsr,
             cfsr,
             hfsr,
@@ -315,7 +316,7 @@ unsafe extern "C" fn hard_fault_handler() {
     }
 }
 
-/*
+
 unsafe extern "C" fn unhandled_interrupt() {
     let mut interrupt_number: u32;
 
