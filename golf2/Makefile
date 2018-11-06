@@ -1,5 +1,4 @@
-#APP ?= dcrypto_test
-APP ?= spin
+APP ?= dcrypto_test
 TARGET=thumbv7m-none-eabi
 PLATFORM=golf2
 TOCK_ARCH=cortex-m3
@@ -30,7 +29,7 @@ target/$(TARGET)/release/golf2-$(APP): target/$(TARGET)/release/golf2.bin apps/$
 	  target/$(TARGET)/release/golf2-$(APP)
 
 target/$(TARGET)/release/golf2-$(APP)-self-signed: target/$(TARGET)/release/golf2-$(APP).elf
-	$(TANGO_CODESIGNER) --verbose --b --input $^ --key=$(TANGO_CODESIGNER_KEY) --output=$@
+	$(TANGO_CODESIGNER) --b --input $^ --key=$(TANGO_CODESIGNER_KEY) --output=$@
 
 target/$(TARGET)/release/golf2-$(APP)-full: target/$(TARGET)/release/golf2-$(APP)-self-signed
 	cat $(TANGO_BOOTLOADER) $^ > $@

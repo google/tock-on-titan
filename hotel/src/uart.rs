@@ -95,11 +95,6 @@ impl UART {
         }
     }
 
-    fn init(&self, params: hil::uart::UARTParameters) {
-        self.config(params.baud_rate);
-        // TODO(alevy) can we handle other parameters?
-    }
-    
     /// Enables transmission on the UART
     ///
     /// Side-effect: ensures the clock is on.

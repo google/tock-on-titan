@@ -782,9 +782,9 @@ impl USB {
             SetupRequestType::GetDescriptor => {
                 let value      = request.value();
                 let descriptor = Descriptor::from_u8((value >> 8) as u8);
-                let index      = (value & 0xff) as u8;
+                let _index      = (value & 0xff) as u8;
                 let len        = request.length() as usize;
-                usb_debug!("  - Descriptor: {:?}, index: {}, length: {}\n", descriptor, index, len);
+                usb_debug!("  - Descriptor: {:?}, index: {}, length: {}\n", descriptor, _index, len);
                 match descriptor {
                     Descriptor::Report => {
                         if U2F_REPORT_DESCRIPTOR.len() != len {
@@ -832,9 +832,9 @@ impl USB {
         match request.class_request() {
             SetupClassRequestType::SetIdle => {
                 let val = request.value();
-                let interval: u8 = (val & 0xff) as u8;
-                let id: u8 = (val >> 8) as u8;
-                usb_debug!("SetIdle: {} to {}, stall fifos.", id, interval);
+                let _interval: u8 = (val & 0xff) as u8;
+                let _id: u8 = (val >> 8) as u8;
+                usb_debug!("SetIdle: {} to {}, stall fifos.", _id, _interval);
                 self.stall_both_fifos();
             },
             _ => {
