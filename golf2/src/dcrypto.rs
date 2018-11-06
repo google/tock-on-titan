@@ -77,7 +77,7 @@ impl<'a> Driver for DcryptoDriver<'a> {
     fn subscribe(&self,
                  subscribe_num: usize,
                  callback: Option<Callback>,
-                 app_id: AppId,
+                 _app_id: AppId,
     ) -> ReturnCode {
         match subscribe_num {
             0 => {

@@ -1,12 +1,16 @@
 #![no_std]
 #![no_main]
-#![feature(asm, const_fn, lang_items, compiler_builtins_lib, const_cell_new)]
+#![feature(asm, const_fn, lang_items, compiler_builtins_lib)]
+#![feature(in_band_lifetimes)]
+#![feature(infer_outlives_requirements)]
+#![feature(panic_implementation)]
 #![feature(core_intrinsics)]
 
 extern crate capsules;
 extern crate hotel;
-#[macro_use(static_init,debug)]
+#[macro_use(static_init, debug, create_capability)]
 extern crate kernel;
+extern crate cortexm3;
 
 #[macro_use]
 pub mod io;
@@ -16,13 +20,17 @@ pub mod aes;
 pub mod dcrypto;
 pub mod dcrypto_test;
 
+use capsules::console;
+use capsules::virtual_uart::{UartDevice, UartMux};
+
 use kernel::{Chip, Platform};
+use kernel::capabilities;
 use kernel::mpu::MPU;
-use kernel::hil::uart::UART;
+use kernel::hil;
 
 use hotel::crypto::dcrypto::Dcrypto;
 use hotel::usb::{Descriptor, StringDescriptor};
-    
+
 //use kernel::hil::rng::RNG;
 
 // State for loading apps
@@ -34,10 +42,15 @@ const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultRespons
 #[link_section = ".app_memory"]
 static mut APP_MEMORY: [u8; 16384] = [0; 16384];
 
-static mut PROCESSES: [Option<&'static mut kernel::procs::Process<'static>>; NUM_PROCS] = [None, None];
+static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; NUM_PROCS] = [None, None];
+
+/// Dummy buffer that causes the linker to reserve enough space for the stack.
+#[no_mangle]
+#[link_section = ".stack_buffer"]
+pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 
 pub struct Golf {
-    console: &'static capsules::console::Console<'static, hotel::uart::UART>,
+    console: &'static capsules::console::Console<'static, UartDevice<'static>>,
     gpio: &'static capsules::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
     timer: &'static capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
     ipc: kernel::ipc::IPC,
@@ -121,18 +134,61 @@ pub unsafe fn reset_handler() {
         pinmux.uart0_rx.select.set(hotel::pinmux::SelectablePin::Diob6);
     }
 
-    let console = static_init!(
-        capsules::console::Console<'static, hotel::uart::UART>,
-        capsules::console::Console::new(&hotel::uart::UART0,
-                                        115200,
-                                        &mut capsules::console::WRITE_BUF,
-                                        &mut capsules::console::READ_BUF,
-                                       kernel::Grant::create()));
-    hotel::uart::UART0.set_client(console);
-    console.initialize();
-    let kc = static_init!(capsules::console::App, capsules::console::App::default());
-    kernel::debug::assign_console_driver(Some(console), kc);
+    // Create capabilities that the board needs to call certain protected kernel
+    // functions.
+    let process_mgmt_cap = create_capability!(capabilities::ProcessManagementCapability);
+    let main_cap = create_capability!(capabilities::MainLoopCapability);
+    let grant_cap = create_capability!(capabilities::MemoryAllocationCapability);
 
+    let kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
+
+    let uart_mux = static_init!(
+        UartMux<'static>,
+        UartMux::new(
+            &hotel::uart::UART0,
+            &mut capsules::virtual_uart::RX_BUF,
+            115200
+        )
+    );
+    hil::uart::UART::set_client(&hotel::uart::UART0, uart_mux);
+    
+    // Create virtual device for console.
+    let console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
+    console_uart.setup();
+    
+    let console = static_init!(
+        console::Console<UartDevice>,
+        console::Console::new(
+            console_uart,
+            115200,
+            &mut console::WRITE_BUF,
+            &mut console::READ_BUF,
+            kernel.create_grant(&grant_cap)
+        )
+    );
+    hil::uart::UART::set_client(console_uart, console);
+    console.initialize();
+    
+    // Create virtual device for kernel debug.
+    let debugger_uart = static_init!(UartDevice, UartDevice::new(uart_mux, false));
+    debugger_uart.setup();
+    let debugger = static_init!(
+        kernel::debug::DebugWriter,
+        kernel::debug::DebugWriter::new(
+            debugger_uart,
+            &mut kernel::debug::OUTPUT_BUF,
+            &mut kernel::debug::INTERNAL_BUF,
+        )
+    );
+    hil::uart::UART::set_client(debugger_uart, debugger);
+    
+    let debug_wrapper = static_init!(
+        kernel::debug::DebugWriterWrapper,
+        kernel::debug::DebugWriterWrapper::new(debugger)
+    );
+    kernel::debug::set_debug_writer_wrapper(debug_wrapper);
+
+    //debug!("Booting.");
     let gpio_pins = static_init!(
         [&'static hotel::gpio::GPIOPin; 2],
         [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]]);
@@ -147,18 +203,18 @@ pub unsafe fn reset_handler() {
     let timer = static_init!(
         capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
         capsules::alarm::AlarmDriver::new(
-            &hotel::timels::TIMELS0, kernel::Grant::create()));
+            &hotel::timels::TIMELS0, kernel.create_grant(&grant_cap)));
     hotel::timels::TIMELS0.set_client(timer);
 
     let digest = static_init!(
         digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
         digest::DigestDriver::new(
                 &mut hotel::crypto::sha::KEYMGR0_SHA,
-                kernel::Grant::create()));
+                kernel.create_grant(&grant_cap)));
 
     let aes = static_init!(
         aes::AesDriver,
-        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel::Grant::create()));
+        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel.create_grant(&grant_cap)));
     hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
 
     hotel::crypto::dcrypto::DCRYPTO.initialize();
@@ -175,16 +231,16 @@ pub unsafe fn reset_handler() {
         8);
     hotel::trng::TRNG0.set_client(rng);*/
  
-    let golf2 = static_init!(Golf, Golf {
+    let golf2 = Golf {
         console: console,
         gpio: gpio,
         timer: timer,
-        ipc: kernel::ipc::IPC::new(),
+        ipc: kernel::ipc::IPC::new(kernel, &grant_cap),
         digest: digest,
         aes: aes,
         dcrypto: dcrypto
 //        rng: rng,
-    });
+    };
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
@@ -209,7 +265,21 @@ pub unsafe fn reset_handler() {
         vs(0x400900cc as *mut u32, !0);
     }
 
+    let mut _ctr = 0;
+    let end = timerhs.now();
 
+    println!("Tock 1.0 booting. Initialization took {} tics.",
+             end.wrapping_sub(start));
+
+    let chip = static_init!(hotel::chip::Hotel, hotel::chip::Hotel::new());
+
+    chip.mpu().enable_mpu();
+
+    for _i in 0..1_000_000 {
+        _ctr += timerhs.now();
+    }
+
+    println!("Tock 1.0 booting. About to initialize USB.");
     
     hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
                           &mut hotel::usb::OUT_BUFFERS,
@@ -223,15 +293,9 @@ pub unsafe fn reset_handler() {
                           &mut STRINGS);
 
 
-    let end = timerhs.now();
-
-    println!("Tock 1.0 booting. Initialization took {} tics.",
-              end.wrapping_sub(start));
 
 
-    let mut chip = hotel::chip::Hotel::new();
-    chip.mpu().enable_mpu();
-
+    
 // dcrypto_test::run_dcrypto();
 //    rng_test::run_rng();
 
@@ -241,15 +305,20 @@ pub unsafe fn reset_handler() {
     }
 
     kernel::procs::load_processes(
+        kernel,
+        chip,
         &_sapps as *const u8,
         &mut APP_MEMORY,
         &mut PROCESSES,
         FAULT_RESPONSE,
-    );
+        &process_mgmt_cap,
+        );
 
     debug!("Start main loop.");
     debug!("");
-    kernel::main(golf2, &mut chip, &mut PROCESSES, Some(&golf2.ipc));
+
+
+    kernel.kernel_loop(&golf2, chip, Some(&golf2.ipc), &main_cap);
 }
 
 impl Platform for Golf {
