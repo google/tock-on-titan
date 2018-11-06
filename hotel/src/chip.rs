@@ -35,7 +35,6 @@ impl Chip for Hotel {
     fn service_pending_interrupts(&self) {
         unsafe {
             while let Some(nvic_num) = cortexm3::nvic::next_pending() {
-                println!("Handling NVIC {}", nvic_num);
                 match nvic_num {
                     1 | 3 | 6 | 7 | 8 | 9 | 10 | 11 => crypto::dcrypto::DCRYPTO.handle_error_interrupt(nvic_num),
                     4 => crypto::dcrypto::DCRYPTO.handle_done_interrupt(),

@@ -29,12 +29,12 @@ use self::types::{EndpointSynchronizationType};
 // but you can uncomment print defintions to get detailed output on the
 // messages sent and received.
 macro_rules! usb_debug {
-    () => ({print!();});
-    ($fmt:expr) => ({print!($fmt);});
-    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
-//    () => ({});
-//    ($fmt:expr) => ({});
-//    ($fmt:expr, $($arg:tt)+) => ({});
+//    () => ({print!();});
+//    ($fmt:expr) => ({print!($fmt);});
+//    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
+    () => ({});
+    ($fmt:expr) => ({});
+    ($fmt:expr, $($arg:tt)+) => ({});
 }
 
 
@@ -1083,7 +1083,6 @@ impl USB {
             
             config.set_total_length(size as u16);
             config.into_u8_buf(&mut desc[0..config.length()]);
-            println!("Generating full configuration_descriptor of len: {}", size);
             self.set_configuration_total_length(size as u16);
         });
     }
