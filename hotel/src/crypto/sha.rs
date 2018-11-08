@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use core::mem;
 use hil::digest::{DigestEngine, DigestMode, DigestError};
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::VolatileCell;
 use super::keymgr::{KEYMGR0_REGS, Registers};
 
 #[allow(unused)]

@@ -34,9 +34,10 @@
 //!
 
 use core::cell::Cell;
-use kernel::common::take_cell::TakeCell;
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::TakeCell;
+use kernel::common::cells::VolatileCell;
 use kernel::hil;
+use kernel::ReturnCode;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 /// Registers for the UART controller
@@ -289,11 +290,6 @@ impl UART {
 }
 
 impl hil::uart::UART for UART {
-    fn init(&self, params: hil::uart::UARTParams) {
-        self.config(params.baud_rate);
-        // TODO(alevy) can we handle other parameters?
-    }
-
     fn set_client(&self, client: &'static hil::uart::Client) {
         self.client.set(Some(client));
     }
@@ -307,5 +303,14 @@ impl hil::uart::UART for UART {
 
     fn receive(&self, _rx_buffer: &'static mut[u8], _rx_len: usize) {
         unimplemented!();
+    }
+
+    fn abort_receive(&self) {
+        unimplemented!();
+    }
+
+    fn configure(&self, params: hil::uart::UARTParameters) -> ReturnCode {
+        self.config(params.baud_rate);
+        ReturnCode::SUCCESS
     }
 }

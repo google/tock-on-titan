@@ -9,6 +9,7 @@ use usb;
 
 pub struct Hotel {
     mpu: cortexm3::mpu::MPU,
+    userspace_kernel_boundary: cortexm3::syscall::SysCall,
     systick: cortexm3::systick::SysTick,
 }
 
@@ -16,6 +17,7 @@ impl Hotel {
     pub unsafe fn new() -> Hotel {
         Hotel {
             mpu: cortexm3::mpu::MPU::new(),
+            userspace_kernel_boundary: cortexm3::syscall::SysCall::new(),
             systick: cortexm3::systick::SysTick::new(),
         }
     }
@@ -23,13 +25,14 @@ impl Hotel {
 
 impl Chip for Hotel {
     type MPU = cortexm3::mpu::MPU;
+    type UserspaceKernelBoundary = cortexm3::syscall::SysCall;
     type SysTick = cortexm3::systick::SysTick;
 
     fn has_pending_interrupts(&self) -> bool {
         unsafe { cortexm3::nvic::next_pending().is_some() }
     }
 
-    fn service_pending_interrupts(&mut self) {
+    fn service_pending_interrupts(&self) {
         unsafe {
             while let Some(nvic_num) = cortexm3::nvic::next_pending() {
                 match nvic_num {
@@ -84,6 +87,27 @@ impl Chip for Hotel {
 
     fn systick(&self) -> &Self::SysTick {
         &self.systick
+    }
+
+    fn userspace_kernel_boundary(&self) -> &cortexm3::syscall::SysCall {
+        &self.userspace_kernel_boundary
+    }
+    
+    fn sleep(&self) {
+        unsafe {
+                cortexm3::scb::unset_sleepdeep();
+        }
+        
+        unsafe {
+            cortexm3::support::wfi();
+        }
+    }
+
+    unsafe fn atomic<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        cortexm3::support::atomic(f)
     }
 
 }

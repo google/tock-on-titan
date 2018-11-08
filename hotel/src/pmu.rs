@@ -28,7 +28,7 @@
 //!
 
 use core::mem::transmute;
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::VolatileCell;
 
 /// Registers for the Power Management Unit (PMU)
 // Non-public fields prefixed with "_" mark unused registers
@@ -253,5 +253,5 @@ impl Clock {
 pub fn reset_dcrypto() {
     let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
     // Clear the DCRYPTO bit, which is 0x2
-    pmu.reset.set(pmu.reset0.get() & !(0x2));
+    unsafe {pmu.reset.set(pmu.reset0.get() & !(0x2));}
 }

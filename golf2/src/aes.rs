@@ -152,14 +152,18 @@ impl<'a> AesDriver<'a> {
             .unwrap_or(ReturnCode::FAIL)
     }
 
-    fn register(&self, interrupt: Interrupt, callback: Callback) -> ReturnCode {
+    fn register(&self,
+                interrupt: Interrupt,
+                callback: Option<Callback>,
+                app_id: AppId,
+    ) -> ReturnCode {
         self.apps
-            .enter(callback.app_id(), |app_data, _| {
+            .enter(app_id, |app_data, _| {
                 let ref mut cb = app_data.callbacks;
                 match interrupt {
-                    Interrupt::DoneCipher => cb.done_cipher = Some(callback),
-                    Interrupt::DoneKeyExpansion => cb.done_key_expansion = Some(callback),
-                    Interrupt::DoneWipeSecrets => cb.done_wipe_secrets = Some(callback),
+                    Interrupt::DoneCipher => cb.done_cipher = callback,
+                    Interrupt::DoneKeyExpansion => cb.done_key_expansion = callback,
+                    Interrupt::DoneWipeSecrets => cb.done_wipe_secrets = callback,
                     _ => return ReturnCode::ENOSUPPORT,
                 }
 
@@ -170,11 +174,15 @@ impl<'a> AesDriver<'a> {
 }
 
 impl<'a> Driver for AesDriver<'a> {
-    fn subscribe(&self, subscribe_num: usize, callback: Callback) -> ReturnCode {
+    fn subscribe(&self,
+                 subscribe_num: usize,
+                 callback: Option<Callback>,
+                 app_id: AppId,
+    ) -> ReturnCode {
         match subscribe_num {
-            0 => self.register(Interrupt::DoneCipher, callback),
-            1 => self.register(Interrupt::DoneKeyExpansion, callback),
-            2 => self.register(Interrupt::DoneWipeSecrets, callback),
+            0 => self.register(Interrupt::DoneCipher, callback, app_id),
+            1 => self.register(Interrupt::DoneKeyExpansion, callback, app_id),
+            2 => self.register(Interrupt::DoneWipeSecrets, callback, app_id),
             _ => ReturnCode::ENOSUPPORT
         }
     }
@@ -201,13 +209,17 @@ impl<'a> Driver for AesDriver<'a> {
         }
     }
 
-    fn allow(&self, app_id: AppId, minor_num: usize, slice: AppSlice<Shared, u8>) -> ReturnCode {
+    fn allow(&self,
+             app_id: AppId,
+             minor_num: usize,
+             slice: Option<AppSlice<Shared, u8>>
+    ) -> ReturnCode {
         match minor_num {
                 0 => {
                     // Key
                     self.apps
                         .enter(app_id, |app_data, _| {
-                            app_data.key = Some(slice);
+                            app_data.key = slice;
                             ReturnCode::SUCCESS
                         })
                         .unwrap_or(ReturnCode::FAIL)
@@ -216,7 +228,7 @@ impl<'a> Driver for AesDriver<'a> {
                     // Input Buffer
                     self.apps
                         .enter(app_id, |app_data, _| {
-                            app_data.input_buffer = Some(slice);
+                            app_data.input_buffer = slice;
                             ReturnCode::SUCCESS
                         })
                         .unwrap_or(ReturnCode::FAIL)
@@ -225,7 +237,7 @@ impl<'a> Driver for AesDriver<'a> {
                     // Output Buffer
                     self.apps
                         .enter(app_id, |app_data, _| {
-                            app_data.output_buffer = Some(slice);
+                            app_data.output_buffer = slice;
                             ReturnCode::SUCCESS
                         })
                         .unwrap_or(ReturnCode::FAIL)

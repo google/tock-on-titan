@@ -1,5 +1,5 @@
 use core::ops::{BitAnd, BitOr};
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::VolatileCell;
 
 #[repr(C)]
 pub struct Registers {

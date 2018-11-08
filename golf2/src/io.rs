@@ -1,7 +1,15 @@
-use core::fmt::*;
+use core::fmt::Write;
+use core::panic::PanicInfo;
+use cortexm3;
+use kernel::debug;
+use kernel::hil::led;
 use hotel;
 
+use PROCESSES;
+
 pub struct Writer;
+
+static mut WRITER: Writer = Writer {};
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
@@ -25,19 +33,16 @@ impl Write for Writer {
     }
 }
 
-
+/// Panic handler.
 #[cfg(not(test))]
-#[lang="panic_fmt"]
 #[no_mangle]
-pub unsafe extern "C" fn rust_begin_unwind(args: Arguments, file: &'static str, line: u32) -> ! {
-
-    let mut writer = Writer;
-    let _ = writer.write_fmt(format_args!("Kernel panic at {}:{}:\r\n\t\"", file, line));
-    let _ = write(&mut writer, args);
-    let _ = writer.write_str("\"\r\n");
-
-    loop {}
+#[panic_implementation]
+pub unsafe extern "C" fn panic_fmt(pi: &PanicInfo) -> ! {
+    let led = &mut led::LedLow::new(&mut hotel::gpio::PORT0.pins[0]);
+    let writer = &mut WRITER;
+    debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &PROCESSES)
 }
+
 
 #[macro_export]
 macro_rules! print {

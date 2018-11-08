@@ -2,7 +2,7 @@
 
 use core::cell::Cell;
 use crypto::dcrypto::{Dcrypto, DcryptoClient, DcryptoEngine, ProgramFault};
-use kernel::returncode::ReturnCode;
+use kernel::ReturnCode;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum TestCase {

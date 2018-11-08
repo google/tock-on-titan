@@ -1,4 +1,4 @@
-use kernel::common::volatile_cell::VolatileCell;
+use kernel::common::cells::VolatileCell;
 use super::KEYMGR0_BASE_ADDRESS;
 
 #[repr(C)]

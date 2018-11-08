@@ -126,13 +126,17 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
         }
     }
 
-    fn allow(&self, app_id: AppId, minor_num: usize, slice: AppSlice<Shared, u8>) -> ReturnCode {
-        match minor_num {
+    fn allow(&self,
+             app_id: AppId,
+             allow_num: usize,
+             slice: Option<AppSlice<Shared, u8>>
+    ) -> ReturnCode {
+        match allow_num {
                 0 => {
                     // Input buffer
                     self.apps
                         .enter(app_id, |app_data, _| {
-                            app_data.input_buffer = Some(slice);
+                            app_data.input_buffer = slice;
                             ReturnCode::SUCCESS
                         })
                         .unwrap_or(ReturnCode::ENOMEM)
@@ -141,7 +145,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                     // Hash output buffer
                     self.apps
                         .enter(app_id, |app_data, _| {
-                            app_data.output_buffer = Some(slice);
+                            app_data.output_buffer = slice;
                             ReturnCode::SUCCESS
                         })
                         .unwrap_or(ReturnCode::ENOMEM)

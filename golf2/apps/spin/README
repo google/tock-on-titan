@@ -1,0 +1,8 @@
+Spin process
+Author: Philip Levis <plevis@google.com>
+
+This is a userspace application that enters a simple
+while(1) loop. It is intended to test a process that
+does not use system calls, as well as a way to test
+userspace time-slicing (by running alongside another
+process).

@@ -38,9 +38,9 @@
 
 use core::cell::Cell;
 use core::mem;
-use kernel::common::take_cell::TakeCell;
-use kernel::common::volatile_cell::VolatileCell;
-use kernel::returncode::ReturnCode;
+use kernel::common::cells::TakeCell;
+use kernel::common::cells::VolatileCell;
+use kernel::ReturnCode;
 
 use pmu::{Clock, PeripheralClock, PeripheralClock0, reset_dcrypto};
 
