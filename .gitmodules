@@ -1,3 +1,7 @@
+[submodule "third_party/libtock-c"]
+	path = third_party/libtock-c
+	url = https://github.com/tock/libtock-c
+
 [submodule "tock"]
 	path = tock
 	url = https://github.com/tock/tock.git

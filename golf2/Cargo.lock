@@ -1,10 +1,13 @@
 [[package]]
-name = "aligned"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+name = "capsules"
+version = "0.1.0"
+dependencies = [
+ "enum_primitive 0.1.0",
+ "kernel 0.1.0",
+]
 
 [[package]]
-name = "capsules"
+name = "cortexm"
 version = "0.1.0"
 dependencies = [
  "kernel 0.1.0",
@@ -14,15 +17,20 @@ dependencies = [
 name = "cortexm3"
 version = "0.1.0"
 dependencies = [
+ "cortexm 0.1.0",
  "kernel 0.1.0",
 ]
+
+[[package]]
+name = "enum_primitive"
+version = "0.1.0"
 
 [[package]]
 name = "golf2"
 version = "0.1.0"
 dependencies = [
- "aligned 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "capsules 0.1.0",
+ "cortexm3 0.1.0",
  "hotel 0.1.0",
  "kernel 0.1.0",
 ]
@@ -38,6 +46,16 @@ dependencies = [
 [[package]]
 name = "kernel"
 version = "0.1.0"
+dependencies = [
+ "tock-cells 0.1.0",
+ "tock-registers 0.2.0",
+]
 
-[metadata]
-"checksum aligned 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d39da9b88ae1a81c03c9c082b8db83f1d0e93914126041962af61034ab44c4a5"
+[[package]]
+name = "tock-cells"
+version = "0.1.0"
+
+[[package]]
+name = "tock-registers"
+version = "0.2.0"
+
