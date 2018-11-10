@@ -3,7 +3,7 @@ TARGET=thumbv7m-none-eabi
 PLATFORM=golf2
 TOCK_ARCH=cortex-m3
 
-include ../tock/boards/Makefile.common
+include ../third_party/tock/boards/Makefile.common
 
 TOCKLOADER = $(TANGO_SPIFLASH)
 

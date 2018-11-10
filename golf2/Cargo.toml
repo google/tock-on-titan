@@ -17,9 +17,9 @@ opt-level = "z"
 debug = true
 
 [dependencies]
-capsules = { path = "../tock/capsules" }
-kernel = { path = "../tock/kernel" }
-cortexm3 = { path = "../tock/arch/cortex-m3" }
+capsules = { path = "../third_party/tock/capsules" }
+kernel = { path = "../third_party/tock/kernel" }
+cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
 hotel = { path = "../hotel" }
 
 

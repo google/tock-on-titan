@@ -6,8 +6,9 @@
 #include <unistd.h>
 
 #include <tock.h>
-#include <firestorm.h>
 #include <gpio.h>
+
+#define LED_0 0
 
 // callback for timers
 timer_cb (int arg0, int arg2, int arg3, void* userdata) {
@@ -69,7 +70,8 @@ void gpio_interrupt() {
   gpio_interrupt_callback(gpio_cb, NULL);
 
   // set LED as input and enable interrupts on it
-  gpio_enable_interrupt(LED_0, PullDown, Change);
+  gpio_enable_input(LED_0, PullDown);
+  gpio_enable_interrupt(LED_0, Change);
 
   while (1) {
     wait();

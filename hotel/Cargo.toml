@@ -6,6 +6,6 @@ authors = ["Amit Levy <amit@amitlevy.com>"]
 build = "build.rs"
 
 [dependencies]
-kernel = { path = "../tock/kernel" }
-cortexm3 = { path = "../tock/arch/cortex-m3" }
+kernel = { path = "../third_party/tock/kernel" }
+cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
 

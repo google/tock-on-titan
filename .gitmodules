@@ -2,6 +2,6 @@
 	path = third_party/libtock-c
 	url = https://github.com/tock/libtock-c
 
-[submodule "tock"]
-	path = tock
+[submodule "third_party/tock"]
+	path = third_party/tock
 	url = https://github.com/tock/tock.git
