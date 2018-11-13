@@ -31,12 +31,12 @@ version = "0.1.0"
 dependencies = [
  "capsules 0.1.0",
  "cortexm3 0.1.0",
- "hotel 0.1.0",
+ "h1b 0.1.0",
  "kernel 0.1.0",
 ]
 
 [[package]]
-name = "hotel"
+name = "h1b"
 version = "0.1.0"
 dependencies = [
  "cortexm3 0.1.0",

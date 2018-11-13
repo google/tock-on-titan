@@ -28,5 +28,5 @@ lto = true
 [dependencies]
 rust-libcore = "*"
 capsules = { path = "../tock/capsules" }
-hotel = { path = "../hotel" }
+h1b = { path = "../h1b" }
 kernel = { path = "../tock/kernel" }

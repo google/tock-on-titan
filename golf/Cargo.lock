@@ -3,7 +3,7 @@ name = "golf"
 version = "0.1.0"
 dependencies = [
  "capsules 0.1.0",
- "hotel 0.1.0",
+ "h1b 0.1.0",
  "kernel 0.1.0",
  "rust-libcore 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hotel"
+name = "h1b"
 version = "0.1.0"
 dependencies = [
  "cortexm3 0.1.0",

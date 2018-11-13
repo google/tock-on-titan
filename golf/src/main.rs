@@ -17,7 +17,7 @@
 #![feature(lang_items)]
 
 extern crate capsules;
-extern crate hotel;
+extern crate h1b;
 #[macro_use(static_init)]
 extern crate kernel;
 
@@ -66,19 +66,19 @@ unsafe fn load_processes() -> &'static mut [Option<kernel::process::Process<'sta
 }
 
 pub struct Golf {
-    console: &'static capsules::console::Console<'static, hotel::uart::UART>,
-    gpio: &'static capsules::gpio::GPIO<'static, hotel::gpio::Pin>,
-    timer: &'static capsules::timer::TimerDriver<'static, hotel::timels::Timels>,
-    digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
+    console: &'static capsules::console::Console<'static, h1b::uart::UART>,
+    gpio: &'static capsules::gpio::GPIO<'static, h1b::gpio::Pin>,
+    timer: &'static capsules::timer::TimerDriver<'static, h1b::timels::Timels>,
+    digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
 }
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
-    hotel::init();
+    h1b::init();
 
     let timerhs = {
-        use hotel::pmu::*;
-        use hotel::timeus::Timeus;
+        use h1b::pmu::*;
+        use h1b::timeus::Timeus;
         Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeUs0Timer)).enable();
         Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeLs0)).enable();
         let timer = Timeus::new(0);
@@ -89,36 +89,36 @@ pub unsafe fn reset_handler() {
     let start = timerhs.now();
 
     {
-        use hotel::pmu::*;
+        use h1b::pmu::*;
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
-        let pinmux = &mut *hotel::pinmux::PINMUX;
-        pinmux.diob0.select.set(hotel::pinmux::Function::Gpio0Gpio0);
+        let pinmux = &mut *h1b::pinmux::PINMUX;
+        pinmux.diob0.select.set(h1b::pinmux::Function::Gpio0Gpio0);
 
-        pinmux.gpio0_gpio1.select.set(hotel::pinmux::SelectablePin::Dioa8);
-        pinmux.dioa8.select.set(hotel::pinmux::Function::Gpio0Gpio1);
+        pinmux.gpio0_gpio1.select.set(h1b::pinmux::SelectablePin::Dioa8);
+        pinmux.dioa8.select.set(h1b::pinmux::Function::Gpio0Gpio1);
         pinmux.dioa8.control.set(1 << 2 | 1 << 4);
 
-        pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
+        pinmux.dioa0.select.set(h1b::pinmux::Function::Uart0Tx);
         pinmux.dioa11.control.set(1 << 2 | 1 << 4);
-        pinmux.uart0_rx.select.set(hotel::pinmux::SelectablePin::Dioa11);
+        pinmux.uart0_rx.select.set(h1b::pinmux::SelectablePin::Dioa11);
     }
 
     let console = static_init!(
-        capsules::console::Console<'static, hotel::uart::UART>,
-        capsules::console::Console::new(&hotel::uart::UART0,
+        capsules::console::Console<'static, h1b::uart::UART>,
+        capsules::console::Console::new(&h1b::uart::UART0,
                                        &mut capsules::console::WRITE_BUF,
                                        kernel::container::Container::create()),
         24);
-    hotel::uart::UART0.set_client(console);
+    h1b::uart::UART0.set_client(console);
     console.initialize();
 
     let gpio_pins = static_init!(
-        [&'static hotel::gpio::Pin; 2],
-        [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]],
+        [&'static h1b::gpio::Pin; 2],
+        [&h1b::gpio::PORT0.pins[0], &h1b::gpio::PORT0.pins[1]],
         8);
 
     let gpio = static_init!(
-        capsules::gpio::GPIO<'static, hotel::gpio::Pin>,
+        capsules::gpio::GPIO<'static, h1b::gpio::Pin>,
         capsules::gpio::GPIO::new(gpio_pins),
         20);
     for pin in gpio_pins.iter() {
@@ -126,16 +126,16 @@ pub unsafe fn reset_handler() {
     }
 
     let timer = static_init!(
-        capsules::timer::TimerDriver<'static, hotel::timels::Timels>,
+        capsules::timer::TimerDriver<'static, h1b::timels::Timels>,
         capsules::timer::TimerDriver::new(
-            &hotel::timels::Timels0, kernel::container::Container::create()),
+            &h1b::timels::Timels0, kernel::container::Container::create()),
         12);
-    hotel::timels::Timels0.set_client(timer);
+    h1b::timels::Timels0.set_client(timer);
 
     let digest = static_init!(
-        digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
+        digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
         digest::DigestDriver::new(
-                &mut hotel::crypto::sha::KEYMGR0_SHA,
+                &mut h1b::crypto::sha::KEYMGR0_SHA,
                 kernel::Container::create()),
         16);
 
@@ -146,21 +146,21 @@ pub unsafe fn reset_handler() {
         digest: digest,
     }, 16);
 
-    hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
-                          &mut hotel::usb::OUT_BUFFERS,
-                          &mut hotel::usb::IN_DESCRIPTORS,
-                          &mut hotel::usb::IN_BUFFERS,
-                          hotel::usb::PHY::A,
-                          None,
-                          Some(0x0011),
-                          Some(0x7788));
+    h1b::usb::USB0.init(&mut h1b::usb::OUT_DESCRIPTORS,
+                        &mut h1b::usb::OUT_BUFFERS,
+                        &mut h1b::usb::IN_DESCRIPTORS,
+                        &mut h1b::usb::IN_BUFFERS,
+                        h1b::usb::PHY::A,
+                        None,
+                        Some(0x0011),
+                        Some(0x7788));
 
     let end = timerhs.now();
 
     println!("Hello from Rust! Initialization took {} tics.",
              end.wrapping_sub(start));
 
-    let mut chip = hotel::chip::Hotel::new();
+    let mut chip = h1b::chip::Hotel::new();
     chip.mpu().enable_mpu();
 
 

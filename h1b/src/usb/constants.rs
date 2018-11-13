@@ -22,7 +22,7 @@ pub const STRING_BOARD: u8      = 2;
 pub const STRING_PLATFORM: u8   = 3;
 pub const STRING_INTERFACE1: u8 = 4;  // Shell
 pub const STRING_BLAH: u8       = 5;  // Garbage?
-pub const STRING_INTERFACE2: u8 = 6;  // Haven_U2F
+pub const STRING_INTERFACE2: u8 = 6;  // Hotel_U2F
 
 
 pub const SOF: u32           = 1 << 3;

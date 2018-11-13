@@ -13,22 +13,22 @@
 // limitations under the License.
 
 use core::fmt::*;
-use hotel;
+use h1b;
 
 pub struct Writer;
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         unsafe {
-            let uart = &hotel::uart::UART0;
+            let uart = &h1b::uart::UART0;
 
             static mut initialized: bool = false;
             if !initialized {
                 initialized = true;
 
-                let pinmux = &mut *hotel::pinmux::PINMUX;
+                let pinmux = &mut *h1b::pinmux::PINMUX;
                 // Drive DIOA0 from TX
-                pinmux.dioa0.select.set(hotel::pinmux::Function::Uart0Tx);
+                pinmux.dioa0.select.set(h1b::pinmux::Function::Uart0Tx);
 
                 uart.config(115200);
             }

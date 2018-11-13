@@ -34,6 +34,6 @@ debug = true
 capsules = { path = "../third_party/tock/capsules" }
 kernel = { path = "../third_party/tock/kernel" }
 cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
-hotel = { path = "../hotel" }
+h1b = { path = "../h1b" }
 
 

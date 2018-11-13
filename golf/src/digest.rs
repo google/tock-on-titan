@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use core::cell::Cell;
-use hotel::hil::common::SyscallError;
-use hotel::hil::digest::{DigestEngine, DigestMode};
+use h1b::hil::common::SyscallError;
+use h1b::hil::digest::{DigestEngine, DigestMode};
 use kernel::{AppId, AppSlice, Container, Driver, Shared};
 use kernel::common::take_cell::TakeCell;
 

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use core::cell::Cell;
-use hotel::crypto::aes::AesEngine;
-use hotel::hil::aes::{AesClient, Interrupt, KeySize};
+use h1b::crypto::aes::AesEngine;
+use h1b::hil::aes::{AesClient, Interrupt, KeySize};
 use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
 
 pub const DRIVER_NUM: usize = 0x40000;

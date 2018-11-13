@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![crate_name = "hotel"]
+#![crate_name = "h1b"]
 #![crate_type = "rlib"]
 #![no_std]
 #![feature(asm, core_intrinsics, const_fn)]

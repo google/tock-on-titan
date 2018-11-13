@@ -21,7 +21,7 @@
 #![feature(core_intrinsics)]
 
 extern crate capsules;
-extern crate hotel;
+extern crate h1b;
 #[macro_use(static_init, debug, create_capability)]
 extern crate kernel;
 extern crate cortexm3;
@@ -42,8 +42,8 @@ use kernel::capabilities;
 use kernel::mpu::MPU;
 use kernel::hil;
 
-use hotel::crypto::dcrypto::Dcrypto;
-use hotel::usb::{Descriptor, StringDescriptor};
+use h1b::crypto::dcrypto::Dcrypto;
+use h1b::usb::{Descriptor, StringDescriptor};
 
 //use kernel::hil::rng::RNG;
 
@@ -65,12 +65,12 @@ pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 
 pub struct Golf {
     console: &'static capsules::console::Console<'static, UartDevice<'static>>,
-    gpio: &'static capsules::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
-    timer: &'static capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
+    gpio: &'static capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
+    timer: &'static capsules::alarm::AlarmDriver<'static, h1b::timels::Timels<'static>>,
     ipc: kernel::ipc::IPC,
-    digest: &'static digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
+    digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
-    //rng: &'static capsules::rng::SimpleRng<'static, hotel::trng::Trng<'static>>,
+    //rng: &'static capsules::rng::SimpleRng<'static, h1b::trng::Trng<'static>>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
 }
 
@@ -111,17 +111,17 @@ static mut STRINGS: [StringDescriptor; 7] = [
     StringDescriptor {
         b_length: 20,
         b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0048, 0x0061, 0x0076, 0x0065, 0x006E, 0x0020, 0x0055, 0x0032, 0x0046], // Haven U2F
+        b_string: &[0x0048, 0x006F, 0x0074, 0x0065, 0x006C, 0x0020, 0x0055, 0x0032, 0x0046], // Hotel U2F
     },
 ];
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
-    hotel::init();
+    h1b::init();
 
     let timerhs = {
-        use hotel::pmu::*;
-        use hotel::timeus::Timeus;
+        use h1b::pmu::*;
+        use h1b::timeus::Timeus;
         Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeUs0Timer)).enable();
         Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeLs0)).enable();
         let timer = Timeus::new(0);
@@ -132,20 +132,20 @@ pub unsafe fn reset_handler() {
     let start = timerhs.now();
 
     {
-        use hotel::pmu::*;
+        use h1b::pmu::*;
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
-        let pinmux = &mut *hotel::pinmux::PINMUX;
+        let pinmux = &mut *h1b::pinmux::PINMUX;
         // LED_0
-        pinmux.dioa11.select.set(hotel::pinmux::Function::Gpio0Gpio0);
+        pinmux.dioa11.select.set(h1b::pinmux::Function::Gpio0Gpio0);
 
         // SW1
-        pinmux.gpio0_gpio1.select.set(hotel::pinmux::SelectablePin::Diom2);
-        pinmux.diom2.select.set(hotel::pinmux::Function::Gpio0Gpio1);
+        pinmux.gpio0_gpio1.select.set(h1b::pinmux::SelectablePin::Diom2);
+        pinmux.diom2.select.set(h1b::pinmux::Function::Gpio0Gpio1);
         pinmux.diom2.control.set(1 << 2 | 1 << 4);
 
-        pinmux.diob1.select.set(hotel::pinmux::Function::Uart0Tx);
+        pinmux.diob1.select.set(h1b::pinmux::Function::Uart0Tx);
         pinmux.diob6.control.set(1 << 2 | 1 << 4);
-        pinmux.uart0_rx.select.set(hotel::pinmux::SelectablePin::Diob6);
+        pinmux.uart0_rx.select.set(h1b::pinmux::SelectablePin::Diob6);
     }
 
     // Create capabilities that the board needs to call certain protected kernel
@@ -159,12 +159,12 @@ pub unsafe fn reset_handler() {
     let uart_mux = static_init!(
         UartMux<'static>,
         UartMux::new(
-            &hotel::uart::UART0,
+            &h1b::uart::UART0,
             &mut capsules::virtual_uart::RX_BUF,
             115200
         )
     );
-    hil::uart::UART::set_client(&hotel::uart::UART0, uart_mux);
+    hil::uart::UART::set_client(&h1b::uart::UART0, uart_mux);
     
     // Create virtual device for console.
     let console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
@@ -204,46 +204,46 @@ pub unsafe fn reset_handler() {
 
     //debug!("Booting.");
     let gpio_pins = static_init!(
-        [&'static hotel::gpio::GPIOPin; 2],
-        [&hotel::gpio::PORT0.pins[0], &hotel::gpio::PORT0.pins[1]]);
+        [&'static h1b::gpio::GPIOPin; 2],
+        [&h1b::gpio::PORT0.pins[0], &h1b::gpio::PORT0.pins[1]]);
 
     let gpio = static_init!(
-        capsules::gpio::GPIO<'static, hotel::gpio::GPIOPin>,
+        capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
         capsules::gpio::GPIO::new(gpio_pins));
     for pin in gpio_pins.iter() {
         pin.set_client(gpio)
     }
 
     let timer = static_init!(
-        capsules::alarm::AlarmDriver<'static, hotel::timels::Timels<'static>>,
+        capsules::alarm::AlarmDriver<'static, h1b::timels::Timels<'static>>,
         capsules::alarm::AlarmDriver::new(
-            &hotel::timels::TIMELS0, kernel.create_grant(&grant_cap)));
-    hotel::timels::TIMELS0.set_client(timer);
+            &h1b::timels::TIMELS0, kernel.create_grant(&grant_cap)));
+    h1b::timels::TIMELS0.set_client(timer);
 
     let digest = static_init!(
-        digest::DigestDriver<'static, hotel::crypto::sha::ShaEngine>,
+        digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
         digest::DigestDriver::new(
-                &mut hotel::crypto::sha::KEYMGR0_SHA,
+                &mut h1b::crypto::sha::KEYMGR0_SHA,
                 kernel.create_grant(&grant_cap)));
 
     let aes = static_init!(
         aes::AesDriver,
-        aes::AesDriver::new(&mut hotel::crypto::aes::KEYMGR0_AES, kernel.create_grant(&grant_cap)));
-    hotel::crypto::aes::KEYMGR0_AES.set_client(aes);
+        aes::AesDriver::new(&mut h1b::crypto::aes::KEYMGR0_AES, kernel.create_grant(&grant_cap)));
+    h1b::crypto::aes::KEYMGR0_AES.set_client(aes);
 
-    hotel::crypto::dcrypto::DCRYPTO.initialize();
+    h1b::crypto::dcrypto::DCRYPTO.initialize();
     let dcrypto = static_init!(
         dcrypto::DcryptoDriver<'static>,
-        dcrypto::DcryptoDriver::new(&mut hotel::crypto::dcrypto::DCRYPTO));
+        dcrypto::DcryptoDriver::new(&mut h1b::crypto::dcrypto::DCRYPTO));
     
-    hotel::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
+    h1b::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
         
-    /*    hotel::trng::TRNG0.init();
+    /*    h1b::trng::TRNG0.init();
     let rng = static_init!(
-        capsules::rng::SimpleRng<'static, hotel::trng::Trng>,
-        capsules::rng::SimpleRng::new(&mut hotel::trng::TRNG0, kernel::grant::Grant::create()),
+        capsules::rng::SimpleRng<'static, h1b::trng::Trng>,
+        capsules::rng::SimpleRng::new(&mut h1b::trng::TRNG0, kernel::grant::Grant::create()),
         8);
-    hotel::trng::TRNG0.set_client(rng);*/
+    h1b::trng::TRNG0.set_client(rng);*/
  
     let golf2 = Golf {
         console: console,
@@ -285,7 +285,7 @@ pub unsafe fn reset_handler() {
     println!("Tock 1.0 booting. Initialization took {} tics.",
              end.wrapping_sub(start));
 
-    let chip = static_init!(hotel::chip::Hotel, hotel::chip::Hotel::new());
+    let chip = static_init!(h1b::chip::Hotel, h1b::chip::Hotel::new());
 
     chip.mpu().enable_mpu();
 
@@ -295,16 +295,16 @@ pub unsafe fn reset_handler() {
 
     println!("Tock 1.0 booting. About to initialize USB.");
     
-    hotel::usb::USB0.init(&mut hotel::usb::OUT_DESCRIPTORS,
-                          &mut hotel::usb::OUT_BUFFERS,
-                          &mut hotel::usb::IN_DESCRIPTORS,
-                          &mut hotel::usb::IN_BUFFERS,
-                          &mut hotel::usb::CONFIGURATION_BUFFER,
-                          hotel::usb::PHY::A,
-                          None,
-                          Some(0x18d1),
-                          Some(0x5026),
-                          &mut STRINGS);
+    h1b::usb::USB0.init(&mut h1b::usb::OUT_DESCRIPTORS,
+                        &mut h1b::usb::OUT_BUFFERS,
+                        &mut h1b::usb::IN_DESCRIPTORS,
+                        &mut h1b::usb::IN_BUFFERS,
+                        &mut h1b::usb::CONFIGURATION_BUFFER,
+                        h1b::usb::PHY::A,
+                        None,
+                        Some(0x18d1),
+                        Some(0x5026),
+                        &mut STRINGS);
 
 
 

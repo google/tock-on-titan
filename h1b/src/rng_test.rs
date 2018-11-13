@@ -14,8 +14,8 @@
 
 use test_rng::TestRng;
 use kernel::hil::rng::RNG;
-use hotel::trng;
-use hotel::test_rng;
+use h1b::trng;
+use h1b::test_rng;
 
 pub unsafe fn run_rng() {
     let r = static_init_test_rng();

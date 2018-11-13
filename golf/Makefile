@@ -19,7 +19,7 @@ all: target/target/release/golf-$(APP)
 
 .PHONY: target/target/release/golf
 target/target/release/golf:
-	@cargo build --release --target=../hotel/target.json
+	@cargo build --release --target=../h1b/target.json
 
 .PHONY: apps/$(APP)/build/$(TOCK_ARCH)/app.bin
 apps/$(APP)/build/$(TOCK_ARCH)/app.bin:
@@ -41,7 +41,7 @@ flash: target/target/release/golf-$(APP)-full
 
 .PHONY: doc
 doc:
-	@cargo doc --target=../hotel/target.json
+	@cargo doc --target=../h1b/target.json
 
 .PHONY: clean
 clean:
