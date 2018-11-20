@@ -118,11 +118,18 @@ pub struct EpCtl(pub u32);
 
 impl EpCtl {
     /// Enable the endpoint
-    pub const ENABLE: EpCtl = EpCtl(1 << 31);
+    pub const ENABLE: EpCtl    = EpCtl(1 << 31);
     /// Clear endpoint NAK
-    pub const CNAK: EpCtl = EpCtl(1 << 26);
+    pub const CNAK: EpCtl      = EpCtl(1 << 26);
+    /// Set the 4-bit TxFIFO number to be 1
+    pub const TXFNUM1: EpCtl   = EpCtl(1 << 22);
     /// Stall endpoint
-    pub const STALL: EpCtl = EpCtl(1 << 21);
+    pub const STALL: EpCtl     = EpCtl(1 << 21);
+    /// Make an endpoint of type Interrupt
+    pub const INTERRUPT: EpCtl = EpCtl(3 << 18);
+    /// Denotes whether endpoint is active
+    pub const USBACTEP: EpCtl  = EpCtl(1 << 15);
+
 }
 
 impl BitOr for EpCtl {

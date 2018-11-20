@@ -35,11 +35,12 @@ pub const OEPINT: u32        = 1 << 19;
 pub const GOUTNAKEFF: u32    = 1 << 7;
 pub const GINNAKEFF: u32     = 1 << 6;
 
-const MAX_CONTROL_ENDPOINTS: u16 = 3;
-const MAX_NORMAL_ENDPOINTS: u16 = 16;
-pub const MAX_PACKET_SIZE: u16 = 64;
+const MAX_CONTROL_ENDPOINTS: u16 =  3;
+const MAX_NORMAL_ENDPOINTS: u16  = 16;
+pub const MAX_PACKET_SIZE: u16   = 64;
+pub const U2F_REPORT_SIZE: usize = 64;
 
-// Ask Amit 
+// Ask Amit
 pub const RX_FIFO_SIZE: u16 = (4 * MAX_CONTROL_ENDPOINTS + 6) +
                               (2 * (MAX_PACKET_SIZE / 4 + 1)) +
                               (2 * MAX_NORMAL_ENDPOINTS) + 1;
@@ -137,7 +138,7 @@ pub enum AllEndpointInterruptMask {
 // OTG Databook, Table 5-58
 #[allow(dead_code)]
 pub enum OutInterruptMask {
-    XferComplMsk =         1 <<  0,    
+    XferComplMsk =         1 <<  0,
     EPDisbldMsg =          1 <<  1,
     AHBErrMsk =            1 <<  2,
     SetUPMsk =             1 <<  3,
@@ -157,7 +158,7 @@ pub enum OutInterruptMask {
 // OTG Databook, Table 5-57
 #[allow(dead_code)]
 pub enum InInterruptMask {
-    XferComplMsk =         1 <<  0,    
+    XferComplMsk =         1 <<  0,
     EPDisbldMsg =          1 <<  1,
     AHBErrMsk =            1 <<  2,
     TimeOUTMsk =           1 <<  3,
@@ -232,4 +233,3 @@ pub const U2F_REPORT_DESCRIPTOR: [u8; 34] = [
     0x91, 0x02,       /*   Output (Data, Var, Abs), Usage */
     0xC0              /* End Collection */
 ];
-
