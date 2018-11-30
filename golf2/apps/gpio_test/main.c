@@ -21,86 +21,88 @@
 
 #include <tock.h>
 #include <gpio.h>
+#include <timer.h>
 
 #define LED_0 0
 
-// callback for timers
-timer_cb (int arg0, int arg2, int arg3, void* userdata) {
-}
+void output_cb(int arg0, int arg2, int arg3, void* userdata);
+void gpio_output(void);
+void input_cb(int arg0, int arg2, int arg3, void* userdata);
+void gpio_input(void);
+void interrupt_cb(int arg0, int arg2, int arg3, void* userdata);
+void gpio_interrupt(void);
+
+tock_timer_t timer;
 
 //**************************************************
 // GPIO output example
 //**************************************************
-void gpio_output() {
-  putstr("Periodically blinking LED pin\n");
+void output_cb(__attribute__ ((unused)) int arg0,
+               __attribute__ ((unused)) int arg1,
+               __attribute__ ((unused)) int arg2,
+               __attribute__ ((unused)) void* ud) {
+  gpio_toggle(LED_0);
+}
 
+
+
+void gpio_output(void) {
+  printf("Periodically blinking LED pin\n");
   // set LED pin as output and start repeating timer
   gpio_enable_output(LED_0);
-  timer_subscribe(timer_cb, NULL);
-  timer_start_repeating(500);
-
-  while (1) {
-    gpio_toggle(LED_0);
-    wait();
-  }
+  timer_every(500, output_cb, NULL, &timer);
 }
 
 //**************************************************
 // GPIO input example
 //**************************************************
-void gpio_input() {
-  putstr("Periodically reading value of the LED pin\n");
-  putstr("Jump pin high to test (defaults to low)\n");
+void input_cb(__attribute__ ((unused)) int arg0,
+              __attribute__ ((unused)) int arg1,
+              __attribute__ ((unused)) int arg2,
+              __attribute__ ((unused)) void* ud) {
+  int pin_val = gpio_read(LED_0);
+  printf("\tValue(%d)\n", pin_val);
+}
+
+void gpio_input(void) {
+  printf("Periodically reading value of the LED pin\n");
+  printf("Jump pin high to test (defaults to low)\n");
 
   // set LED pin as input and start repeating timer
   // pin is configured with a pull-down resistor, so it should read 0 as default
   gpio_enable_input(LED_0, PullDown);
-  timer_subscribe(timer_cb, NULL);
-  timer_start_repeating(500);
-
-  while (1) {
-    // print pin value
-    int pin_val = gpio_read(LED_0);
-    {
-      char buf[64];
-      sprintf(buf, "\tValue(%d)\n", pin_val);
-      putstr(buf);
-    }
-    wait();
-  }
+  timer_every(500, input_cb, NULL, &timer);
 }
 
 //**************************************************
 // GPIO interrupt example
 //**************************************************
-void gpio_cb (int pin_num, int arg2, int arg3, void* userdata) {
+void interrupt_cb(__attribute__ ((unused)) int arg0,
+                  __attribute__ ((unused)) int arg1,
+                  __attribute__ ((unused)) int arg2,
+                  __attribute__ ((unused)) void* ud) {
+  printf("\tGPIO interrupt!\n");
 }
 
-void gpio_interrupt() {
-  putstr("Print LED pin reading whenever its value changes\n");
-  putstr("Jump pin high to test\n");
+void gpio_interrupt(void) {
+  printf("Print LED pin reading whenever its value changes\n");
+  printf("Jump pin high to test\n");
 
   // set callback for GPIO interrupts
-  gpio_interrupt_callback(gpio_cb, NULL);
-
+  gpio_interrupt_callback(interrupt_cb, NULL);
   // set LED as input and enable interrupts on it
   gpio_enable_input(LED_0, PullDown);
   gpio_enable_interrupt(LED_0, Change);
-
-  while (1) {
-    wait();
-    putstr("\tGPIO Interrupt!\n");
-  }
 }
 
 
-void main() {
-  putstr("*********************\n");
-  putstr("GPIO Test Application\n");
+int main(void) {
+  printf("*********************\n");
+  printf("GPIO Test Application\n");
 
   // uncomment whichever example you want
-  //gpio_output();
+  gpio_output();
   //gpio_input();
-  gpio_interrupt();
+  //gpio_interrupt();
+  return 0;
 }
-
