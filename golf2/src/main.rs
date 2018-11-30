@@ -167,11 +167,11 @@ pub unsafe fn reset_handler() {
         )
     );
     hil::uart::UART::set_client(&h1b::uart::UART0, uart_mux);
-    
+
     // Create virtual device for console.
     let console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
     console_uart.setup();
-    
+
     let console = static_init!(
         console::Console<UartDevice>,
         console::Console::new(
@@ -184,7 +184,7 @@ pub unsafe fn reset_handler() {
     );
     hil::uart::UART::set_client(console_uart, console);
     console.initialize();
-    
+
     // Create virtual device for kernel debug.
     let debugger_uart = static_init!(UartDevice, UartDevice::new(uart_mux, false));
     debugger_uart.setup();
@@ -197,7 +197,7 @@ pub unsafe fn reset_handler() {
         )
     );
     hil::uart::UART::set_client(debugger_uart, debugger);
-    
+
     let debug_wrapper = static_init!(
         kernel::debug::DebugWriterWrapper,
         kernel::debug::DebugWriterWrapper::new(debugger)
@@ -237,16 +237,16 @@ pub unsafe fn reset_handler() {
     let dcrypto = static_init!(
         dcrypto::DcryptoDriver<'static>,
         dcrypto::DcryptoDriver::new(&mut h1b::crypto::dcrypto::DCRYPTO));
-    
+
     h1b::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
-        
+
     /*    h1b::trng::TRNG0.init();
     let rng = static_init!(
         capsules::rng::SimpleRng<'static, h1b::trng::Trng>,
         capsules::rng::SimpleRng::new(&mut h1b::trng::TRNG0, kernel::grant::Grant::create()),
         8);
     h1b::trng::TRNG0.set_client(rng);*/
- 
+
     let golf2 = Golf {
         console: console,
         gpio: gpio,
@@ -274,7 +274,7 @@ pub unsafe fn reset_handler() {
         vs(0x40090084 as *mut u32, !0);
         vs(0x40090088 as *mut u32, !0);
         vs(0x4009008c as *mut u32, !0);
-        
+
         // GLOBALSEC_DUSB_REGION0-DUSB_REGION3
         vs(0x400900c0 as *mut u32, !0);
         vs(0x400900c4 as *mut u32, !0);
@@ -297,11 +297,15 @@ pub unsafe fn reset_handler() {
     }
 
     println!("Tock 1.0 booting. About to initialize USB.");
-    
-    h1b::usb::USB0.init(&mut h1b::usb::OUT_DESCRIPTORS,
-                        &mut h1b::usb::OUT_BUFFERS,
-                        &mut h1b::usb::IN_DESCRIPTORS,
-                        &mut h1b::usb::IN_BUFFERS,
+
+    h1b::usb::USB0.init(&mut h1b::usb::EP0_OUT_DESCRIPTORS,
+                        &mut h1b::usb::EP0_OUT_BUFFERS,
+                        &mut h1b::usb::EP0_IN_DESCRIPTORS,
+                        &mut h1b::usb::EP0_IN_BUFFERS,
+                        &mut h1b::usb::EP1_OUT_DESCRIPTOR,
+                        &mut h1b::usb::EP1_OUT_BUFFER,
+                        &mut h1b::usb::EP1_IN_DESCRIPTOR,
+                        &mut h1b::usb::EP1_IN_BUFFER,
                         &mut h1b::usb::CONFIGURATION_BUFFER,
                         h1b::usb::PHY::A,
                         None,
@@ -312,7 +316,7 @@ pub unsafe fn reset_handler() {
 
 
 
-    
+
 // dcrypto_test::run_dcrypto();
 //    rng_test::run_rng();
 
