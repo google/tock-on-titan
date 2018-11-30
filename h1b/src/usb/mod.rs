@@ -144,7 +144,7 @@ pub struct USB<'a> {
     ep1_out_descriptor: TakeCell<'static, DMADescriptor>,
     ep1_out_buffer: Cell<Option<&'static [u32; 16]>>,
     ep1_in_descriptor: TakeCell<'static, DMADescriptor>,
-    ep1_in_buffer: TakeCell<'static, [u32; 16]>,
+    ep1_in_buffer: Cell<Option<&'static [u32; 16]>>,
 
     // Track the index of which ep0_out descriptor is currently set
     // for reception and which descriptor received the most
@@ -174,17 +174,34 @@ pub struct USB<'a> {
 const BASE_ADDR: *const Registers = 0x40300000 as *const Registers;
 pub static mut USB0: USB<'static> = unsafe { USB::new() };
 
-// Statically allocated buffers for initializing USB stack
-pub static mut OUT_DESCRIPTORS: [DMADescriptor; 2] = [DMADescriptor {
+const EP0_IN_COUNT:  usize = 4;
+const EP0_OUT_COUNT: usize = 2;
+
+
+// Statically allocated buffers for initializing USB stack.
+pub static mut EP0_OUT_DESCRIPTORS: [DMADescriptor; EP0_OUT_COUNT] = [DMADescriptor {
     flags: DescFlag::HOST_BUSY,
     addr: 0,
-}; 2];
-pub static mut OUT_BUFFERS: [[u32; 16]; 2] = [[0; 16]; 2];
-pub static mut IN_DESCRIPTORS: [DMADescriptor; 4] = [DMADescriptor {
+}; EP0_OUT_COUNT];
+pub static mut EP0_IN_DESCRIPTORS: [DMADescriptor; EP0_IN_COUNT] = [DMADescriptor {
     flags: DescFlag::HOST_BUSY,
     addr: 0,
-}; 4];
-pub static mut IN_BUFFERS: [u32; 16 * 4] = [0; 16 * 4];
+}; EP0_IN_COUNT];
+
+pub static mut EP1_OUT_DESCRIPTOR: DMADescriptor = DMADescriptor {flags: DescFlag::HOST_BUSY,
+                                                                  addr: 0};
+pub static mut EP1_IN_DESCRIPTOR:  DMADescriptor = DMADescriptor {flags: DescFlag::HOST_BUSY,
+                                                                  addr: 0};
+pub static mut EP0_OUT_BUFFERS: [[u32; 16]; EP0_OUT_COUNT] = [[0; 16]; EP0_OUT_COUNT];
+pub static mut EP1_OUT_BUFFER: [u32; 16] = [0; 16];
+pub static mut EP1_IN_BUFFER: [u32; 16] = [0; 16];
+// EP0 in buffers are allocated differently. In case EP0 needs to send
+// more than 64 bytes, its four buffers are one contiguous block of
+// memory. This allows the code to write >64 bytes contiguously,
+// rather than explicitly fragmenting it across buffers.
+pub static mut EP0_IN_BUFFERS: [u32; 16 * EP0_IN_COUNT] = [0; 16 * EP0_IN_COUNT];
+
+// Buffer used to store device configuration (descriptors) initialized at startup.
 pub static mut CONFIGURATION_BUFFER: [u8; 64] = [0; 64];
 
 impl<'a> USB<'a> {
@@ -208,7 +225,7 @@ impl<'a> USB<'a> {
             ep1_out_descriptor: TakeCell::empty(),
             ep1_out_buffer: Cell::new(None),
             ep1_in_descriptor: TakeCell::empty(),
-            ep1_in_buffer: TakeCell::empty(),
+            ep1_in_buffer: Cell::new(None),
             configuration_descriptor: TakeCell::empty(),
             next_out_idx: Cell::new(0),
             last_out_idx: Cell::new(0),
@@ -225,20 +242,28 @@ impl<'a> USB<'a> {
     /// Initialize the USB driver in device mode, so it can be begin
     /// communicating with a connected host.
     pub fn init(&self,
-                out_descriptors: &'static mut [DMADescriptor; 2],
-                out_buffers: &'static mut [[u32; 16]; 2],
-                in_descriptors: &'static mut [DMADescriptor; 4],
-                in_buffers: &'static mut [u32; 16 * 4],
+                ep0_out_descriptors: &'static mut [DMADescriptor; EP0_OUT_COUNT],
+                ep0_out_buffers: &'static mut [[u32; 16]; EP0_OUT_COUNT],
+                ep0_in_descriptors: &'static mut [DMADescriptor; EP0_IN_COUNT],
+                ep0_in_buffers: &'static mut [u32; 16 * 4],
+                ep1_out_descriptor: &'static mut DMADescriptor,
+                ep1_out_buffer: &'static mut [u32; 16],
+                ep1_in_descriptor: &'static mut DMADescriptor,
+                ep1_in_buffer: &'static mut [u32; 16],
                 configuration_buffer: &'static mut [u8; 64],
                 phy: PHY,
                 device_class: Option<u8>,
                 vendor_id: Option<u16>,
                 product_id: Option<u16>,
                 strings: &'static mut [StringDescriptor]) {
-        self.ep0_out_descriptors.replace(out_descriptors);
-        self.ep0_out_buffers.set(Some(out_buffers));
-        self.ep0_in_descriptors.replace(in_descriptors);
-        self.ep0_in_buffers.replace(in_buffers);
+        self.ep0_out_descriptors.replace(ep0_out_descriptors);
+        self.ep0_out_buffers.set(Some(ep0_out_buffers));
+        self.ep0_in_descriptors.replace(ep0_in_descriptors);
+        self.ep0_in_buffers.replace(ep0_in_buffers);
+        self.ep1_out_descriptor.replace(ep1_out_descriptor);
+        self.ep1_out_buffer.set(Some(ep1_out_buffer));
+        self.ep1_in_descriptor.replace(ep1_in_descriptor);
+        self.ep1_in_buffer.set(Some(ep1_in_buffer));
         self.configuration_descriptor.replace(configuration_buffer);
         self.strings.replace(strings);
 
