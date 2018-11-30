@@ -121,8 +121,6 @@ impl EpCtl {
     pub const ENABLE: EpCtl    = EpCtl(1 << 31);
     /// Clear endpoint NAK
     pub const CNAK: EpCtl      = EpCtl(1 << 26);
-    /// Set the 4-bit TxFIFO number to be 1
-    pub const TXFNUM1: EpCtl   = EpCtl(1 << 22);
     /// Stall endpoint
     pub const STALL: EpCtl     = EpCtl(1 << 21);
     /// Make an endpoint of type Interrupt
@@ -130,6 +128,43 @@ impl EpCtl {
     /// Denotes whether endpoint is active
     pub const USBACTEP: EpCtl  = EpCtl(1 << 15);
 
+    pub const TXFNUM_0: EpCtl  = EpCtl(0 << 22);
+    pub const TXFNUM_1: EpCtl  = EpCtl(1 << 22);
+    pub const TXFNUM_2: EpCtl  = EpCtl(2 << 22);
+    pub const TXFNUM_3: EpCtl  = EpCtl(3 << 22);
+
+    pub const TXFNUM_4: EpCtl  = EpCtl(4 << 22);
+    pub const TXFNUM_5: EpCtl  = EpCtl(5 << 22);
+    pub const TXFNUM_6: EpCtl  = EpCtl(6 << 22);
+    pub const TXFNUM_7: EpCtl  = EpCtl(7 << 22);
+
+    pub const TXFNUM_8: EpCtl  = EpCtl(8 << 22);
+    pub const TXFNUM_9: EpCtl  = EpCtl(9 << 22);
+    pub const TXFNUM_10: EpCtl = EpCtl(10 << 22);
+    pub const TXFNUM_11: EpCtl = EpCtl(11 << 22);
+
+    pub const TXFNUM_12: EpCtl = EpCtl(12 << 22);
+    pub const TXFNUM_13: EpCtl = EpCtl(13 << 22);
+    pub const TXFNUM_14: EpCtl = EpCtl(14 << 22);
+    pub const TXFNUM_15: EpCtl = EpCtl(15 << 22);
+
+
+    // EP0 has a different control register layout than the other
+    // endpoints (EPN). In EP0, the MPS field is 2 bits; in EPN, it is
+    // 10 bits (sections 5.3.5.21 and 5.3.5.22 in the OTG databook. A
+    // better implementation would type check this. -pal
+    pub const MPS_EP0_64: EpCtl = EpCtl(0 << 0);
+    pub const MPS_EP0_32: EpCtl = EpCtl(1 << 0);
+    pub const MPS_EP0_16: EpCtl = EpCtl(2 << 0);
+    pub const MPS_EP0_8:  EpCtl = EpCtl(3 << 0);
+
+    pub const fn epn_mps(self, cnt: u16) -> EpCtl {
+        EpCtl(self.0 | (cnt & 0x3f) as u32)
+    }
+
+    pub const fn to_u32(self) -> u32 {
+        self.0
+    }
 }
 
 impl BitOr for EpCtl {

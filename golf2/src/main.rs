@@ -315,7 +315,8 @@ pub unsafe fn reset_handler() {
 
 
 
-
+    h1b::usb::UsbHidU2f::reset(&h1b::usb::USB0);
+    h1b::usb::UsbHidU2f::put_frame(&h1b::usb::USB0, &[0x00000000; 16]);
 
 // dcrypto_test::run_dcrypto();
 //    rng_test::run_rng();

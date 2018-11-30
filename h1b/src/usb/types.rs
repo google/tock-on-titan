@@ -594,12 +594,12 @@ pub struct U2fHidCommandFrame {
     command: u8,
     bcount_high: u8,
     bcount_low: u8,
-    data: [u8; U2F_REPORT_SIZE - 7],
+    data: [u8; U2F_REPORT_SIZE as usize - 7],
 }
 
 pub struct U2fHidSequenceFrame {
     channel_id: u32,
     frame_type: u8,
     sequence_num: u8,
-    data: [u8; U2F_REPORT_SIZE - 5],
+    data: [u8; U2F_REPORT_SIZE as usize - 5],
 }
