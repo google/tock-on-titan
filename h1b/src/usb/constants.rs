@@ -36,9 +36,9 @@ pub const GOUTNAKEFF: u32    = 1 << 7;
 pub const GINNAKEFF: u32     = 1 << 6;
 
 const MAX_CONTROL_ENDPOINTS: u16 =  3;
-const MAX_NORMAL_ENDPOINTS: u16  = 16;
-pub const MAX_PACKET_SIZE: u16   = 64;
-pub const U2F_REPORT_SIZE: usize = 64;
+const MAX_NORMAL_ENDPOINTS:  u16 = 16;
+pub const MAX_PACKET_SIZE:   u16 = 64;
+pub const U2F_REPORT_SIZE:   u16 = 64;
 
 // Ask Amit
 pub const RX_FIFO_SIZE: u16 = (4 * MAX_CONTROL_ENDPOINTS + 6) +
