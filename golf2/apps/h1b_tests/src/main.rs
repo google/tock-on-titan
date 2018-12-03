@@ -19,13 +19,15 @@ extern crate alloc;
 extern crate tock;
 
 fn main() {
-	use tock::console::Console;
+    use tock::console::Console;
 
-	let mut console = Console::new();
-	loop {
-		use core::fmt::Write;
-		use tock::timer;
-		console.write_str("Hello, World!\n").expect("Failed console write");
-		timer::sleep(timer::Duration::from_ms(1000));
-	}
+    let mut console = Console::new();
+    loop {
+        use core::fmt::Write;
+        use tock::timer;
+        console
+            .write_str("Hello, World!\n")
+            .expect("Failed console write");
+        timer::sleep(timer::Duration::from_ms(1000));
+    }
 }
