@@ -15,6 +15,7 @@
 #![allow(dead_code)]
 
 pub mod constants;
+pub mod driver;
 mod registers;
 mod serialize;
 pub mod types;
@@ -64,25 +65,38 @@ macro_rules! data_debug {
 /// Trait a USB peripheral stack must implement to support the U2F syscall
 /// capsule. Mostly a Rust translation of abstractions used in C implementation.
 pub trait UsbHidU2f<'a> {
-    fn set_client(&self, client: &'a UsbHidU2fClient<'a>);
+    fn set_u2f_client(&self, client: &'a UsbHidU2fClient<'a>);
+
     /// Reset the device and endpoints
     fn reset(&self);
+
     /// For a reconnect: disconnect, wait, then connect
     fn force_reconnect(&self) -> ReturnCode;
+
     /// Sends the U2F report descriptor over the control channel (EP0)
     fn iface_respond(&self) -> ReturnCode;
+
     /// Blindly copies a frame out of the RXFIFO: run in response to `frame_received`.
     fn get_frame(&self, frame: &mut [u32; 16]);
+
     /// Returns whether the TXFIFO is available for sending.
     fn transmit_ready(&self) -> bool;
-    /// Transmits a frame, fails if TXFIFO is not ready.
+
+    /// Transmits a frame, fails if TXFIFO is not ready. Simple word copy (requires no byte
+    /// reordering), use this when possible.
     fn put_frame(&self, frame: &[u32; 16]) -> ReturnCode;
+
+    /// Transmits a frame, fails if TXFIFO is not ready. Requires byte-by-byte copy, use
+    /// only when caller buffer couldn't be aligned or presized. Included to prevent
+    /// double-copy from userspace buffers.
+    fn put_slice(&self, frame: &[u8]) -> ReturnCode;
 }
 
 /// Client for the UsbHidU2f trait.
 pub trait UsbHidU2fClient<'a> {
     fn reconnected(&self);
     fn frame_received(&self);
+    fn frame_transmitted(&self);
 }
 
 /// USBState encodes the current state of the USB driver's state
@@ -1291,7 +1305,7 @@ impl<'a> USB<'a> {
 }
 
 impl<'a> UsbHidU2f<'a> for USB<'a> {
-    fn set_client(&self, client: &'a UsbHidU2fClient<'a>) {
+    fn set_u2f_client(&self, client: &'a UsbHidU2fClient<'a>) {
         self.u2f_client.set(client);
     }
 
@@ -1349,12 +1363,36 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
             ReturnCode::EBUSY
         } else {
             self.ep1_in_buffer.map(|hardware_buffer| {
-                for i in 0..16 {
+                for i in 0..frame.len() {
                     hardware_buffer[i] = frame[i];
                 }
             });
             self.ep1_enable_tx();
             data_debug!("Sending frame.\n");
+            ReturnCode::SUCCESS
+        }
+    }
+
+    fn put_slice(&self, slice: &[u8]) -> ReturnCode {
+        if slice.len() > 64 {
+            ReturnCode::ESIZE
+        } else if !self.ep1_tx_fifo_is_ready() {
+            data_debug!("U2FData: Tried to put slice but busy.\n");
+            ReturnCode::EBUSY
+        } else {
+            self.ep1_in_buffer.map(|hardware_buffer| {
+                for (i, c) in slice.iter().enumerate() {
+                    let hw_index = i / 4;
+                    let byte_index = i % 4;
+                    if byte_index == 0 {
+                        hardware_buffer[hw_index] = *c as u32;
+                    } else {
+                        hardware_buffer[hw_index] = (*c as u32) << (8 * byte_index);
+                    }
+                }
+            });
+            self.ep1_enable_tx();
+            data_debug!("U2FData: Sending frame.\n");
             ReturnCode::SUCCESS
         }
     }
