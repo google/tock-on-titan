@@ -233,3 +233,7 @@ pub const U2F_REPORT_DESCRIPTOR: [u8; 34] = [
     0x91, 0x02,       /*   Output (Data, Var, Abs), Usage */
     0xC0              /* End Collection */
 ];
+
+pub enum U2fHidCommand {
+    Error = 0xbf,
+}
