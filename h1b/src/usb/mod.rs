@@ -14,10 +14,10 @@
 
 #![allow(dead_code)]
 
-mod constants;
+pub mod constants;
 mod registers;
 mod serialize;
-mod types;
+pub mod types;
 
 use cortexm3::support;
 use kernel::ReturnCode;
