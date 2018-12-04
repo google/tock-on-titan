@@ -74,6 +74,7 @@ pub struct Golf {
     aes: &'static aes::AesDriver<'static>,
     //rng: &'static capsules::rng::SimpleRng<'static, h1b::trng::Trng<'static>>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
+    u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
 }
 
 static mut STRINGS: [StringDescriptor; 7] = [
@@ -240,23 +241,18 @@ pub unsafe fn reset_handler() {
 
     h1b::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
 
+    let u2f = static_init!(
+        h1b::usb::driver::U2fSyscallDriver<'static>,
+        h1b::usb::driver::U2fSyscallDriver::new(&mut h1b::usb::USB0, kernel.create_grant(&grant_cap)));
+    h1b::usb::UsbHidU2f::set_u2f_client(&h1b::usb::USB0, u2f);
+
+
     /*    h1b::trng::TRNG0.init();
     let rng = static_init!(
         capsules::rng::SimpleRng<'static, h1b::trng::Trng>,
         capsules::rng::SimpleRng::new(&mut h1b::trng::TRNG0, kernel::grant::Grant::create()),
         8);
     h1b::trng::TRNG0.set_client(rng);*/
-
-    let golf2 = Golf {
-        console: console,
-        gpio: gpio,
-        timer: timer,
-        ipc: kernel::ipc::IPC::new(kernel, &grant_cap),
-        digest: digest,
-        aes: aes,
-        dcrypto: dcrypto
-//        rng: rng,
-    };
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
@@ -315,6 +311,20 @@ pub unsafe fn reset_handler() {
 
 
     h1b::usb::UsbHidU2f::reset(&h1b::usb::USB0);
+
+    let golf2 = Golf {
+        console: console,
+        gpio: gpio,
+        timer: timer,
+        ipc: kernel::ipc::IPC::new(kernel, &grant_cap),
+        digest: digest,
+        aes: aes,
+        dcrypto: dcrypto,
+        //        rng: rng,
+        u2f_usb: u2f,
+    };
+
+
     let mut f = U2fHidCommandFrame {
         channel_id: 0xaa,
         frame_type: 0,
@@ -363,6 +373,7 @@ impl Platform for Golf {
 //            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
+            h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
             _ =>  f(None),
         }
     }
