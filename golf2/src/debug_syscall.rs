@@ -24,15 +24,15 @@
 use kernel::{AppId, Driver, ReturnCode};
 
 pub const DRIVER_NUM: usize = 0x80000001;
-pub struct Debug {}
+pub struct UintPrinter {}
 
-impl Debug {
-    pub fn new() -> Debug {
-        Debug {}
+impl UintPrinter {
+    pub fn new() -> UintPrinter {
+        UintPrinter {}
     }
 }
 
-impl Driver for Debug {
+impl Driver for UintPrinter {
     fn command(&self, minor_num: usize, r2: usize, r3: usize, _caller_id: AppId) -> ReturnCode {
         match (minor_num, r2, r3) {
             (_, 0, 0) => debug!("{}", minor_num),

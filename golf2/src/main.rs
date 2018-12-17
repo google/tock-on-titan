@@ -33,7 +33,7 @@ pub mod digest;
 pub mod aes;
 pub mod dcrypto;
 pub mod dcrypto_test;
-pub mod debug;
+pub mod debug_syscall;
 
 use capsules::console;
 use capsules::virtual_uart::{UartDevice, UartMux};
@@ -73,7 +73,7 @@ pub struct Golf {
     aes: &'static aes::AesDriver<'static>,
     //rng: &'static capsules::rng::SimpleRng<'static, h1b::trng::Trng<'static>>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
-    debug: debug::Debug,
+    uint_printer: debug_syscall::UintPrinter,
 }
 
 static mut STRINGS: [StringDescriptor; 7] = [
@@ -256,7 +256,7 @@ pub unsafe fn reset_handler() {
         aes: aes,
         dcrypto: dcrypto,
 //        rng: rng,
-        debug: debug::Debug::new(),
+        uint_printer: debug_syscall::UintPrinter::new(),
     };
 
     // ** GLOBALSEC **
@@ -348,7 +348,7 @@ impl Platform for Golf {
 //            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
-            debug::DRIVER_NUM             => f(Some(&self.debug)),
+            debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
             _ =>  f(None),
         }
     }
