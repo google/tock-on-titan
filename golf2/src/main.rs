@@ -33,6 +33,7 @@ pub mod digest;
 pub mod aes;
 pub mod dcrypto;
 pub mod dcrypto_test;
+pub mod debug;
 
 use capsules::console;
 use capsules::virtual_uart::{UartDevice, UartMux};
@@ -72,6 +73,7 @@ pub struct Golf {
     aes: &'static aes::AesDriver<'static>,
     //rng: &'static capsules::rng::SimpleRng<'static, h1b::trng::Trng<'static>>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
+    debug: debug::Debug,
 }
 
 static mut STRINGS: [StringDescriptor; 7] = [
@@ -252,8 +254,9 @@ pub unsafe fn reset_handler() {
         ipc: kernel::ipc::IPC::new(kernel, &grant_cap),
         digest: digest,
         aes: aes,
-        dcrypto: dcrypto
+        dcrypto: dcrypto,
 //        rng: rng,
+        debug: debug::Debug::new(),
     };
 
     // ** GLOBALSEC **
@@ -332,29 +335,6 @@ pub unsafe fn reset_handler() {
     kernel.kernel_loop(&golf2, chip, Some(&golf2.ipc), &main_cap);
 }
 
-// Syscall driver for libtock-rs debugging. Allows applications to print 1, 2,
-// or 3 integers to the console using only the command syscall. The integers are
-// passed through the minor number and command arguments. Unlike the console
-// driver, this does not rely on the allow syscall (useful because relocations
-// are not currently working). The syscall is nonblocking and does not produce
-// an event. Calling it multiple times in quick succession will not work -- it
-// fills up a buffer and stops printing more messages. The driver number is
-// 0x80000001.
-struct DebugDriver {}
-static DEBUG_DRIVER: DebugDriver = DebugDriver{};
-
-impl kernel::Driver for DebugDriver {
-    fn command(&self, minor_num: usize, r2: usize, r3: usize, _caller_id: kernel::AppId) -> kernel::ReturnCode {
-        match (minor_num, r2, r3) {
-            (_, 0, 0) => debug!("{}", minor_num),
-            (_, _, 0) => debug!("{} {}", minor_num, r2),
-            (_, _, _) => debug!("{} {} {}", minor_num, r2, r3),
-        }
-        kernel::ReturnCode::SUCCESS
-    }
-}
-
-
 impl Platform for Golf {
     fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
         where F: FnOnce(Option<&kernel::Driver>) -> R
@@ -368,7 +348,7 @@ impl Platform for Golf {
 //            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
-            0x80000001                    => f(Some(&DEBUG_DRIVER)),
+            debug::DRIVER_NUM             => f(Some(&self.debug)),
             _ =>  f(None),
         }
     }
