@@ -17,8 +17,9 @@
 //! Driver for the True Random Number Generator (TRNG).
 
 use core::cell::Cell;
-use hil::rng::{Continue, RNG, Client};
+use kernel::hil::entropy::{Continue, Entropy32, Client32};
 use kernel::common::cells::VolatileCell;
+use kernel::ReturnCode;
 
 
 #[repr(C)]
@@ -136,7 +137,7 @@ pub static mut TRNG0: Trng<'static> = unsafe { Trng::new(TRNG0_BASE) };
 
 pub struct Trng<'a> {
     regs: *mut Registers,
-    client: Cell<Option<&'a Client>>,
+    client: Cell<Option<&'a Client32>>,
 }
 
 impl<'a> Trng<'a> {
@@ -155,14 +156,14 @@ impl<'a> Trng<'a> {
         regs.interrupt_state.set(0x1);
 
         self.client.get().map(|client| {
-            if let Continue::More = client.randomness_available(&mut Iter(self)) {
+            if let Continue::More = client.entropy_available(&mut Iter(self), ReturnCode::SUCCESS) {
                 // Re-enable the interrupt since the client needs more data.
                 regs.interrupt_enable.set(0x1);
             }
         });
     }
 
-    fn init(&self) {
+    pub fn init(&self) {
         let regs = unsafe { &*self.regs };
 
         // Enable bit shuffling and churn mode.  Disable XOR and Von Neumann processing.
@@ -177,13 +178,13 @@ impl<'a> Trng<'a> {
 
 }
 
-impl<'a> RNG<'a> for Trng<'a> {
+impl<'a> Entropy32<'a> for Trng<'a> {
 
-    fn set_client(&self, client: &'a Client) {
+    fn set_client(&self, client: &'a Client32) {
         self.client.set(Some(client));
     }
-    
-    fn get(&self) {
+
+    fn get(&self) -> ReturnCode {
         let regs = unsafe { &*self.regs };
 
         if regs.empty.get() > 0 {
@@ -198,11 +199,16 @@ impl<'a> RNG<'a> for Trng<'a> {
             regs.interrupt_enable.set(0x1);
         } else {
             self.client.get().map(|client| {
-                if let Continue::More = client.randomness_available(&mut Iter(self)) {
+                if let Continue::More = client.entropy_available(&mut Iter(self), ReturnCode::SUCCESS) {
                     regs.interrupt_enable.set(0x1);
                 }
             });
         }
+        ReturnCode::SUCCESS
+    }
+
+    fn cancel(&self) -> ReturnCode {
+        ReturnCode::FAIL
     }
 }
 

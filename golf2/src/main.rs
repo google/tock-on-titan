@@ -42,12 +42,13 @@ use kernel::capabilities;
 use kernel::mpu::MPU;
 use kernel::hil;
 
+use kernel::hil::entropy::Entropy32;
+use kernel::hil::rng::Rng;
+
 use h1b::crypto::dcrypto::Dcrypto;
 use h1b::usb::{Descriptor, StringDescriptor};
 use h1b::usb::constants::{U2F_REPORT_SIZE, U2fHidCommand};
 use h1b::usb::types::U2fHidCommandFrame;
-
-//use kernel::hil::rng::RNG;
 
 // State for loading apps
 const NUM_PROCS: usize = 2;
@@ -72,7 +73,7 @@ pub struct Golf {
     ipc: kernel::ipc::IPC,
     digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
-    //rng: &'static capsules::rng::SimpleRng<'static, h1b::trng::Trng<'static>>,
+    rng: &'static capsules::rng::RngDriver<'static>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
     u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
 }
@@ -247,12 +248,21 @@ pub unsafe fn reset_handler() {
     h1b::usb::UsbHidU2f::set_u2f_client(&h1b::usb::USB0, u2f);
 
 
-    /*    h1b::trng::TRNG0.init();
+    h1b::trng::TRNG0.init();
+    let entropy_to_random = static_init!(
+        capsules::rng::Entropy32ToRandom<'static>,
+        capsules::rng::Entropy32ToRandom::new(&h1b::trng::TRNG0)
+    );
+
     let rng = static_init!(
-        capsules::rng::SimpleRng<'static, h1b::trng::Trng>,
-        capsules::rng::SimpleRng::new(&mut h1b::trng::TRNG0, kernel::grant::Grant::create()),
-        8);
-    h1b::trng::TRNG0.set_client(rng);*/
+        capsules::rng::RngDriver<'static>,
+        capsules::rng::RngDriver::new(
+            entropy_to_random,
+            kernel.create_grant(&grant_cap)
+        )
+    );
+    h1b::trng::TRNG0.set_client(entropy_to_random);
+    entropy_to_random.set_client(rng);
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
@@ -316,7 +326,7 @@ pub unsafe fn reset_handler() {
         digest: digest,
         aes: aes,
         dcrypto: dcrypto,
-        //        rng: rng,
+        rng: rng,
         u2f_usb: u2f,
     };
 // dcrypto_test::run_dcrypto();
@@ -351,7 +361,7 @@ impl Platform for Golf {
             digest::DRIVER_NUM            => f(Some(self.digest)),
             capsules::alarm::DRIVER_NUM   => f(Some(self.timer)),
             aes::DRIVER_NUM               => f(Some(self.aes)),
-//            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
+            capsules::rng::DRIVER_NUM     => f(Some(self.rng)),
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
             h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
