@@ -199,7 +199,7 @@ impl UART {
         let regs = &*self.regs;
 
         self.enable_tx();
-        
+
         for b in bytes {
             while regs.state.get() & 1 != 0 {}
             regs.write_data.set(*b as u32);
@@ -215,28 +215,31 @@ impl UART {
     // certain threshold (determined by the `fifo` register and defaults to 1
     // byte).
     //
-    // Returns the number of bytes written.
-    fn send_remaining_bytes(&self) -> usize {
+    // Returns the number of bytes written, -1 if no more to write.
+    fn send_remaining_bytes(&self) -> isize {
         let regs = unsafe { &*self.regs };
 
         // If there is no current buffer, just return zero. Probably shouldn't
         // happen though.
-        let nwritten = self.tx_buffer.map(|bytes| {
+        let nwritten: isize = self.tx_buffer.map(|bytes| {
             let init_cursor = self.tx_cursor.get();
             let limit = self.tx_limit.get();
-            
-            for b in bytes[init_cursor..limit].iter() {
-                if regs.state.get() & 1 == 1 {
-                    break; // TX Buffer full, we'll continue later
+            if init_cursor == limit {
+                -1 // done
+            } else {
+                for b in bytes[init_cursor..limit].iter() {
+                    if regs.state.get() & 1 == 1 {
+                        break; // TX Buffer full, we'll continue later
+                    }
+                    self.tx_cursor.set(self.tx_cursor.get() + 1);
+                    regs.write_data.set(*b as u32);
                 }
-                self.tx_cursor.set(self.tx_cursor.get() + 1);
-                regs.write_data.set(*b as u32);
+                (self.tx_cursor.get() - init_cursor) as isize
             }
-            self.tx_cursor.get() - init_cursor
         })
-            .unwrap_or(0);
-        
-        if nwritten > 0 {
+            .unwrap_or(0 as isize);
+
+        if nwritten >= 0 {
             // if we wrote anything, we're gonna want to get notified when the FIFO has room again.
             // Technically we could be done here if there is nothing left to send, but we want to
             // get an interrupt anyway so we can return the buffer to the client from
@@ -263,7 +266,7 @@ impl UART {
         let regs = unsafe { &*self.regs };
 
         regs.clear_interrupt_state.set(1);
-        if self.send_remaining_bytes() == 0 {
+        if self.send_remaining_bytes() == -1 {
             self.client.get().map(|client| {
                 if self.tx_buffer.is_some() {
                     client.transmit_complete(self.tx_buffer.take().unwrap(), hil::uart::Error::CommandComplete);
@@ -307,7 +310,7 @@ impl hil::uart::UART for UART {
     fn set_client(&self, client: &'static hil::uart::Client) {
         self.client.set(Some(client));
     }
-    
+
     fn transmit(&self, tx_buffer: &'static mut [u8], tx_len: usize) {
         self.tx_buffer.replace(tx_buffer);
         self.tx_cursor.set(0);
