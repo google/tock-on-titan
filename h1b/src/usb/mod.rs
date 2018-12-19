@@ -62,22 +62,38 @@ macro_rules! data_debug {
 //    ($fmt:expr, $($arg:tt)+) => ({});
 }
 
+// Debug interrupts
+macro_rules! int_debug {
+    //() => ({print!();});
+    //($fmt:expr) => ({print!($fmt);});
+    //($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
+    () => ({});
+    ($fmt:expr) => ({});
+    ($fmt:expr, $($arg:tt)+) => ({});
+}
+
 /// Trait a USB peripheral stack must implement to support the U2F syscall
 /// capsule. Mostly a Rust translation of abstractions used in C implementation.
 pub trait UsbHidU2f<'a> {
     fn set_u2f_client(&self, client: &'a UsbHidU2fClient<'a>);
 
     /// Reset the device and endpoints
-    fn reset(&self);
+    fn setup_u2f_descriptors(&self);
 
     /// For a reconnect: disconnect, wait, then connect
     fn force_reconnect(&self) -> ReturnCode;
+
+    /// Enable reception of next frame; call after `get_slice` or `get_frame`.
+    fn enable_rx(&self) -> ReturnCode;
 
     /// Sends the U2F report descriptor over the control channel (EP0)
     fn iface_respond(&self) -> ReturnCode;
 
     /// Blindly copies a frame out of the RXFIFO: run in response to `frame_received`.
     fn get_frame(&self, frame: &mut [u32; 16]);
+
+    /// Blindly copies a frame out of the RXFIFO: run in response to `frame_received`.
+    fn get_slice(&self, frame: &mut [u8]) -> ReturnCode;
 
     /// Returns whether the TXFIFO is available for sending.
     fn transmit_ready(&self) -> bool;
@@ -263,10 +279,10 @@ impl<'a> USB<'a> {
     }
     /// Initialize descriptors for endpoint 0 IN and OUT, resetting
     /// the endpoint 0 descriptors to a clean state.
-    fn init_descriptors(&self) {
+    fn init_ep0_descriptors(&self) {
         // Setup descriptor for OUT endpoint 0
-        self.ep0_out_buffers.get().map(|bufs| {
-            self.ep0_out_descriptors.map(|descs| {
+        self.ep0_out_descriptors.map(|descs| {
+            self.ep0_out_buffers.get().map(|bufs| {
                 for (desc, buf) in descs.iter_mut().zip(bufs.iter()) {
                     desc.flags = DescFlag::HOST_BUSY;
                     desc.addr = buf.as_ptr() as usize;
@@ -295,14 +311,14 @@ impl<'a> USB<'a> {
         // Reset device address field (bits 10:4) of device config
         //self.registers.device_config.set(self.registers.device_config.get() & !(0b1111111 << 4));
 
-        self.init_descriptors();
+        self.init_ep0_descriptors();
         self.expect_setup_packet();
     }
 
     fn ep1_tx_fifo_is_ready(&self) -> bool {
         self.ep1_in_descriptor.map_or(false, |desc| {
-            desc.flags & DescFlag::DMA_DONE == DescFlag::DMA_DONE ||
-                desc.flags & DescFlag::HOST_BUSY == DescFlag::HOST_BUSY
+            desc.flags & DescFlag::STATUS_MASK == DescFlag::DMA_DONE ||
+                desc.flags & DescFlag::STATUS_MASK == DescFlag::HOST_BUSY
         })
     }
 
@@ -320,20 +336,20 @@ impl<'a> USB<'a> {
             let mut control = self.registers.in_endpoints[1].control.get();
             control = control | EpCtl::ENABLE | EpCtl::CNAK;
             self.registers.in_endpoints[1].control.set(control);
-
         });
     }
 
-    fn ep1_enable_rx(&self) {
-        self.ep1_out_descriptor.map(|desc| {
+    fn ep1_enable_rx(&self) -> ReturnCode {
+        self.ep1_out_descriptor.map_or(ReturnCode::FAIL, |desc| {
             desc.flags = (DescFlag::LAST |
                           DescFlag::HOST_READY |
                           DescFlag::IOC).bytes(U2F_REPORT_SIZE);
             let mut control = self.registers.out_endpoints[1].control.get();
             control = control | EpCtl::ENABLE | EpCtl::CNAK;
             self.registers.out_endpoints[1].control.set(control);
-        });
-
+            data_debug!("Set EP1 receive flags.\n");
+            ReturnCode::SUCCESS
+        })
     }
 
 
@@ -379,7 +395,7 @@ impl<'a> USB<'a> {
     pub fn handle_interrupt(&self) {
         // Save current interrupt status snapshot to correctly clear at end
         let status = self.registers.interrupt_status.get();
-        //print_usb_interrupt_status(status);
+        print_usb_interrupt_status(status);
 
         if status & ENUM_DONE != 0 {
             // MPS default set to 0 == 64 bytes
@@ -404,15 +420,21 @@ impl<'a> USB<'a> {
         }
 
         if status & (OEPINT | IEPINT) != 0 { // Interrupt pending
-            usb_debug!(" - handling endpoint interrupts\n");
             let pending_interrupts = self.registers.device_all_ep_interrupt.get();
             let inter_ep0_out = (pending_interrupts & AllEndpointInterruptMask::OUT0 as u32) != 0;
             let inter_ep0_in =  (pending_interrupts & AllEndpointInterruptMask::IN0 as u32)  != 0;
             let inter_ep1_out = (pending_interrupts & AllEndpointInterruptMask::OUT1 as u32) != 0;
             let inter_ep1_in =  (pending_interrupts & AllEndpointInterruptMask::IN1 as u32)  != 0;
+            int_debug!(" - handling endpoint interrupts {:032b}\n", pending_interrupts);
+            int_debug!(" -      all endpoint mask       {:032b}\n", self.registers.device_all_ep_interrupt_mask.get());
+            int_debug!(" -     out1 endpoint ints       {:032b}\n", self.registers.out_endpoints[1].interrupt.get());
+            int_debug!(" -      in1 endpoint ints       {:032b}\n", self.registers.in_endpoints[1].interrupt.get());
+            int_debug!("                   debug reg    {:032b}\n", self.registers._grxstsr.get());
             if inter_ep0_out || inter_ep0_in {
+                int_debug!("   - ep0out: {} ep0in: {}\n", inter_ep0_out, inter_ep0_in);
                 self.handle_endpoint0_events(inter_ep0_out, inter_ep0_in);
             } else if inter_ep1_out || inter_ep1_in {
+                int_debug!("   - ep1out: {} ep1in: {}\n", inter_ep1_out, inter_ep1_in);
                 self.handle_endpoint1_events(inter_ep1_out, inter_ep1_in);
             }
         }
@@ -457,13 +479,24 @@ impl<'a> USB<'a> {
         let ep_out = &self.registers.out_endpoints[1];
         let ep_out_interrupts = ep_out.interrupt.get();
         if out_interrupt {
+            data_debug!("Out interrupts: {:#x}\n", ep_out_interrupts);
             ep_out.interrupt.set(ep_out_interrupts);
+            if (ep_out_interrupts & OutInterrupt::XferComplete as u32) != 0 {
+                data_debug!("U2F: ep1 frame received.\n");
+                self.u2f_client.map(|client| client.frame_received());
+            }
         }
 
         let ep_in = &self.registers.in_endpoints[1];
         let ep_in_interrupts = ep_in.interrupt.get();
         if in_interrupt {
+            print_in_endpoint_interrupt_status(ep_in_interrupts);
             ep_in.interrupt.set(ep_in_interrupts);
+            if (ep_in_interrupts & InInterrupt::XferComplete as u32) != 0  {
+                data_debug!("U2F: frame_transmitted callback on ep1.\n");
+                self.u2f_client.map(|client| client.frame_transmitted());
+            }
+
         }
 
     }
@@ -487,7 +520,7 @@ impl<'a> USB<'a> {
 
         // If the transfer is compelte (XferCompl), swap which EP0
         // OUT descriptor to use so stack can immediately receive again.
-        if out_interrupt && ep_out_interrupts & (OutInterruptMask::XferComplMsk as u32) != 0 {
+        if out_interrupt && ep_out_interrupts & (OutInterrupt::XferComplete as u32) != 0 {
             self.swap_ep0_out_descriptors();
         }
 
@@ -529,7 +562,7 @@ impl<'a> USB<'a> {
             USBState::DataStageIn => {
                 usb_debug!("USB: state is data stage in\n");
                 if in_interrupt &&
-                    ep_in_interrupts & (InInterruptMask::XferComplMsk as u32) != 0 {
+                    ep_in_interrupts & (InInterrupt::XferComplete as u32) != 0 {
                         self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                     }
 
@@ -703,7 +736,7 @@ impl<'a> USB<'a> {
                             len = ::core::cmp::min(len, request.w_length as usize);
                             self.ep0_in_descriptors.map(|descs| {
                                 descs[0].flags = (DescFlag::HOST_READY |
-                                              DescFlag::LAST |
+                                                  DescFlag::LAST |
                                                   DescFlag::SHORT |
                                                   DescFlag::IOC).bytes(len as u16);
                             });
@@ -728,8 +761,7 @@ impl<'a> USB<'a> {
                 len = ::core::cmp::min(len, request.w_length as usize);
                 self.ep0_in_descriptors.map(|descs| {
                     descs[0].flags = (DescFlag::HOST_READY | DescFlag::LAST |
-                                      DescFlag::SHORT | DescFlag::IOC)
-                        .bytes(len as u16);
+                                      DescFlag::SHORT | DescFlag::IOC).bytes(len as u16);
                 });
                 self.expect_data_phase_in(transfer_type);
             }
@@ -841,6 +873,7 @@ impl<'a> USB<'a> {
                 self.registers
                     .device_config
                     .set(dcfg);
+                self.setup_u2f_descriptors(); // Need to activate EP1 after SetAddress
                 self.expect_status_phase_in(transfer_type);
             }
             SetConfiguration => {
@@ -959,7 +992,7 @@ impl<'a> USB<'a> {
         while self.registers.reset.get() & (Reset::TxFFlsh as u32) != 0 {}
     }
 
-    /// Flush endpoint 0's TX FIFO
+    /// Flush one or all endpoint TX FIFOs.
     ///
     /// `fifo_num` is 0x0-0xF for a particular fifo, or 0x10 for all fifos
     ///
@@ -1263,12 +1296,12 @@ impl<'a> USB<'a> {
 
         // Unmask some endpoint interrupts
         //    Device OUT SETUP & XferCompl
-        self.registers.device_out_ep_interrupt_mask.set(1 << 0 | // XferCompl
-            1 << 1 | // Disabled
-            1 << 3); // SETUP
+        self.registers.device_out_ep_interrupt_mask.set(OutInterrupt::XferComplete as u32 |
+                                                        OutInterrupt::EPDisabled as u32 |
+                                                        OutInterrupt::SetUP as u32);
         //    Device IN XferCompl & TimeOut
-        self.registers.device_in_ep_interrupt_mask.set(1 << 0 | // XferCompl
-            1 << 1); // Disabled
+        self.registers.device_in_ep_interrupt_mask.set(InInterrupt::XferComplete as u32 |
+                                                       InInterrupt::EPDisabled as u32);
 
         // To set ourselves up for processing the state machine through interrupts,
         // unmask:
@@ -1309,55 +1342,70 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
         self.u2f_client.set(client);
     }
 
-
     // Note that this resets the EP1 (U2F) descriptors and buffers;
-    // usb_reset() and init_descriptors() do these operations on the
+    // usb_reset() and init_ep0_descriptors() do these operations on the
     // EP0 (control) descriptors and buffers.
-    fn reset(&self) {
+    //
+    // This method must be called after a SetConfiguration and SetAddress
+    // command, to initialize EP1 and enable data transmission.
+    fn setup_u2f_descriptors(&self) {
         self.ep1_out_descriptor.map(|out_desc| {
-            self.ep1_in_descriptor.map(|in_desc| {
-                self.ep1_out_buffer.get().map(|out_buf| {
-                    self.ep1_in_buffer.map(|in_buf| {
-                        out_desc.flags = (DescFlag::LAST |
-                                          DescFlag::HOST_READY |
-                                          DescFlag::IOC).bytes(U2F_REPORT_SIZE);
-                        out_desc.addr = out_buf.as_ptr() as usize;
-                        self.registers.out_endpoints[1].dma_address.set(&out_desc);
-
-                        in_desc.flags =  DescFlag::LAST |
-                                         DescFlag::HOST_READY |
-                                         DescFlag::IOC;
-                        in_desc.addr = in_buf.as_ptr() as usize;
-                        self.registers.in_endpoints[1].dma_address.set(&in_desc);
-
-                        let out_control = (EpCtl::ENABLE | EpCtl::CNAK |
-                                           EpCtl::USBACTEP | EpCtl::INTERRUPT).epn_mps(64);
-                        self.registers.out_endpoints[1].control.set(out_control);
-
-                        let in_control  = (EpCtl::ENABLE | EpCtl::USBACTEP |
-                                           EpCtl::INTERRUPT | EpCtl::TXFNUM_1).epn_mps(64);
-                        self.registers.in_endpoints[1].control.set(in_control);
-
-                        let mut interrupts = self.registers.device_all_ep_interrupt_mask.get();
-                        interrupts |= AllEndpointInterruptMask::OUT1 as u32 |
-                                      AllEndpointInterruptMask::IN1 as u32;
-                        self.registers.device_all_ep_interrupt_mask.set(interrupts);
-                    });
-                });
+            self.ep1_out_buffer.get().map(|out_buf| {
+                out_desc.flags = (DescFlag::LAST |
+                                  DescFlag::HOST_READY |
+                                  DescFlag::IOC).bytes(U2F_REPORT_SIZE);
+                out_desc.addr = out_buf.as_ptr() as usize;
+                self.registers.out_endpoints[1].dma_address.set(&out_desc);
             });
         });
 
+        self.ep1_in_descriptor.map(|in_desc| {
+            self.ep1_in_buffer.map(|in_buf| {
+                in_desc.flags =  DescFlag::LAST | DescFlag::HOST_BUSY | DescFlag::IOC;
+                in_desc.addr = in_buf.as_ptr() as usize;
+                self.registers.in_endpoints[1].dma_address.set(&in_desc);
 
+            });
+        });
+
+        self.ep1_out_descriptor.map(|out_desc| {
+            self.ep1_out_buffer.get().map(|out_buf| {
+                let out_control = (EpCtl::ENABLE | EpCtl::CNAK |
+                                   EpCtl::USBACTEP | EpCtl::INTERRUPT).epn_mps(U2F_REPORT_SIZE as u32);
+                self.registers.out_endpoints[1].control.set(out_control);
+            });
+        });
+
+        self.ep1_in_descriptor.map(|in_desc| {
+            self.ep1_in_buffer.map(|in_buf| {
+                let in_control  = (EpCtl::USBACTEP | EpCtl::INTERRUPT |
+                                   EpCtl::TXFNUM_1).epn_mps(U2F_REPORT_SIZE as u32);
+                self.registers.in_endpoints[1].control.set(in_control);
+            });
+        });
+
+        let mut interrupts = self.registers.device_all_ep_interrupt_mask.get();
+        interrupts |=  AllEndpointInterruptMask::OUT1 as u32 | AllEndpointInterruptMask::IN1 as u32;
+        self.registers.device_all_ep_interrupt_mask.set(interrupts);
     }
 
     fn force_reconnect(&self) -> ReturnCode {
         panic!("Trying to force reconnect USB EP1\n");
     }
 
+    fn enable_rx(&self) -> ReturnCode {
+        self.ep1_enable_rx();
+        ReturnCode::SUCCESS
+    }
+
     fn iface_respond(&self) -> ReturnCode {ReturnCode::FAIL}
-    fn transmit_ready(&self) -> bool {false}
+
+    fn transmit_ready(&self) -> bool {
+        self.ep1_tx_fifo_is_ready()
+    }
 
     fn put_frame(&self, frame: &[u32; 16]) -> ReturnCode {
+        data_debug!("U2F: put_frame\n");
         if !self.ep1_tx_fifo_is_ready() {
             data_debug!("Tried to put frame but busy.\n");
             ReturnCode::EBUSY
@@ -1374,6 +1422,7 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
     }
 
     fn put_slice(&self, slice: &[u8]) -> ReturnCode {
+        data_debug!("U2F: put_slice\n");
         if slice.len() > 64 {
             ReturnCode::ESIZE
         } else if !self.ep1_tx_fifo_is_ready() {
@@ -1392,7 +1441,8 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
                 }
             });
             self.ep1_enable_tx();
-            data_debug!("U2FData: Sending frame.\n");
+            data_debug!("U2FData: Started slice send.\n");
+            data_debug!("U2FData: {} words available.\n", self.registers.in_endpoints[1].tx_fifo_status.get());
             ReturnCode::SUCCESS
         }
     }
@@ -1405,6 +1455,23 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
                 frame[i] = hardware_buffer[i];
             }
         });
+    }
+
+    fn get_slice(&self, slice: &mut [u8]) -> ReturnCode{
+        data_debug!("U2F: get_slice\n");
+        if slice.len() > 64 {
+            ReturnCode::ESIZE
+        } else {
+            self.ep1_out_buffer.get().map(|hardware_buffer| {
+                let len = slice.len();
+                for i in 0..len {
+                    let hw_index = i / 4;
+                    let byte_index = i % 4;
+                    slice[i] = ((hardware_buffer[hw_index] >> (8 * byte_index)) & 0xff) as u8;
+                }
+            });
+            ReturnCode::SUCCESS
+        }
     }
 }
 
@@ -1460,16 +1527,16 @@ impl TableCase {
     /// Only properly decodes values with the combinations shown in the
     /// programming guide.
     pub fn decode_interrupt(device_out_int: u32) -> TableCase {
-        if device_out_int & (OutInterruptMask::XferComplMsk as u32) != 0 {
-            if device_out_int & (OutInterruptMask::SetUPMsk as u32) != 0 {
+        if device_out_int & (OutInterrupt::XferComplete as u32) != 0 {
+            if device_out_int & (OutInterrupt::SetUP as u32) != 0 {
                 TableCase::C
-            } else if device_out_int & (OutInterruptMask::StsPhseRcvdMsk as u32) != 0 {
+            } else if device_out_int & (OutInterrupt::StsPhseRcvd as u32) != 0 {
                 TableCase::E
             } else {
                 TableCase::A
             }
         } else {
-            if device_out_int & (OutInterruptMask::SetUPMsk as u32) != 0 {
+            if device_out_int & (OutInterrupt::SetUP as u32) != 0 {
                 TableCase::B
             } else {
                 TableCase::D
@@ -1478,29 +1545,48 @@ impl TableCase {
     }
 }
 
+fn print_in_endpoint_interrupt_status(status: u32) {
+    int_debug!("USB in endpoint interrupt, status: {:08x}\n", status);
+    if (status & InInterrupt::XferComplete as u32) != 0    {data_debug!("  +Transfer complete\n");}
+    if (status & InInterrupt::EPDisabled as u32) != 0      {data_debug!("  +Endpoint disabled\n");}
+    if (status & InInterrupt::AHBErr as u32) != 0          {data_debug!("  +AHB Error\n");}
+    if (status & InInterrupt::Timeout as u32) != 0         {data_debug!("  +Timeout\n");}
+    if (status & InInterrupt::InTokenRecv as u32) != 0     {data_debug!("  +In token received\n");}
+    if (status & InInterrupt::InTokenEPMis as u32) != 0    {data_debug!("  +In token EP mismatch\n");}
+    if (status & InInterrupt::InNakEffect as u32) != 0     {data_debug!("  +In NAK effective\n");}
+    if (status & InInterrupt::TxFifoReady as u32) != 0     {data_debug!("  +TXFifo ready\n");}
+    if (status & InInterrupt::TxFifoUnder as u32) != 0     {data_debug!("  +TXFifo under\n");}
+    if (status & InInterrupt::BuffNotAvail as u32) != 0    {data_debug!("  +Buff not available\n");}
+    if (status & InInterrupt::PacketDrop as u32) != 0      {data_debug!("  +Packet drop\n");}
+    if (status & InInterrupt::BabbleErr as u32) != 0       {data_debug!("  +Babble error\n");}
+    if (status & InInterrupt::NAK as u32) != 0             {data_debug!("  +NAK\n");}
+    if (status & InInterrupt::NYET as u32) != 0            {data_debug!("  +NYET\n");}
+    if (status & InInterrupt::SetupRecvd as u32) != 0      {data_debug!("  +Setup received\n");}
+}
+
 fn print_usb_interrupt_status(status: u32) {
-    usb_debug!("USB interrupt, status: {:08x}\n", status);
-    if (status & Interrupt::HostMode as u32) != 0           {usb_debug!("  +Host mode\n");}
-    if (status & Interrupt::Mismatch as u32) != 0           {usb_debug!("  +Mismatch\n");}
-    if (status & Interrupt::OTG as u32) != 0                {usb_debug!("  +OTG\n");}
-    if (status & Interrupt::SOF as u32) != 0                {usb_debug!("  +SOF\n");}
-    if (status & Interrupt::RxFIFO as u32) != 0             {usb_debug!("  +RxFIFO\n");}
-    if (status & Interrupt::GlobalInNak as u32) != 0        {usb_debug!("  +GlobalInNak\n");}
-    if (status & Interrupt::OutNak as u32) != 0             {usb_debug!("  +OutNak\n");}
-    if (status & Interrupt::EarlySuspend as u32) != 0       {usb_debug!("  +EarlySuspend\n");}
-    if (status & Interrupt::Suspend as u32) != 0            {usb_debug!("  +Suspend\n");}
-    if (status & Interrupt::Reset as u32) != 0              {usb_debug!("  +USB reset\n");}
-    if (status & Interrupt::EnumDone as u32) != 0           {usb_debug!("  +Speed enum done\n");}
-    if (status & Interrupt::OutISOCDrop as u32) != 0        {usb_debug!("  +Out ISOC drop\n");}
-    if (status & Interrupt::EOPF as u32) != 0               {usb_debug!("  +EOPF\n");}
-    if (status & Interrupt::EndpointMismatch as u32) != 0   {usb_debug!("  +Endpoint mismatch\n");}
-    if (status & Interrupt::InEndpoints as u32) != 0        {usb_debug!("  +IN endpoints\n");}
-    if (status & Interrupt::OutEndpoints as u32) != 0       {usb_debug!("  +OUT endpoints\n");}
-    if (status & Interrupt::InISOCIncomplete as u32) != 0   {usb_debug!("  +IN ISOC incomplete\n");}
-    if (status & Interrupt::IncompletePeriodic as u32) != 0 {usb_debug!("  +Incomp periodic\n");}
-    if (status & Interrupt::FetchSuspend as u32) != 0       {usb_debug!("  +Fetch suspend\n");}
-    if (status & Interrupt::ResetDetected as u32) != 0      {usb_debug!("  +Reset detected\n");}
-    if (status & Interrupt::ConnectIDChange as u32) != 0    {usb_debug!("  +Connect ID change\n");}
-    if (status & Interrupt::SessionRequest as u32) != 0     {usb_debug!("  +Session request\n");}
-    if (status & Interrupt::ResumeWakeup as u32) != 0       {usb_debug!("  +Resume/wakeup\n");}
+    int_debug!("USB interrupt, status: {:08x}\n", status);
+    if (status & Interrupt::HostMode as u32) != 0           {int_debug!("  +Host mode\n");}
+    if (status & Interrupt::Mismatch as u32) != 0           {int_debug!("  +Mismatch\n");}
+    if (status & Interrupt::OTG as u32) != 0                {int_debug!("  +OTG\n");}
+    if (status & Interrupt::SOF as u32) != 0                {int_debug!("  +SOF\n");}
+    if (status & Interrupt::RxFIFO as u32) != 0             {int_debug!("  +RxFIFO\n");}
+    if (status & Interrupt::GlobalInNak as u32) != 0        {int_debug!("  +GlobalInNak\n");}
+    if (status & Interrupt::OutNak as u32) != 0             {int_debug!("  +OutNak\n");}
+    if (status & Interrupt::EarlySuspend as u32) != 0       {int_debug!("  +EarlySuspend\n");}
+    if (status & Interrupt::Suspend as u32) != 0            {int_debug!("  +Suspend\n");}
+    if (status & Interrupt::Reset as u32) != 0              {int_debug!("  +USB reset\n");}
+    if (status & Interrupt::EnumDone as u32) != 0           {int_debug!("  +Speed enum done\n");}
+    if (status & Interrupt::OutISOCDrop as u32) != 0        {int_debug!("  +Out ISOC drop\n");}
+    if (status & Interrupt::EOPF as u32) != 0               {int_debug!("  +EOPF\n");}
+    if (status & Interrupt::EndpointMismatch as u32) != 0   {int_debug!("  +Endpoint mismatch\n");}
+    if (status & Interrupt::InEndpoints as u32) != 0        {int_debug!("  +IN endpoints\n");}
+    if (status & Interrupt::OutEndpoints as u32) != 0       {int_debug!("  +OUT endpoints\n");}
+    if (status & Interrupt::InISOCIncomplete as u32) != 0   {int_debug!("  +IN ISOC incomplete\n");}
+    if (status & Interrupt::IncompletePeriodic as u32) != 0 {int_debug!("  +Incomp periodic\n");}
+    if (status & Interrupt::FetchSuspend as u32) != 0       {int_debug!("  +Fetch suspend\n");}
+    if (status & Interrupt::ResetDetected as u32) != 0      {int_debug!("  +Reset detected\n");}
+    if (status & Interrupt::ConnectIDChange as u32) != 0    {int_debug!("  +Connect ID change\n");}
+    if (status & Interrupt::SessionRequest as u32) != 0     {int_debug!("  +Session request\n");}
+    if (status & Interrupt::ResumeWakeup as u32) != 0       {int_debug!("  +Resume/wakeup\n");}
 }

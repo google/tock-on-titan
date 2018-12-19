@@ -590,24 +590,19 @@ impl SetupRequest {
 
 pub struct U2fHidCommandFrame {
     pub channel_id: u32,
-    pub frame_type: u8,
     pub command: u8,
     pub bcount_high: u8,
     pub bcount_low: u8,
-    pub data: [u8; U2F_REPORT_SIZE as usize - 8],
+    pub data: [u8; U2F_REPORT_SIZE as usize - 7],
 }
 
 impl U2fHidCommandFrame {
     pub fn into_u32_buf(&self, buf: &mut [u32; 16]) {
         buf[0] = self.channel_id;
-        buf[1] = (self.bcount_low as u32) << 24 |
-                 (self.bcount_high as u32) << 16 |
-                 (self.command as u32) << 8 |
-                 (self.frame_type as u32) << 0;
-        buf[2] = (self.data[0] as u32) << 24 |
-                 (self.data[1] as u32) << 16 |
-                 (self.data[2] as u32) << 8 |
-                 (self.data[3] as u32) << 0;
+        buf[1] = (self.command as u32) << 0 |
+                 (self.bcount_high as u32) << 8 |
+                 (self.bcount_low as u32) << 16 |
+                 (self.data[0] as u32) << 24;
 
     }
 }
