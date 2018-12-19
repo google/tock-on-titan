@@ -310,10 +310,6 @@ pub unsafe fn reset_handler() {
                         Some(0x5026),
                         &mut STRINGS);
 
-
-
-    h1b::usb::UsbHidU2f::reset(&h1b::usb::USB0);
-
     let golf2 = Golf {
         console: console,
         gpio: gpio,
@@ -326,21 +322,6 @@ pub unsafe fn reset_handler() {
         uint_printer: debug_syscall::UintPrinter::new(),
         u2f_usb: u2f,
     };
-
-
-    let mut f = U2fHidCommandFrame {
-        channel_id: 0xaa,
-        frame_type: 0,
-        command: U2fHidCommand::Error as u8,
-        bcount_high: 0,
-        bcount_low: 1,
-        data: [0; U2F_REPORT_SIZE as usize -8],
-    };
-    f.data[0] = 0x3;
-    let mut buf: [u32; 16] = [0; 16];
-    f.into_u32_buf(&mut buf);
-    h1b::usb::UsbHidU2f::put_frame(&h1b::usb::USB0, &buf);
-
 // dcrypto_test::run_dcrypto();
 //    rng_test::run_rng();
 

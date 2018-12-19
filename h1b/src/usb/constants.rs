@@ -137,40 +137,42 @@ pub enum AllEndpointInterruptMask {
 
 // OTG Databook, Table 5-58
 #[allow(dead_code)]
-pub enum OutInterruptMask {
-    XferComplMsk =         1 <<  0,
-    EPDisbldMsg =          1 <<  1,
-    AHBErrMsk =            1 <<  2,
-    SetUPMsk =             1 <<  3,
-    OUTTknEPdisMsk =       1 <<  4,
-    StsPhseRcvdMsk =       1 <<  5,
-    Back2BackSETupMsk =    1 <<  6,
+pub enum OutInterrupt {
+    XferComplete =      1 <<  0,
+    EPDisabled =        1 <<  1,
+    AHBErr =            1 <<  2,
+    SetUP =             1 <<  3,
+    OutToknEPdis =      1 <<  4,
+    StsPhseRcvd =       1 <<  5,
+    Back2BackSETup =    1 <<  6,
     // Bit 7 reserved
-    OutPkrErrMsk =         1 <<  8,
-    BnaOutIntrMsk =        1 <<  9,
+    OutPkrErr =         1 <<  8,
+    BnaOutIntr =        1 <<  9,
     // Bits 10-11 reserved
-    BbleErrMsk =           1 << 12,
-    NAKMsk =               1 << 13,
-    NYETMsk =              1 << 14,
+    BbleErr =           1 << 12,
+    NAK =               1 << 13,
+    NYET =              1 << 14,
     // Bits 15-31 reserved
 }
 
-// OTG Databook, Table 5-57
+// OTG Databook, Table 5-76
 #[allow(dead_code)]
-pub enum InInterruptMask {
-    XferComplMsk =         1 <<  0,
-    EPDisbldMsg =          1 <<  1,
-    AHBErrMsk =            1 <<  2,
-    TimeOUTMsk =           1 <<  3,
-    INTknTXFEdmpMsk =      1 <<  4,
-    INTknEPMisMsk =        1 <<  5,
-    INTEPNakEffMsk =       1 <<  6,
-    // Bit 7 reserved
-    TxfifiUndrnMsk =       1 <<  8,
-    BNAInIntrMsk =         1 <<  9,
-    // Bits 10-12 reserved
-    NAKMsk =               1 << 13,
-    // Bits 14-31 reserved
+pub enum InInterrupt {
+    XferComplete =         1 << 0,
+    EPDisabled   =         1 << 1,
+    AHBErr       =         1 << 2,
+    Timeout      =         1 << 3,
+    InTokenRecv  =         1 << 4,
+    InTokenEPMis =         1 << 5,
+    InNakEffect  =         1 << 6,
+    TxFifoReady  =         1 << 7,
+    TxFifoUnder  =         1 << 8,
+    BuffNotAvail =         1 << 9,
+    PacketDrop   =         1 << 11,
+    BabbleErr    =         1 << 12,
+    NAK          =         1 << 13,
+    NYET         =         1 << 14,
+    SetupRecvd   =         1 << 15,
 }
 
 #[repr(u8)]

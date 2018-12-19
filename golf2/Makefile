@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-APP ?= dcrypto_test
+APP ?= u2f_test
 TARGET=thumbv7m-none-eabi
 PLATFORM=golf2
 TOCK_ARCH=cortex-m3
@@ -50,4 +50,3 @@ target/$(TARGET)/release/golf2-$(APP)-full: target/$(TARGET)/release/golf2-$(APP
 
 #flash: target/target/release/golf2-$(APP)-full
 #	$(TANGO_SPIFLASH) --input=$^ --verbose
-
