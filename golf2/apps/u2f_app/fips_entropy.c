@@ -1,0 +1,46 @@
+#include "fips.h"
+#include "rng.h"
+#include "storage.h"
+
+#define FLASH_ENTROPY_SIZE FLASH_INFO_MANUFACTURE_STATE_SIZE
+
+static char fips_entropy[FLASH_ENTROPY_SIZE];
+static uint32_t counter = 0;
+
+uint32_t flash_ctr_incr(void) {
+  counter++;
+  return counter;
+}
+
+int flash_info_read_enable(uint32_t addr __attribute__((unused)),
+                           uint32_t len __attribute__((unused))) {return 0;}
+int flash_info_read_disable(void) {return 0;}
+
+uint32_t flash_physical_info_read_word(uint32_t addr, uint32_t* dest) {
+  uint32_t* words = (uint32_t*)fips_entropy;
+  *dest = words[addr];
+  return 0;
+}
+
+// Make sure there's entropy. Should only generate on first boot, then store
+// in flash. Until flash driver is ready, just store in RAM.
+void ensure_factory_entropy(void) {
+  //uint32_t ones = -1u, v;
+  uint8_t entropy[128];  // 1024 bits
+  uint32_t digest[8];    // SHA256 digest
+  for (int i = 0; i < FLASH_ENTROPY_SIZE; i += sizeof(digest)) {
+    rng_sync(entropy, sizeof(entropy), sizeof(entropy));
+    SHA256(entropy, sizeof(entropy), (uint8_t*)digest);
+    memcpy(fips_entropy + i, digest, sizeof(digest));
+  }
+  printf("    - Entropy generated:");
+  for (int i = 0; i < FLASH_ENTROPY_SIZE; i++) {
+    if (i % 32 == 0) {
+      printf("\n");
+    } else if (i % 4 == 0) {
+      printf(" ");
+    }
+    printf("%02x", fips_entropy[i]);
+  }
+  printf("\n");
+}
