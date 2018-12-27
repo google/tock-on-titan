@@ -13,14 +13,17 @@
 // limitations under the License.
 
 #include "include/aes.h"
-#include "include/aes_syscalls.h"
-#include "include/trng.h"
 #include "include/sha256.h"
+#include "include/trng.h"
+#include "include/u2f_hid_corp.h"
+
 #include "include/digest_syscalls.h"
+#include "include/u2f_syscalls.h"
+#include "include/aes_syscalls.h"
 
 #include "tock.h"
 #include "rng.h"
-
+#include "aes.h"
 
 static uint32_t current_key[SHA256_DIGEST_WORDS];
 static uint32_t current_hmac[SHA256_DIGEST_WORDS];
@@ -94,4 +97,24 @@ static int counter = 0;
 int increment_counter(void) {
   counter++;
   return counter;
+}
+
+int usbu2f_put_frame(const U2FHID_FRAME* frame_p) {
+  tock_u2f_transmit((void*)frame_p, sizeof(U2FHID_FRAME));
+}
+
+void usbu2f_get_frame(U2FHID_FRAME *frame_p) {
+  tock_u2f_receive((void*)frame_p, sizeof(U2FHID_FRAME));
+}
+
+uint32_t tock_chip_dev_id0() {
+  return 0xdeadbeef;
+}
+
+uint32_t tock_chip_dev_id1() {
+  return 0x600613;
+}
+
+int tock_chip_category() {
+  return 0x0702;
 }

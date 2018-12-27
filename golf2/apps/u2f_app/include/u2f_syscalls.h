@@ -36,10 +36,12 @@ int tock_u2f_transmit(void* data, size_t datalen);
 // Receive a frame from U2F endopint. datalen must be <= 64.
 int tock_u2f_receive(void* data, size_t datalen);
 
-
 // Low-level chip accesses
-int tock_chip_dev_id0();
-int tock_chip_dev_id1();
-int tock_chip_category();
+uint32_t tock_chip_dev_id0(void);
+uint32_t tock_chip_dev_id1(void);
+int tock_chip_category(void);
+
+// Robust counter
+int increment_counter(void);
 
 #endif

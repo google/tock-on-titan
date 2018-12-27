@@ -21,12 +21,16 @@
 
 #define U2F_FRAME_SIZE 64
 
+#include "include/fips.h"
+#include "include/storage.h"
 #include "include/u2f_syscalls.h"
 #include "include/u2f_hid.h"
-#include "include/storage.h"
+
 
 static void check_device_setup(void);
 static void process_frame(U2FHID_FRAME* frame);
+
+static void setup_personality(void);
 
 const perso_st* get_personality(void) {return NULL;}
 int check_personality(const perso_st* id) {return id != NULL;}
@@ -46,7 +50,7 @@ int set_personality(const perso_st* id) {
   }
 }
 
-void setup_personality(void) {
+static void setup_personality(void) {
   perso_st me;
   if (check_personality(get_personality()) == 1) return;
   if (new_personality(&me) == 1) set_personality(&me);
@@ -54,7 +58,7 @@ void setup_personality(void) {
 }
 
 
-void check_device_setup(void) {
+static void check_device_setup(void) {
   //perso_st me;
   printf("  - Checking setup\n");
   ensure_factory_entropy();
@@ -69,6 +73,7 @@ void check_device_setup(void) {
 void u2fhid_process_frame(U2FHID_FRAME *f_p);
 
 void process_frame(U2FHID_FRAME* frame) {
+  printf("u2f_app: processing frame\n");
   u2fhid_process_frame(frame);
 }
 
@@ -86,4 +91,5 @@ int main(void) {
     U2FHID_FRAME* frame = (U2FHID_FRAME*)u2f_buffer;
     process_frame(frame);
   }
+  return ret;
 }

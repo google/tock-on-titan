@@ -16,12 +16,13 @@
 #include "include/u2f_syscalls.h"
 
 static void get_serial(p256_int* n) {
-  const struct SignedHeader* ro_hdr =
-      (const struct SignedHeader*)get_program_memory_addr(
-          system_get_ro_image_copy());
+
+  // const struct SignedHeader* ro_hdr =
+  //    (const struct SignedHeader*)get_program_memory_addr(
+  //        system_get_ro_image_copy());
   uint32_t tmp[8] = {0};
 
-  tmp[7] = ro_hdr->keyid;
+  //tmp[7] = ro_hdr->keyid;
   tmp[6] = tock_chip_dev_id0();
   tmp[5] = tock_chip_dev_id1();
   tmp[4] = (SN_VERSION << 16) | ((tock_chip_category() & 255) << 24);
