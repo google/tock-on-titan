@@ -1436,7 +1436,7 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
                     if byte_index == 0 {
                         hardware_buffer[hw_index] = *c as u32;
                     } else {
-                        hardware_buffer[hw_index] = (*c as u32) << (8 * byte_index);
+                        hardware_buffer[hw_index] |= (*c as u32) << (8 * byte_index);
                     }
                 }
             });

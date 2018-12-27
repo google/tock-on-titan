@@ -100,7 +100,9 @@ int increment_counter(void) {
 }
 
 int usbu2f_put_frame(const U2FHID_FRAME* frame_p) {
+  printf("calling tock_u2f_transmit\n");
   tock_u2f_transmit((void*)frame_p, sizeof(U2FHID_FRAME));
+  printf("returned from tock_u2f_transmit\n");
 }
 
 void usbu2f_get_frame(U2FHID_FRAME *frame_p) {

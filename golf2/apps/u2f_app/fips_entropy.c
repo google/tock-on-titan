@@ -30,19 +30,19 @@ void ensure_factory_entropy(void) {
   //uint32_t ones = -1u, v;
   uint8_t entropy[128];  // 1024 bits
   uint32_t digest[8];    // SHA256 digest
-  for (int i = 0; i < FLASH_ENTROPY_SIZE; i += sizeof(digest)) {
+  printf("Generating entropy:");
+  for (int i = 0; i < FLASH_ENTROPY_SIZE; i += (8 * sizeof(uint32_t))) {
     rng_sync(entropy, sizeof(entropy), sizeof(entropy));
     SHA256(entropy, sizeof(entropy), (uint8_t*)digest);
     memcpy(fips_entropy + i, digest, sizeof(digest));
   }
-  printf("    - Entropy generated:");
   for (int i = 0; i < FLASH_ENTROPY_SIZE; i++) {
     if (i % 32 == 0) {
-      printf("\n");
+      printf("\n  ");
     } else if (i % 4 == 0) {
       printf(" ");
     }
     printf("%02x", fips_entropy[i]);
   }
-  printf("\n");
+  printf("\n\n");
 }

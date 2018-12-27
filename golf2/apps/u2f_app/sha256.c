@@ -287,6 +287,9 @@ void hmac_SHA256(uint8_t *output, const uint8_t *key, const int key_len,
 }
 
 uint8_t* tock_compat_sha256(const void* data, size_t len, uint8_t* digest) {
-  tock_digest_hash_easy((void*)data, len, digest, SHA256_DIGEST_SIZE, DIGEST_MODE_SHA256);
+  int rval = tock_digest_hash_easy((void*)data, len, digest, SHA256_DIGEST_SIZE, DIGEST_MODE_SHA256);
+  if (rval < 0) {
+    printf("Error on digest: %i\n", rval);
+  }
   return digest;
 }

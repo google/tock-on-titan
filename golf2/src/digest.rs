@@ -62,7 +62,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                             return ReturnCode::EBUSY;
                         }
                         self.current_user.set(Some(caller_id));
-                        
+
                         let digest_mode = match r2 {
                             0 => DigestMode::Sha1,
                             1 => DigestMode::Sha256,
@@ -87,9 +87,9 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                                 return ReturnCode::EBUSY
                             }
                         }
-                        
+
                         let app_data: &mut App = app_data;
-                        
+
                         let input_buffer = match app_data.input_buffer {
                             Some(ref slice) => slice,
                             None => return ReturnCode::ENOMEM
@@ -99,7 +99,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                         if input_len > input_buffer.len() {
                             return ReturnCode::ESIZE
                         }
-                        
+
                         match self.engine.update(&input_buffer.as_ref()[..input_len]) {
                             Ok(_t) => ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => ReturnCode::ENOSUPPORT,
@@ -119,20 +119,21 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                                 return ReturnCode::EBUSY
                             }
                         }
-                        
+                        self.current_user.set(None);
                         let app_data: &mut App = app_data;
-                        
+
                         let output_buffer = match app_data.output_buffer {
                             Some(ref mut slice) => slice,
                             None => return ReturnCode::ENOMEM
                         };
-                        
+
                         match self.engine.finalize(output_buffer.as_mut()) {
                             Ok(_t) => ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => ReturnCode::ENOSUPPORT,
                             Err(DigestError::NotConfigured) => ReturnCode::FAIL,
                             Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE
                         }
+
                     })
                     .unwrap_or(ReturnCode::ENOMEM)
             },

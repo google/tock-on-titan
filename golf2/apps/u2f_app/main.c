@@ -65,11 +65,6 @@ static void check_device_setup(void) {
   setup_personality();
 }
 
-//int usbu2f_put_frame(U2FHID_FRAME* frame) {
-//  tock_u2f_transmit(frame, U2F_FRAME_SIZE);
-//  return 0;
-//}
-
 void u2fhid_process_frame(U2FHID_FRAME *f_p);
 
 void process_frame(U2FHID_FRAME* frame) {
@@ -87,6 +82,7 @@ int main(void) {
 
   char u2f_buffer[U2F_FRAME_SIZE];
   while (1) {
+    printf("u2f_app: receiving frame.\n");
     ret = tock_u2f_receive(u2f_buffer, U2F_FRAME_SIZE);
     U2FHID_FRAME* frame = (U2FHID_FRAME*)u2f_buffer;
     process_frame(frame);

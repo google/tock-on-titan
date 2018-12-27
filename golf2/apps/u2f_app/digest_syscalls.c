@@ -31,7 +31,7 @@ int tock_digest_hash_update(size_t n) {
   return command(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_CMD_UPDATE, n, 0);
 }
 
-int tock_digest_hash_finalize() {
+int tock_digest_hash_finalize(void) {
   return command(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_CMD_FINALIZE, 0, 0);
 }
 
@@ -39,12 +39,24 @@ int tock_digest_hash_easy(void* input_buf, size_t input_len,
                           void* output_buf, size_t output_len, TockDigestMode mode) {
   int ret = -1;
   ret = tock_digest_set_input(input_buf, input_len);
-  if (ret < 0) return ret;
+  if (ret < 0) {
+    printf("Digest: error %i on set_input\n", ret);
+    return ret;
+  }
   ret = tock_digest_set_output(output_buf, output_len);
-  if (ret < 0) return ret;
+  if (ret < 0) {
+    printf("Digest: error %i on set_output\n", ret);
+    return ret;
+  }
   ret = tock_digest_hash_initialize(mode);
-  if (ret < 0) return ret;
+  if (ret < 0) {
+    printf("Digest: error %i on initialize\n", ret);
+    return ret;
+  }
   ret = tock_digest_hash_update(input_len);
-  if (ret < 0) return ret;
+  if (ret < 0) {
+    printf("Digest: error %i on update\n", ret);
+    return ret;
+  }
   return tock_digest_hash_finalize();
 }
