@@ -1,6 +1,6 @@
-#include "p256.h"
-#include "drbg.h"
-#include "trng.h"
+#include "include/p256.h"
+#include "include/drbg.h"
+#include "include/trng.h"
 
 const p256_int FIPS_SECP256r1_n =  // curve order
     {{0xfc632551, 0xf3b9cac2, 0xa7179e84, 0xbce6faad, -1, -1, 0, -1}};

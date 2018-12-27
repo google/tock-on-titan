@@ -2,16 +2,16 @@
  * Main apdu dispatcher and u2f command handlers.
  */
 
-#include "asn1.h"
-#include "storage.h"
-#include "u2f_corp.h" /* asn.1 der */
-#include "aes.h"
-#include "fips.h"
-#include "fips_err.h"
-#include "sha256.h"
-#include "p256_ecdsa.h"
-#include "trng.h"
-#include "kl.h"
+#include "include/asn1.h"
+#include "include/storage.h"
+#include "include/u2f_corp.h" /* asn.1 der */
+#include "include/aes.h"
+#include "include/fips.h"
+#include "include/fips_err.h"
+#include "include/sha256.h"
+#include "include/p256_ecdsa.h"
+#include "include/trng.h"
+#include "include/kl.h"
 
 #define POP_TOUCH_YES 1
 

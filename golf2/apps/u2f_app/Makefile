@@ -23,12 +23,14 @@ C_SRCS   := $(wildcard *.c)
 OBJS += $(patsubst %.c,$(BUILDDIR)/%.o,$(C_SRCS))
 
 TOCK_APP_CONFIG = -Xlinker --defsym=STACK_SIZE=$$(STACK_SIZE)\
-                  -Xlinker --defsym=APP_HEAP_SIZE=$$(APP_HEAP_SIZE)\
-                   -Xlinker --defsym=KERNEL_HEAP_SIZE=$$(KERNEL_HEAP_SIZE)
+		  -Xlinker --defsym=APP_HEAP_SIZE=$$(APP_HEAP_SIZE)\
+		  -Xlinker --defsym=KERNEL_HEAP_SIZE=$$(KERNEL_HEAP_SIZE)
+
 
 
 include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk
 
+ override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
+
 $(BUILDDIR)/%.o: %.c | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
-

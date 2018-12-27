@@ -1,5 +1,5 @@
-#include "drbg.h"
-#include "sha256.h"
+#include "include/drbg.h"
+#include "include/sha256.h"
 
 void set_8words(uint32_t* dst, uint32_t v) {
   dst[0] = v;

@@ -12,18 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "aes.h"
-#include "trng.h"
-#include "sha256.h"
+#include "include/aes.h"
+#include "include/aes_syscalls.h"
+#include "include/trng.h"
+#include "include/sha256.h"
+#include "include/digest_syscalls.h"
 
 #include "tock.h"
 #include "rng.h"
-#include "digest_syscalls.h"
-#include "aes_syscalls.h"
 
-void rand_bytes(void* buffer, size_t len) {
-  rng_sync(buffer, len, len);
-}
 
 static uint32_t current_key[SHA256_DIGEST_WORDS];
 static uint32_t current_hmac[SHA256_DIGEST_WORDS];

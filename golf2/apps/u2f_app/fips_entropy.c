@@ -1,6 +1,8 @@
-#include "fips.h"
+#include "include/fips.h"
+#include "include/storage.h"
+
+// libtock-c
 #include "rng.h"
-#include "storage.h"
 
 #define FLASH_ENTROPY_SIZE FLASH_INFO_MANUFACTURE_STATE_SIZE
 

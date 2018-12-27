@@ -9,8 +9,11 @@
 #include "fips_err.h"
 #include "drbg.h"
 #include "p256.h"
-#include "digest_syscalls.h"
 #include "sha256.h"
+
+// Tock
+#include "digest_syscalls.h"
+
 
 #define PT_TO_BIN fips_p256_to_bin
 #define PT_FROM_BIN fips_p256_from_bin

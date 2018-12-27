@@ -8,7 +8,7 @@
 #ifndef __CROS_EC_SYSTEM_H
 #define __CROS_EC_SYSTEM_H
 
-#include "atomic.h"
+//#include "atomic.h"
 #include "common.h"
 #include "console.h"
 #include "timer.h"
@@ -28,7 +28,7 @@
 #define RESET_FLAG_HARD        (1 << 11)  /* Hard reset from software */
 #define RESET_FLAG_AP_OFF      (1 << 12)  /* Do not power on AP */
 #define RESET_FLAG_PRESERVED   (1 << 13)  /* Some reset flags preserved from
-					   * previous boot */
+                                           * previous boot */
 #define RESET_FLAG_USB_RESUME  (1 << 14)  /* USB resume triggered wake */
 #define RESET_FLAG_RDD         (1 << 15)  /* USB Type-C debug cable */
 #define RESET_FLAG_RBOX        (1 << 16)  /* Fixed Reset Functionality */
@@ -40,13 +40,13 @@ uint32_t chip_read_reset_flags(void);
 
 /* System images */
 enum system_image_copy_t {
-	SYSTEM_IMAGE_UNKNOWN = 0,
-	SYSTEM_IMAGE_RO,
-	SYSTEM_IMAGE_RW,
-	SYSTEM_IMAGE_RW_A = SYSTEM_IMAGE_RW,
-	/* Some systems may have these too */
-	SYSTEM_IMAGE_RO_B,
-	SYSTEM_IMAGE_RW_B,
+        SYSTEM_IMAGE_UNKNOWN = 0,
+        SYSTEM_IMAGE_RO,
+        SYSTEM_IMAGE_RW,
+        SYSTEM_IMAGE_RW_A = SYSTEM_IMAGE_RW,
+        /* Some systems may have these too */
+        SYSTEM_IMAGE_RO_B,
+        SYSTEM_IMAGE_RW_B,
 };
 
 /**
@@ -331,18 +331,18 @@ int board_write_serial(const char *serial) __attribute__((weak));
  * not implemented.
  */
 enum system_bbram_idx {
-	SYSTEM_BBRAM_IDX_VBNVBLOCK0 = 0,
-	/*
-	 * ...
-	 * 16 total bytes of VB NVRAM.
-	 * ...
-	 */
-	SYSTEM_BBRAM_IDX_VBNVBLOCK15 = 15,
-	/* PD state for CONFIG_USB_PD_DUAL_ROLE uses one byte per port */
-	SYSTEM_BBRAM_IDX_PD0,
-	SYSTEM_BBRAM_IDX_PD1,
-	SYSTEM_BBRAM_IDX_PD2,
-	SYSTEM_BBRAM_IDX_TRY_SLOT,
+        SYSTEM_BBRAM_IDX_VBNVBLOCK0 = 0,
+        /*
+         * ...
+         * 16 total bytes of VB NVRAM.
+         * ...
+         */
+        SYSTEM_BBRAM_IDX_VBNVBLOCK15 = 15,
+        /* PD state for CONFIG_USB_PD_DUAL_ROLE uses one byte per port */
+        SYSTEM_BBRAM_IDX_PD0,
+        SYSTEM_BBRAM_IDX_PD1,
+        SYSTEM_BBRAM_IDX_PD2,
+        SYSTEM_BBRAM_IDX_TRY_SLOT,
 };
 
 /**
@@ -410,33 +410,33 @@ void system_enable_hib_interrupt(void);
 
 /* Low power modes for idle API */
 enum {
-	/*
-	 * Sleep masks to prevent going in to deep sleep.
-	 */
-	SLEEP_MASK_AP_RUN     = (1 << 0), /* the main CPU is running */
-	SLEEP_MASK_UART       = (1 << 1), /* UART communication ongoing */
-	SLEEP_MASK_I2C_MASTER = (1 << 2), /* I2C master communication ongoing */
-	SLEEP_MASK_CHARGING   = (1 << 3), /* Charging loop ongoing */
-	SLEEP_MASK_USB_PWR    = (1 << 4), /* USB power loop ongoing */
-	SLEEP_MASK_USB_PD     = (1 << 5), /* USB PD device connected */
-	SLEEP_MASK_SPI        = (1 << 6), /* SPI communications ongoing */
-	SLEEP_MASK_I2C_SLAVE  = (1 << 7), /* I2C slave communication ongoing */
-	SLEEP_MASK_FAN        = (1 << 8), /* Fan control loop ongoing */
-	SLEEP_MASK_USB_DEVICE = (1 << 9), /* Generic USB device in use */
-	SLEEP_MASK_PWM        = (1 << 10), /* PWM output is enabled */
-	SLEEP_MASK_PHYSICAL_PRESENCE  = (1 << 11), /* Physical presence
-						    * detection ongoing */
-	SLEEP_MASK_PLL        = (1 << 12), /* High-speed PLL in-use */
-	SLEEP_MASK_FORCE_NO_DSLEEP    = (1 << 15), /* Force disable. */
+        /*
+         * Sleep masks to prevent going in to deep sleep.
+         */
+        SLEEP_MASK_AP_RUN     = (1 << 0), /* the main CPU is running */
+        SLEEP_MASK_UART       = (1 << 1), /* UART communication ongoing */
+        SLEEP_MASK_I2C_MASTER = (1 << 2), /* I2C master communication ongoing */
+        SLEEP_MASK_CHARGING   = (1 << 3), /* Charging loop ongoing */
+        SLEEP_MASK_USB_PWR    = (1 << 4), /* USB power loop ongoing */
+        SLEEP_MASK_USB_PD     = (1 << 5), /* USB PD device connected */
+        SLEEP_MASK_SPI        = (1 << 6), /* SPI communications ongoing */
+        SLEEP_MASK_I2C_SLAVE  = (1 << 7), /* I2C slave communication ongoing */
+        SLEEP_MASK_FAN        = (1 << 8), /* Fan control loop ongoing */
+        SLEEP_MASK_USB_DEVICE = (1 << 9), /* Generic USB device in use */
+        SLEEP_MASK_PWM        = (1 << 10), /* PWM output is enabled */
+        SLEEP_MASK_PHYSICAL_PRESENCE  = (1 << 11), /* Physical presence
+                                                    * detection ongoing */
+        SLEEP_MASK_PLL        = (1 << 12), /* High-speed PLL in-use */
+        SLEEP_MASK_FORCE_NO_DSLEEP    = (1 << 15), /* Force disable. */
 
 
-	/*
-	 * Sleep masks to prevent using slow speed clock in deep sleep.
-	 */
-	SLEEP_MASK_JTAG     = (1 << 16), /* JTAG is in use. */
-	SLEEP_MASK_CONSOLE  = (1 << 17), /* Console is in use. */
+        /*
+         * Sleep masks to prevent using slow speed clock in deep sleep.
+         */
+        SLEEP_MASK_JTAG     = (1 << 16), /* JTAG is in use. */
+        SLEEP_MASK_CONSOLE  = (1 << 17), /* Console is in use. */
 
-	SLEEP_MASK_FORCE_NO_LOW_SPEED = (1 << 31)  /* Force disable. */
+        SLEEP_MASK_FORCE_NO_LOW_SPEED = (1 << 31)  /* Force disable. */
 };
 
 /*
@@ -454,7 +454,7 @@ extern uint32_t sleep_mask;
 #define DEEP_SLEEP_ALLOWED           (!(sleep_mask & 0x0000ffff))
 #else
 #define DEEP_SLEEP_ALLOWED           (!(sleep_mask & 0x0000ffff & \
-				       (~SLEEP_MASK_AP_RUN)))
+                                       (~SLEEP_MASK_AP_RUN)))
 #endif
 #define LOW_SPEED_DEEP_SLEEP_ALLOWED (!(sleep_mask & 0xffff0000))
 
@@ -466,7 +466,7 @@ extern uint32_t sleep_mask;
  */
 static inline void enable_sleep(uint32_t mask)
 {
-	atomic_clear(&sleep_mask, mask);
+  //atomic_clear(&sleep_mask, mask);
 }
 
 /**
@@ -477,7 +477,7 @@ static inline void enable_sleep(uint32_t mask)
  */
 static inline void disable_sleep(uint32_t mask)
 {
-	atomic_or(&sleep_mask, mask);
+  //atomic_or(&sleep_mask, mask);
 }
 
 #ifdef CONFIG_LOW_POWER_IDLE_LIMITED
@@ -490,17 +490,17 @@ extern uint32_t idle_disabled;
 
 static inline uint32_t idle_is_disabled(void)
 {
-	return idle_disabled;
+        return idle_disabled;
 }
 
 static inline void disable_idle(void)
 {
-	atomic_or(&idle_disabled, 1);
+  //atomic_or(&idle_disabled, 1);
 }
 
 static inline void enable_idle(void)
 {
-	atomic_clear(&idle_disabled, 1);
+  //atomic_clear(&idle_disabled, 1);
 }
 #endif
 

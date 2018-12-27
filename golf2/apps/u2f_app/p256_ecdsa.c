@@ -2,13 +2,13 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include "fips.h"
-#include "p256_ecdsa.h"
-#include "drbg.h"
-#include "dcrypto.h"
-#include "trng.h"
+#include "include/fips.h"
+#include "include/p256_ecdsa.h"
+#include "include/drbg.h"
+#include "include/dcrypto.h"
+#include "include/trng.h"
 
-#include "console.h"
+#include "include/console.h"
 
 /* Firmware blob for crypto accelerator */
 

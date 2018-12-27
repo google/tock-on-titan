@@ -1,5 +1,5 @@
 // Fill in KL random functions with calls to random
-#include "kl.h"
+#include "include/kl.h"
 
 int kl_init(void) {
   return 0;

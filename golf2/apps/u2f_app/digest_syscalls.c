@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "digest_syscalls.h"
+#include "include/digest_syscalls.h"
 #include "tock.h"
 
 int tock_digest_set_input(void* buf, size_t len) {
