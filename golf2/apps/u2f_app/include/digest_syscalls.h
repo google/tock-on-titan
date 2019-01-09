@@ -32,6 +32,7 @@
 typedef enum TockDigestMode {
   DIGEST_MODE_SHA1 = 0,
   DIGEST_MODE_SHA256 = 1,
+  DIGEST_MODE_SHA256_HMAC = 2,
 } TockDigestMode;
 
 // TODO: Should be const, but currently not allowed by kernel

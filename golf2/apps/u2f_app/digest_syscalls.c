@@ -16,19 +16,29 @@
 #include "tock.h"
 
 int tock_digest_set_input(void* buf, size_t len) {
-  return allow(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_ALLOW_INPUT, buf, len);
+  int rval = allow(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_ALLOW_INPUT, buf, len);
+  if (rval != TOCK_SUCCESS){
+    printf("Digest set input returned error %i\n", rval);
+  }
+  return rval;
 }
 
 int tock_digest_set_output(void* buf, size_t len) {
-  return allow(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_ALLOW_OUTPUT, buf, len);
+  int rval = allow(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_ALLOW_OUTPUT, buf, len);
+  if (rval != TOCK_SUCCESS){
+    printf("Digest set output returned error %i\n", rval);
+  }
+  return rval;
 }
 
 int tock_digest_hash_initialize(TockDigestMode mode) {
-  return command(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_CMD_INITIALIZE, mode, 0);
+  int rval = command(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_CMD_INITIALIZE, mode, 0);
+  return rval;
 }
 
 int tock_digest_hash_update(size_t n) {
-  return command(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_CMD_UPDATE, n, 0);
+  int rval = command(HOTEL_DRIVER_DIGEST, TOCK_DIGEST_CMD_UPDATE, n, 0);
+  return rval;
 }
 
 int tock_digest_hash_finalize(void) {

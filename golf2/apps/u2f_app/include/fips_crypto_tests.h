@@ -11,11 +11,11 @@ int fips_hmac_sha256_kat(void);
 // coupled bignum engine fcns. :/
 // int fips_ecdsa_sign_kat(void);
 // Ugh, also means these can't be static (file scope).
-extern const p256_int fixed_d;
-extern const p256_int test_msg;
-extern const p256_int fixed_k;
-extern const p256_int fixed_r;
-extern const p256_int fixed_s;
+extern p256_int fixed_d;
+extern p256_int test_msg;
+extern p256_int fixed_k;
+extern p256_int fixed_r;
+extern p256_int fixed_s;
 
 int fips_hmac_drbg_instantiate_kat(DRBG* ctx);
 int fips_hmac_drbg_reseed_kat(DRBG* ctx);

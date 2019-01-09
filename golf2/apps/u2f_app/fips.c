@@ -170,25 +170,48 @@ int fips_keygen(DRBG *drbg, p256_int *d, p256_int *x, p256_int *y,
 int init_fips(void) {
   DRBG ctx;
   p256_int x, y;
-
-  // SHA/HMAC
-  if (fips_sha256_kat() || fips_hmac_sha256_kat()) {
+  printf("FIPS initialization start.\n");
+  // SHA
+  if (fips_sha256_kat()) {
     throw_fips_err(FIPS_FATAL_HMAC_SHA256);
     return EC_ERROR_UNKNOWN;
   }
 
+  printf("PASS: FIPS SHA256.\n");
+  // HMAC
+  if (fips_hmac_sha256_kat()) {
+    throw_fips_err(FIPS_FATAL_HMAC_SHA256);
+    return EC_ERROR_UNKNOWN;
+  }
+  printf("PASS: FIPS HMAC SHA256.\n");
+
   // DRBG
-  if (fips_hmac_drbg_instantiate_kat(&ctx) || fips_hmac_drbg_reseed_kat(&ctx) ||
-      fips_hmac_drbg_generate_kat(&ctx)) {
+  if (fips_hmac_drbg_instantiate_kat(&ctx)) {
     throw_fips_err(FIPS_FATAL_HMAC_DRBG);
     return EC_ERROR_UNKNOWN;
   }
+  printf("PASS: FIPS HMAC DRBG instantiate\n");
+
+  if (fips_hmac_drbg_reseed_kat(&ctx)) {
+    throw_fips_err(FIPS_FATAL_HMAC_DRBG);
+    return EC_ERROR_UNKNOWN;
+  }
+  printf("PASS: FIPS HMAC DRBG reseed\n");
+
+  if (fips_hmac_drbg_generate_kat(&ctx)) {
+    throw_fips_err(FIPS_FATAL_HMAC_DRBG);
+    return EC_ERROR_UNKNOWN;
+  }
+  printf("PASS: FIPS HMAC DRBG generate\n");
 
   // CMAC
   if (fips_cmac_aes128_kat()) {
     throw_fips_err(FIPS_FATAL_CMAC_AES128);
     return EC_ERROR_UNKNOWN;
   }
+
+  printf("PASS: FIPS CMAC AES128\n");
+  while (1) {}
 
   // AES
   if (fips_aes128_kat()) {
@@ -218,5 +241,6 @@ int init_fips(void) {
 
   /* Here and only here */
   fips_fatal = FIPS_INITIALIZED;
+  printf("FIPS initialization complete.\n");
   return EC_SUCCESS;
 }

@@ -57,7 +57,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
             // Initialize hash engine (arg: digest mode)
             0 => {
                 self.apps
-                    .enter(caller_id, |_app_data, _| {
+                    .enter(caller_id, |app_data, _| {
                         if self.current_user.get().is_some() {
                             return ReturnCode::EBUSY;
                         }
@@ -66,14 +66,25 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                         let digest_mode = match r2 {
                             0 => DigestMode::Sha1,
                             1 => DigestMode::Sha256,
+                            2 => DigestMode::Sha256Hmac,
                             _ => return ReturnCode::EINVAL,
                         };
-
-                        match self.engine.initialize(digest_mode) {
-                            Ok(_t) => ReturnCode::SUCCESS,
-                            Err(DigestError::EngineNotSupported) => ReturnCode::ENOSUPPORT,
-                            Err(DigestError::NotConfigured) => ReturnCode::FAIL,
-                            Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE
+                        let init_result = match digest_mode {
+                            DigestMode::Sha1 | DigestMode::Sha256 =>
+                                self.engine.initialize(digest_mode),
+                            DigestMode::Sha256Hmac => {
+                                let input_buffer = match app_data.input_buffer {
+                                    Some(ref slice) => slice,
+                                    None => return ReturnCode::ENOMEM
+                                };
+                                self.engine.initialize_hmac(&input_buffer.as_ref())
+                            }
+                        };
+                        match init_result {
+                            Ok(_t) => return ReturnCode::SUCCESS,
+                            Err(DigestError::EngineNotSupported) => return ReturnCode::ENOSUPPORT,
+                            Err(DigestError::NotConfigured) => return ReturnCode::FAIL,
+                            Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE
                         }
                     }).unwrap_or(ReturnCode::ENOMEM)
             },
@@ -87,19 +98,16 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                                 return ReturnCode::EBUSY
                             }
                         }
-
                         let app_data: &mut App = app_data;
 
                         let input_buffer = match app_data.input_buffer {
                             Some(ref slice) => slice,
                             None => return ReturnCode::ENOMEM
                         };
-
                         let input_len = r2;
                         if input_len > input_buffer.len() {
                             return ReturnCode::ESIZE
                         }
-
                         match self.engine.update(&input_buffer.as_ref()[..input_len]) {
                             Ok(_t) => ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => ReturnCode::ENOSUPPORT,

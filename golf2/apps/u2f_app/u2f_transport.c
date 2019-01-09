@@ -430,7 +430,7 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
    */
 
   uint16_t bcnt = 0;
-
+  printf("U2F: processing frame at 0x%08x.\n", f_p);
   /* Channel error checking */
   /* TODO: Would be nice to check anything related to the channel here. */
   /* ERROR: Nothing should ever be on channel 0 */
@@ -482,16 +482,17 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
 
     /* INIT frame */
     if (FRAME_TYPE(*f_p) == TYPE_INIT) {
+      printf("U2F: Received init frame.\n");
       /* ERROR: Device in use by another channel */
       if ((f_p->cid != pending.cid) && (pending.cid != 0)) {
-        printf("Fob in use by other channel.\n");
+        printf("U2F: Fob in use by other channel.\n");
         u2fhid_err(f_p->cid, ERR_CHANNEL_BUSY);
         return;
       }
       /* ERROR: Right channel, but CONT frame expected
        */
       if (pending.cid != 0) {
-        printf("Expected CONT frame.\n");
+        printf("U2F: Expected CONT frame.\n");
         u2fhid_err(f_p->cid, ERR_INVALID_SEQ);
         /* Clear the channel + timeout */
         cancel_timeout();
@@ -500,7 +501,7 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
       }
       /* ERROR: Message length is too large */
       if (MSG_LEN(*f_p) > MAX_BCNT) {
-        printf("Msg length exceeds max # bytes.\n");
+        printf("U2F: Msg length exceeds max # bytes.\n");
         u2fhid_err(f_p->cid, ERR_INVALID_LEN);
         return;
       }
@@ -537,14 +538,15 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
     }
     /* CONTinuation frame */
     else if (FRAME_TYPE(*f_p) == TYPE_CONT) {
+      printf("U2F: Received CONT frame.\n");
       /* ERRORish: No pending transaction, ignore. */
       if (pending.cid == 0 || pending.cid != f_p->cid) {
-        printf("Random CONT packet; ignoring\n");
+        printf("U2F: Random CONT packet; ignoring\n");
         return;
       }
       /* ERROR: incorrect sequence # */
       if (pending.seqno != f_p->cont.seq) {
-        printf("Invalid sequence number\n");
+        printf("U2F: Invalid sequence number\n");
         u2fhid_err(f_p->cid, ERR_INVALID_SEQ);
         cancel_timeout();
         clear_pending();

@@ -19,7 +19,7 @@
 
 #include "include/digest_syscalls.h"
 #include "include/u2f_syscalls.h"
-#include "include/aes_syscalls.h"
+#include "include/aes_ecb_syscalls.h"
 
 #include "tock.h"
 #include "rng.h"
@@ -33,6 +33,8 @@ void fips_hwHMAC256_init(const uint32_t key[SHA256_DIGEST_WORDS]) {
   for (unsigned int i = 0 ; i < SHA256_DIGEST_WORDS; i++) {
     current_key[i] = key[i];
   }
+  tock_digest_set_input((void*)current_key, SHA256_DIGEST_SIZE);
+  tock_digest_hash_initialize(DIGEST_MODE_SHA256_HMAC);
 }
 
 void fips_hwSHA256_update(const void* data, size_t n) {
@@ -45,8 +47,10 @@ void fips_hwSHA256_init(void) {
   tock_digest_set_output(current_digest, SHA256_DIGEST_SIZE);
 }
 
-const uint8_t* fips_hwSHA256_final(uint32_t crazy[SHA256_DIGEST_WORDS] __attribute__((unused))) {
-  return (uint8_t*)current_digest;
+const uint8_t* fips_hwSHA256_final(uint32_t* output) {
+  tock_digest_set_output(output, SHA256_DIGEST_SIZE);
+  tock_digest_hash_finalize();
+  return (uint8_t*)output;
 }
 
 static enum AES_encrypt_mode encrypt_mode = AES_ENCRYPT_MODE;
@@ -58,13 +62,13 @@ int fips_aes_init(const uint8_t *key, uint32_t key_len, const uint8_t *iv,
   if (cipher_mode != AES_CIPHER_MODE_CTR &&
       cipher_mode != AES_CIPHER_MODE_CBC) {
     printf("fips_aes_init: unsupported cipher mode: %i\n", c_mode);
-    return -1;
+    return 0;
   }
   encrypt_mode = e_mode;
   cipher_mode = c_mode;
   initialization_vector = iv;
   aes128_set_key_sync(key, key_len);
-  return 0;
+  return 1;
 }
 
 int fips_aes_block(const uint8_t *in, uint8_t *out) {
@@ -88,8 +92,9 @@ int fips_aes_block(const uint8_t *in, uint8_t *out) {
     }
   } else {
     printf("fips_aes_init: unsupported cipher mode: %i\n", cipher_mode);
-    return -1;
+    return 0;
   }
+  return 1;
 }
 
 static int counter = 0;
@@ -100,9 +105,10 @@ int increment_counter(void) {
 }
 
 int usbu2f_put_frame(const U2FHID_FRAME* frame_p) {
-  printf("calling tock_u2f_transmit\n");
+  //printf("calling tock_u2f_transmit\n");
   tock_u2f_transmit((void*)frame_p, sizeof(U2FHID_FRAME));
-  printf("returned from tock_u2f_transmit\n");
+  //printf("returned from tock_u2f_transmit\n");
+  return 0;
 }
 
 void usbu2f_get_frame(U2FHID_FRAME *frame_p) {

@@ -34,12 +34,17 @@ int fips_cmac_generate(const void* key, const void* data, size_t data_len,
   int i, j;
 
   // setup key
-  if (!fips_aes_init(key, 128, NULL, AES_CIPHER_MODE_ECB, AES_ENCRYPT_MODE))
+  if (!fips_aes_init(key, 128, NULL, AES_CIPHER_MODE_ECB, AES_ENCRYPT_MODE)) {
+    printf("ERROR: FIPS CMAC failed to init AES\n");
     return EC_ERROR_UNKNOWN;
+  }
 
   // compute K1, K2
   memset(accu, 0, sizeof(accu));
-  if (!fips_aes_block(accu, accu)) return EC_ERROR_UNKNOWN;
+  if (!fips_aes_block(accu, accu)) {
+    printf("ERROR: FIPS CMAC failed to compute keys with AES.\n");
+    return EC_ERROR_UNKNOWN;
+  }
   _ls1(accu, K1);
   _ls1(K1, K2);
 
@@ -58,10 +63,14 @@ int fips_cmac_generate(const void* key, const void* data, size_t data_len,
         _xor(accu, K1);
       }
     }
-    if (!fips_aes_block(accu, accu)) return EC_ERROR_UNKNOWN;
+    if (!fips_aes_block(accu, accu)) {
+      printf("ERROR: FIPS CMAC failed to generate CMAC.\n");
+      return EC_ERROR_UNKNOWN;
+    }
   }
 
   memcpy(tag, accu, 16);
+  printf("Completed CMAC generation.\n");
   return EC_SUCCESS;
 }
 

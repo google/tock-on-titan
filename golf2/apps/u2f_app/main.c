@@ -68,22 +68,31 @@ static void check_device_setup(void) {
 void u2fhid_process_frame(U2FHID_FRAME *f_p);
 
 void process_frame(U2FHID_FRAME* frame) {
-  printf("u2f_app: processing frame\n");
+  printf("U2F APP: processing frame\n");
   u2fhid_process_frame(frame);
+  //u2fhid_process_frame(frame);
+  //u2fhid_process_frame(frame);
+  //u2fhid_process_frame(frame);
+  printf("U2F APP: completed processing frame\n");
 }
+
+char u2f_buffer[U2F_FRAME_SIZE];
 
 int main(void) {
   int ret = 0;
+  printf("= Booting U2F Transport Application =\n");
+  init_fips();
 
-  delay_ms(2000);
   printf("= Running U2F Transport Application =\n");
-  delay_ms(100);
   check_device_setup();
 
-  char u2f_buffer[U2F_FRAME_SIZE];
   while (1) {
-    printf("u2f_app: receiving frame.\n");
+    printf("u2f_app: receiving frame into 0x%08x.\n", (unsigned int)u2f_buffer);
     ret = tock_u2f_receive(u2f_buffer, U2F_FRAME_SIZE);
+    if (ret != 0) {
+      printf("u2f_app: error %i in receive, retry.\n", ret);
+      continue;
+    }
     U2FHID_FRAME* frame = (U2FHID_FRAME*)u2f_buffer;
     process_frame(frame);
   }

@@ -20,10 +20,11 @@ enum fips_err {
 extern int fips_fatal;
 extern int fips_fatal_lineno;
 
-#ifdef CR50_DEV
+//#ifdef CR50_DEV || 1
+#if 1
 #define throw_fips_err(x)                                        \
   {                                                              \
-    CPRINTF("%s:%d fips err 0x%08x\n", __FILE__, __LINE__, (x)); \
+    printf("%s:%d fips err 0x%08x\n", __FILE__, __LINE__, (x)); \
     if (!fips_fatal_lineno) fips_fatal_lineno = __LINE__;        \
     _throw_fips_err(x);                                          \
   }

@@ -14,12 +14,14 @@
 
 use super::common::SyscallError;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DigestMode {
     /// Generates a SHA-1 digest. Output size is 160 bits (20 bytes).
     Sha1,
     /// Generates a SHA-2 256-bit digest. Output size is 256 bits (32 bytes).
     Sha256,
+    /// Generates a SHA-2 256-bit HMAC. Output size is 256 bits (32 bytes).
+    Sha256Hmac,
 }
 
 impl DigestMode {
@@ -27,10 +29,11 @@ impl DigestMode {
         match *self {
             DigestMode::Sha1 => 160 / 8,
             DigestMode::Sha256 => 256 / 8,
+            DigestMode::Sha256Hmac => 256 / 8,
         }
     }
 }
-
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DigestError {
     /// The requested digest type is not supported by this hardware.
     EngineNotSupported,
@@ -53,6 +56,9 @@ impl From<DigestError> for SyscallError {
 pub trait DigestEngine {
     /// Initializes the digest engine for the given mode.
     fn initialize(&self, mode: DigestMode) -> Result<(), DigestError>;
+
+    /// Initialize for HMAC operation with a key.
+    fn initialize_hmac(&self, key: &[u8]) -> Result<(), DigestError>;
 
     /// Feeds data into the digest. Returns the number of bytes that were actually consumed from
     /// the input.

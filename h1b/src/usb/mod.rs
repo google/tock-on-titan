@@ -64,9 +64,9 @@ macro_rules! data_debug {
 
 // Debug interrupts
 macro_rules! int_debug {
-    //() => ({print!();});
-    //($fmt:expr) => ({print!($fmt);});
-    //($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
+//    () => ({print!();});
+//    ($fmt:expr) => ({print!($fmt);});
+//    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
     () => ({});
     ($fmt:expr) => ({});
     ($fmt:expr, $($arg:tt)+) => ({});
@@ -476,20 +476,10 @@ impl<'a> USB<'a> {
 
     fn handle_endpoint1_events(&self, out_interrupt: bool, in_interrupt: bool) {
         data_debug!("Handling endpoint 1 events: out {}, in {}\n", out_interrupt, in_interrupt);
-        let ep_out = &self.registers.out_endpoints[1];
-        let ep_out_interrupts = ep_out.interrupt.get();
-        if out_interrupt {
-            data_debug!("Out interrupts: {:#x}\n", ep_out_interrupts);
-            ep_out.interrupt.set(ep_out_interrupts);
-            if (ep_out_interrupts & OutInterrupt::XferComplete as u32) != 0 {
-                data_debug!("U2F: ep1 frame received.\n");
-                self.u2f_client.map(|client| client.frame_received());
-            }
-        }
-
-        let ep_in = &self.registers.in_endpoints[1];
-        let ep_in_interrupts = ep_in.interrupt.get();
         if in_interrupt {
+            let ep_in = &self.registers.in_endpoints[1];
+            let ep_in_interrupts = ep_in.interrupt.get();
+            data_debug!("In interrupts: {:#x}\n", ep_in_interrupts);
             print_in_endpoint_interrupt_status(ep_in_interrupts);
             ep_in.interrupt.set(ep_in_interrupts);
             if (ep_in_interrupts & InInterrupt::XferComplete as u32) != 0  {
@@ -497,6 +487,16 @@ impl<'a> USB<'a> {
                 self.u2f_client.map(|client| client.frame_transmitted());
             }
 
+        }
+        if out_interrupt {
+            let ep_out = &self.registers.out_endpoints[1];
+            let ep_out_interrupts = ep_out.interrupt.get();
+            data_debug!("Out interrupts: {:#x}\n", ep_out_interrupts);
+            ep_out.interrupt.set(ep_out_interrupts);
+            if (ep_out_interrupts & OutInterrupt::XferComplete as u32) != 0 {
+                data_debug!("U2F: ep1 frame received.\n");
+                self.u2f_client.map(|client| client.frame_received());
+            }
         }
 
     }
@@ -805,7 +805,11 @@ impl<'a> USB<'a> {
 
                         self.ep0_in_buffers.map(|buf| {
                             for i in 0..len {
-                                buf[i / 4] = (U2F_REPORT_DESCRIPTOR[i] as u32) << ((3 - (i % 4))  * 8);
+                                if (i % 4) == 0 {
+                                    buf[i / 4] = (U2F_REPORT_DESCRIPTOR[i] as u32) << ((i % 4) * 8);
+                                } else {
+                                    buf[i / 4] |= (U2F_REPORT_DESCRIPTOR[i] as u32) << ((i % 4) * 8);
+                                }
                             }
                             self.ep0_in_descriptors.map(|descs| {
                                 descs[0].flags = (DescFlag::HOST_READY |
@@ -1368,16 +1372,16 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
             });
         });
 
-        self.ep1_out_descriptor.map(|out_desc| {
-            self.ep1_out_buffer.get().map(|out_buf| {
+        self.ep1_out_descriptor.map(|_out_desc| {
+            self.ep1_out_buffer.get().map(|_out_buf| {
                 let out_control = (EpCtl::ENABLE | EpCtl::CNAK |
                                    EpCtl::USBACTEP | EpCtl::INTERRUPT).epn_mps(U2F_REPORT_SIZE as u32);
                 self.registers.out_endpoints[1].control.set(out_control);
             });
         });
 
-        self.ep1_in_descriptor.map(|in_desc| {
-            self.ep1_in_buffer.map(|in_buf| {
+        self.ep1_in_descriptor.map(|_in_desc| {
+            self.ep1_in_buffer.map(|_in_buf| {
                 let in_control  = (EpCtl::USBACTEP | EpCtl::INTERRUPT |
                                    EpCtl::TXFNUM_1).epn_mps(U2F_REPORT_SIZE as u32);
                 self.registers.in_endpoints[1].control.set(in_control);
@@ -1424,9 +1428,10 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
     fn put_slice(&self, slice: &[u8]) -> ReturnCode {
         data_debug!("U2F: put_slice\n");
         if slice.len() > 64 {
+            data_debug!("U2F EP1: ERROR: slice too large\n");
             ReturnCode::ESIZE
         } else if !self.ep1_tx_fifo_is_ready() {
-            data_debug!("U2FData: Tried to put slice but busy.\n");
+            data_debug!("U2F EP1: ERROR: Tried to put slice but busy.\n");
             ReturnCode::EBUSY
         } else {
             self.ep1_in_buffer.map(|hardware_buffer| {

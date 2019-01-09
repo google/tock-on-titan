@@ -47,8 +47,6 @@ use kernel::hil::rng::Rng;
 
 use h1b::crypto::dcrypto::Dcrypto;
 use h1b::usb::{Descriptor, StringDescriptor};
-use h1b::usb::constants::{U2F_REPORT_SIZE, U2fHidCommand};
-use h1b::usb::types::U2fHidCommandFrame;
 
 // State for loading apps
 const NUM_PROCS: usize = 2;
