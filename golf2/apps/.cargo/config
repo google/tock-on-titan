@@ -17,6 +17,6 @@ target = "thumbv7m-none-eabi"
 
 [target.thumbv7m-none-eabi]
 linker = "rust-lld"
-rustflags = ["-C", "link-arg=-T../../../third_party/libtock-rs/layout.ld",
-             "-C", "relocation-model=ropi-rwpi",
+rustflags = ["-C", "link-arg=-T./layout.ld",
+             "-C", "relocation-model=static",
              "-Z", "linker-flavor=ld.lld"]

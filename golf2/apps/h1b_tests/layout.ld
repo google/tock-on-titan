@@ -13,13 +13,11 @@
  * limitations under the License.
  */
 
-MEMORY
-{
-  rom (rx)     : ORIGIN = 0x00044400, LENGTH = 0x00021c00
-  prog (rx)    : ORIGIN = 0x00066000, LENGTH = 0x00020000
-  ram (rwx)    : ORIGIN = 0x00010000, LENGTH = 0x00008000
-  appram (rwx) : ORIGIN = 0x00018000, LENGTH = 0x00008000
+MEMORY {
+  TEXT (rx)    : ORIGIN = 0x00066030, LENGTH = 0x0001FFD0
+  SRAM (rwx) : ORIGIN = 0x00018000, LENGTH = 0x00008000
 }
 
 MPU_MIN_ALIGN = 8K;
 
+INCLUDE ../../../third_party/libtock-rs/layout.ld
