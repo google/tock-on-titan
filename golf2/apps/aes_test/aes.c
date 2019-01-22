@@ -14,17 +14,31 @@
 
 #include <stdio.h>
 
-#include "gaes.h"
 #include "tock.h"
-
+#include "aes_ecb_syscalls.h"
 int bytes_encrypted = 0;
 
+//#define TOCK_AES_CMD_CHECK 0
+#define TOCK_AES_CMD_ECB_ENC 1
+#define TOCK_AES_CMD_ECB_DEC 2
+//#define TOCK_AES_CMD_CTR_ENC 3
+//#define TOCK_AES_CMD_CTR_DEC 4
+//#define TOCK_AES_CMD_CBC_ENC 5
+//#define TOCK_AES_CMD_CBC_DEC 6
+
+//#define TOCK_AES_ALLOW_KEY    0
+#define TOCK_AES_ALLOW_INPUT  1
+//#define TOCK_AES_ALLOW_OUTPUT 2
+//#define TOCK_AES_ALLOW_IVCTR  3
+
+#define TOCK_AES_SUBSCRIBE_CRYPT 0
+
 static void tock_aes_encrypt_done_cb(int count,
-				    int unused2 __attribute__((unused)),
-				    int unused3 __attribute__((unused)),
-				    void *callback_args) {
+                                    int unused2 __attribute__((unused)),
+                                    int unused3 __attribute__((unused)),
+                                    void *callback_args) {
   bytes_encrypted = count;
-  *(bool *)callback_args = true;  
+  *(bool *)callback_args = true;
 }
 
 static void tock_aes_mark_true_cb(int unused __attribute__((unused)),
@@ -34,60 +48,85 @@ static void tock_aes_mark_true_cb(int unused __attribute__((unused)),
   *(bool *)callback_args = true;
 }
 
-int tock_aes_setup(void *key, size_t len, int aes_size, int encrypt) {
-  int ret = -1;
-  ret = allow(HOTEL_DRIVER_AES, TOCK_AES_ALLOW_KEY, key, len);
-
-  bool key_expansion_done = false;
-  ret = subscribe(HOTEL_DRIVER_AES, TOCK_AES_DONE_KEY_EXPANSION_INT,
-                  tock_aes_mark_true_cb, &key_expansion_done);
-  if (ret < 0) return ret;
-  ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_SETUP, aes_size, 0);
-  if (ret < 0) return ret;
-
-  yield_for(&key_expansion_done);
-
-  ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_SET_ENCRYPT_MODE, encrypt, 0);
-  
-  if (ret < 0) return ret;
-  return 0;
+// function called by the encryption or decryption operation when they are
+// finished
+//
+// callback       - pointer to function to be called
+// callback_args  - pointer to data provided to the callback
+int aes128_set_callback(subscribe_cb callback, void *callback_args) {
+  return subscribe(AES_DRIVER, TOCK_AES_SUBSCRIBE_CRYPT, callback, callback_args);
 }
 
-int tock_aes_crypt(void *data, size_t len, void *out, size_t outlen) {
-  int ret = -1;
-  size_t written_bytes = 0;
-  size_t read_bytes = 0;
-  bytes_encrypted = 0;
-  while (written_bytes < len) {
-    ret = allow(HOTEL_DRIVER_AES, TOCK_AES_ALLOW_INPUT, data + written_bytes,
-                len - written_bytes);
-    if (ret < 0) return ret;
-    
-    ret = allow(HOTEL_DRIVER_AES, TOCK_AES_ALLOW_OUTPUT, out + written_bytes,
-                outlen - written_bytes);
-    if (ret < 0) return ret;
-	
-    bool cipher_done = false;
-    ret = subscribe(HOTEL_DRIVER_AES, TOCK_AES_DONE_CIPHER_INT,
-                    tock_aes_encrypt_done_cb, &cipher_done);
-    if (ret < 0) return ret;
 
-    ret = command(HOTEL_DRIVER_AES, TOCK_AES_CMD_CRYPT, 0, 0);
-    if (ret < 0) {
-      printf("operation failed: %d\n", ret);
-      return ret;
-    }
-    yield_for(&cipher_done);
-    written_bytes += bytes_encrypted;
-    read_bytes += bytes_encrypted;
-    if (read_bytes == outlen) {
-      printf("Output buffer too small to handle encryption\n");
-      return -1;
-    }
+// configures a buffer with data to be used for encryption or decryption
+//
+// data           - buffer with data
+// len            - length of the data buffer
+int aes128_set_data(const unsigned char *data, unsigned char len) {
+  return allow(AES_DRIVER, TOCK_AES_ALLOW_INPUT, (unsigned char*)data, len);
+}
+
+
+// configures an encryption key to be used for encryption and decryption
+//
+// key - a buffer containing the key (should be 16 bytes for aes128)
+// len - length of the buffer (should be 16 bytes for aes128)
+int aes128_set_key_sync(const unsigned char* key, unsigned char len) {
+  int rval = allow(AES_DRIVER, TOCK_AES_ALLOW_KEY, (unsigned char*)key, len);
+  if (rval != TOCK_SUCCESS) {
+    printf("Failed to install AES128 key: %i\n", rval);
   }
-  return read_bytes;
+  return rval;
 }
 
-int tock_aes_finish() {
-  return command(HOTEL_DRIVER_AES, TOCK_AES_CMD_FINISH, 0, 0);
+int aes128_encrypt_ecb(unsigned char* buf, unsigned char buf_len) {
+  bool aes = false;
+
+  int rval = subscribe(AES_DRIVER, TOCK_AES_SUBSCRIBE_CRYPT, &tock_aes_encrypt_done_cb, &aes);
+  if (rval != TOCK_SUCCESS) {
+    printf("Failed to register callback for AES128 ECB encryption: %i\n", rval);
+    return rval;
+  }
+
+  rval = aes128_set_data(buf, buf_len);
+  if (rval != TOCK_SUCCESS) {
+    printf("Failed to install buffer for AES128 ECB encryption: %i\n", rval);
+    return rval;
+  }
+
+  rval = command(AES_DRIVER, TOCK_AES_CMD_ECB_ENC, 0, 0);
+  if (rval != TOCK_SUCCESS) {
+    printf("Failed to invoke AES128 ECB encryption: %i\n", rval);
+    return rval;
+  }
+
+  yield_for(&aes);
+
+  return TOCK_SUCCESS;
+}
+
+int aes128_decrypt_ecb(unsigned char* buf, unsigned char buf_len) {
+  bool aes = false;
+
+  int rval = subscribe(AES_DRIVER, TOCK_AES_SUBSCRIBE_CRYPT, &tock_aes_encrypt_done_cb, &aes);
+  if (rval != TOCK_SUCCESS) {
+    printf("Failed to register callback for AES128 ECB decryption: %i\n", rval);
+    return rval;
+  }
+
+  rval = aes128_set_data(buf, buf_len);
+  if (rval != TOCK_SUCCESS) {
+    printf("Failed to install buffer for AES128 ECB decryption: %i\n", rval);
+    return rval;
+  }
+
+  rval = command(AES_DRIVER, TOCK_AES_CMD_ECB_DEC, 0, 0);
+  if (rval != TOCK_SUCCESS) {
+    printf("Failed to invoke AES128 ECB decryption: %i\n", rval);
+    return rval;
+  }
+
+  yield_for(&aes);
+
+  return TOCK_SUCCESS;
 }

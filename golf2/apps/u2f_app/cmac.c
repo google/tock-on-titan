@@ -84,7 +84,6 @@ int fips_cmac_generate(const void* key, const void* data, size_t data_len,
   }
 
   memcpy(tag, accu, 16);
-  printf("Completed CMAC generation.\n");
   return EC_SUCCESS;
 }
 

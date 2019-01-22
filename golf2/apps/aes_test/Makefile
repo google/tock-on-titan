@@ -22,7 +22,7 @@ C_SRCS   := $(wildcard *.c)
 
 OBJS += $(patsubst %.c,$(BUILDDIR)/%.o,$(C_SRCS))
 
-CPPFLAGS += -DSTACK_SIZE=2048
+CPPFLAGS += 
 
 include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk
 

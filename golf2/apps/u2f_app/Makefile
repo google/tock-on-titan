@@ -18,7 +18,7 @@ TOCK_ARCH ?= cortex-m3
 TOCK_USERLAND_BASE_DIR = $(CURRENT_DIR)../../../third_party/libtock-c
 BUILDDIR ?= $(CURRENT_DIR)/build/$(TOCK_ARCH)
 
-STACK_SIZE := 3072
+STACK_SIZE := 2048
 C_SRCS   := $(wildcard *.c)
 
 OBJS += $(patsubst %.c,$(BUILDDIR)/%.o,$(C_SRCS))

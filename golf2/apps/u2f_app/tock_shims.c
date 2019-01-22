@@ -60,13 +60,19 @@ static const uint8_t* initialization_vector = NULL;
 int fips_aes_init(const uint8_t *key, uint32_t key_len, const uint8_t *iv,
                   enum AES_cipher_mode c_mode, enum AES_encrypt_mode e_mode) {
   if (cipher_mode != AES_CIPHER_MODE_CTR &&
-      cipher_mode != AES_CIPHER_MODE_CBC) {
+      cipher_mode != AES_CIPHER_MODE_CBC &&
+      cipher_mode != AES_CIPHER_MODE_ECB) {
     printf("fips_aes_init: unsupported cipher mode: %i\n", c_mode);
+    printf("  supports CTR (%i), CBC (%i) and ECB (%i)\n", AES_CIPHER_MODE_CTR, AES_CIPHER_MODE_CBC, AES_CIPHER_MODE_ECB);
     return 0;
   }
   encrypt_mode = e_mode;
   cipher_mode = c_mode;
   initialization_vector = iv;
+
+  // fips_aes_init takes the key_len in bits, but Tock expects it in bytes;
+  // convert here.
+  key_len = key_len / 8;
   aes128_set_key_sync(key, key_len);
   return 1;
 }
@@ -90,8 +96,16 @@ int fips_aes_block(const uint8_t *in, uint8_t *out) {
       memcpy(out, in, 16);
       aes128_decrypt_ctr_sync(out, 16, initialization_vector, 16);
     }
+  } else if (cipher_mode == AES_CIPHER_MODE_ECB) {
+    if (encrypt_mode == AES_ENCRYPT_MODE) {
+      memcpy(out, in, 16);
+      aes128_encrypt_ecb_sync(out, 16);
+    } else {
+      memcpy(out, in, 16);
+      aes128_decrypt_ecb_sync(out, 16);
+    }
   } else {
-    printf("fips_aes_init: unsupported cipher mode: %i\n", cipher_mode);
+    printf("fips_aes_block: unsupported cipher mode: %i\n", cipher_mode);
     return 0;
   }
   return 1;
