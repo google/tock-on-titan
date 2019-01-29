@@ -44,4 +44,6 @@ int tock_chip_category(void);
 // Robust counter
 int increment_counter(void);
 
+void tock_enable_pop_detection();
+
 #endif

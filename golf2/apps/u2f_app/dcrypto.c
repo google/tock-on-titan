@@ -31,7 +31,7 @@ const char* TOCK_DCRYPTO_ERRORS[] = {
                                "trap",
                                "?",
                                "fault",
-                               "loop mod operand range",
+                               "mod operand range",
                                "unknown"};
 
 static const char* tock_dcrypto_fault_to_str(int fault) {
@@ -54,7 +54,8 @@ static void tock_dcrypto_run_done(int error,
 
 
 int tock_dcrypto_run(void* data, size_t datalen,
-                     void* program, size_t programlen) {
+                     void* program, size_t programlen,
+                     size_t start_instruction) {
 
   int ret = -1;
   bool run_done = false;
@@ -84,10 +85,10 @@ int tock_dcrypto_run(void* data, size_t datalen,
     return TOCK_EBUSY;
   }
 
-  ret = command(HOTEL_DRIVER_DCRYPTO, TOCK_DCRYPTO_CMD_RUN, 0, 0);
+  ret = command(HOTEL_DRIVER_DCRYPTO, TOCK_DCRYPTO_CMD_RUN, start_instruction, 0);
 
   if (ret < 0) {
-    printf("Could not invoke dcrypto program with command: %d\n", ret);
+    printf("Could not invoke dcrypto program instruction %i rcode: %d\n", start_instruction, ret);
     return ret;
   }
 

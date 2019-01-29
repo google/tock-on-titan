@@ -24,6 +24,7 @@
 #include "tock.h"
 #include "rng.h"
 #include "aes.h"
+#include "gpio.h"
 
 static uint32_t current_key[SHA256_DIGEST_WORDS];
 static uint32_t current_hmac[SHA256_DIGEST_WORDS];
@@ -73,7 +74,14 @@ int fips_aes_init(const uint8_t *key, uint32_t key_len, const uint8_t *iv,
   // fips_aes_init takes the key_len in bits, but Tock expects it in bytes;
   // convert here.
   key_len = key_len / 8;
-  aes128_set_key_sync(key, key_len);
+  if (key_len == AES256_BLOCK_CIPHER_KEY_SIZE) {
+    aes128_set_key_sync(key, key_len);
+  } else if (key_len == AES256_BLOCK_CIPHER_KEY_SIZE/2) {
+    aes128_set_key_sync(key, key_len);
+  } else {
+    printf("FAIL: aes_init passed a non-standard key length: %u\n", key_len);
+    return 0;
+  }
   return 1;
 }
 
@@ -91,10 +99,10 @@ int fips_aes_block(const uint8_t *in, uint8_t *out) {
   } else if (cipher_mode == AES_CIPHER_MODE_CBC) {
     if (encrypt_mode == AES_ENCRYPT_MODE) {
       memcpy(out, in, 16);
-      aes128_encrypt_ctr_sync(out, 16, initialization_vector, 16);
+      aes128_encrypt_cbc_sync(out, 16, initialization_vector, 16);
     } else {
       memcpy(out, in, 16);
-      aes128_decrypt_ctr_sync(out, 16, initialization_vector, 16);
+      aes128_decrypt_cbc_sync(out, 16, initialization_vector, 16);
     }
   } else if (cipher_mode == AES_CIPHER_MODE_ECB) {
     if (encrypt_mode == AES_ENCRYPT_MODE) {
@@ -139,4 +147,19 @@ uint32_t tock_chip_dev_id1() {
 
 int tock_chip_category() {
   return 0x0702;
+}
+
+void pop_falling_callback(int __attribute__((unused)) arg1,
+                          int __attribute__((unused)) arg2,
+                          int __attribute__((unused)) arg3,
+                          void* __attribute__((unused)) data) {
+  printf("Pop callback\n");
+  set_pop();
+}
+
+
+void tock_enable_pop_detection() {
+  gpio_enable_input(1, PullUp);
+  gpio_interrupt_callback(pop_falling_callback, NULL);
+  gpio_enable_interrupt(1, FallingEdge);
 }

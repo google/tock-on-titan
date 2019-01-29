@@ -287,6 +287,10 @@ impl<'a> AesEngine<'a> {
             regs.key[i].set(*word);
         }
         regs.key_start.set(1);
+        // Wait for key expansion.
+        // Blocking here is better than tossing a callback to userspace.
+        // Flag will clear when expansion is complete.
+        while regs.key_start.get() != 0 {}
     }
 
     pub fn set_encrypt_mode(&self, encrypt: bool) {

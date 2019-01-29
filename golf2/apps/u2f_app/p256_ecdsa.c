@@ -776,10 +776,17 @@ uint32_t fips_dcrypto_call(uint32_t addr) __attribute__((warn_unused_result));
 
 // Note: addr is a word address (index into word array)
 uint32_t fips_dcrypto_call(uint32_t addr) {
+  /*  printf("Invoking dcrypto with data %p len %i, instruction %i stream len %i\n",
+         &pEcc,
+         sizeof(DMEM_ecc),
+         addr,
+         sizeof(IMEM_dcrypto_p256));*/
   return tock_dcrypto_run(&pEcc,
                           sizeof(DMEM_ecc),
-                          IMEM_dcrypto_p256 + addr,
-                          sizeof(IMEM_dcrypto_p256) - (addr * 4));
+                          IMEM_dcrypto_p256,
+                          sizeof(IMEM_dcrypto_p256),
+                          addr
+                          );
 }
 
 static void fips_dcrypto_ecc_init(void) {

@@ -54,12 +54,12 @@ macro_rules! usb_debug {
 }
 
 macro_rules! data_debug {
-    () => ({print!();});
-    ($fmt:expr) => ({print!($fmt);});
-    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
-//    () => ({});
-//    ($fmt:expr) => ({});
-//    ($fmt:expr, $($arg:tt)+) => ({});
+//    () => ({print!();});
+//    ($fmt:expr) => ({print!($fmt);});
+//    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
+    () => ({});
+    ($fmt:expr) => ({});
+    ($fmt:expr, $($arg:tt)+) => ({});
 }
 
 // Debug interrupts

@@ -48,6 +48,7 @@
 // While the function does not accept partial words, it does not assume
 // alignment: data and program do not have to be word-aligned.
 int tock_dcrypto_run(void* data, size_t datalen,
-                     void* program, size_t programlen);
+                     void* program, size_t programlen,
+                     size_t instruction);
 
 #endif

@@ -161,7 +161,6 @@ int fips_aes128_kat(void) {
   uint8_t dec[AES_BLOCK_LEN];
 
   uint8_t iv[AES_BLOCK_LEN] = {0};  // AES_BLOCK_LEN = 16.
-
   fips_aes_init(k, 256, iv, AES_CIPHER_MODE_CBC, AES_ENCRYPT_MODE);
   fips_aes_block(msg, enc);
 
@@ -169,7 +168,6 @@ int fips_aes128_kat(void) {
 #ifdef FIPS_BREAK_AES_KAT
   memset(enc, 0x0A, sizeof(uint32_t));
 #endif
-
   fips_aes_init(k, 256, iv, AES_CIPHER_MODE_CBC, AES_DECRYPT_MODE);
   fips_aes_block(enc, dec);
 

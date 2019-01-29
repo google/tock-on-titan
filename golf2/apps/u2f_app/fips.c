@@ -225,7 +225,6 @@ int init_fips(void) {
   }
 
   printf("PASS: FIPS CMAC AES128\n");
-  while (1) {}
 
   // AES
   if (fips_aes128_kat()) {
@@ -233,6 +232,7 @@ int init_fips(void) {
     return EC_ERROR_UNKNOWN;
   }
 
+  printf("PASS: FIPS AES128\n");
   // ECDSA
   /* (1) FIPS ECDSA Signature known-answer test:
    * Fix k, check for previously known r & s.
@@ -244,14 +244,19 @@ int init_fips(void) {
     throw_fips_err(FIPS_FATAL_ECDSA);
     return EC_ERROR_UNKNOWN;
   }
+  printf("PASS: FIPS ECDSA\n");
+
   if (!fips_p256_base_point_mul(&fixed_d, &x, &y)) {
     throw_fips_err(FIPS_FATAL_ECDSA);
     return EC_ERROR_UNKNOWN;
   }
+  printf("PASS: FIPS P256 multiply\n");
+
   if (!fips_p256_ecdsa_verify(&x, &y, &test_msg, &fixed_r, &fixed_s)) {
     throw_fips_err(FIPS_FATAL_ECDSA);
     return EC_ERROR_UNKNOWN;
   }
+  printf("PASS: FIPS ECDSA verify\n");
 
   /* Here and only here */
   fips_fatal = FIPS_INITIALIZED;

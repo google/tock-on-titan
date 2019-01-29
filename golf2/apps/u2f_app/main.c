@@ -50,8 +50,9 @@ int set_personality(const perso_st* id) {
   }
 }
 
+static perso_st me;
+
 static void setup_personality(void) {
-  perso_st me;
   if (check_personality(get_personality()) == 1) return;
   if (new_personality(&me) == 1) set_personality(&me);
   printf("    - Personality configured\n");
@@ -62,6 +63,7 @@ static void check_device_setup(void) {
   //perso_st me;
   printf("  - Checking setup\n");
   ensure_factory_entropy();
+  printf("  - Setting up personality.\n");
   setup_personality();
 }
 
@@ -82,7 +84,7 @@ int main(void) {
   int ret = 0;
   printf("= Booting U2F Transport Application =\n");
   init_fips();
-
+  tock_enable_pop_detection();
   printf("= Running U2F Transport Application =\n");
   check_device_setup();
 

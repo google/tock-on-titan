@@ -27,13 +27,30 @@
 #include "include/trng.h"
 #include "include/kl.h"
 
-#define POP_TOUCH_YES 1
+enum touch_state {
+  POP_TOUCH_NO = 0,  /* waiting for a user touch */
+  POP_TOUCH_YES = 1, /* touch recorded and latched */
+};
+
+static volatile enum touch_state touch_latch = POP_TOUCH_NO;
+
+void expire_pop(void) {
+  touch_latch = POP_TOUCH_NO;
+}
+
+void set_pop(void) {
+  touch_latch = POP_TOUCH_YES;
+}
 
 int pop_check_presence(int consume, int bpm);
 
-int pop_check_presence(int consume __attribute__((unused)),
-                       int bpm __attribute__((unused))) {
-  return POP_TOUCH_YES;
+int pop_check_presence(int consume, int bpm) {
+  enum touch_state old = touch_latch;
+  printf("pop_check_presence consume=%i, bpm=%i; returning %i\n", consume, bpm, old);
+  if (consume) {
+    expire_pop();
+  }
+  return old;
 }
 
 /**
@@ -275,6 +292,7 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   m_off = sizeof(kh);
 
   if (apdu.p1 & G2F_ATTEST) {
+    printf("Using keyladder-derived keypair for Individual attestation.\n");
     /* Use a keyladder-derived keypair for Individual attestation */
     if (individual_keypair(&att_d, NULL, NULL, NULL) != EC_SUCCESS) {
       printf("ERR: Attestation key generation failed!");
@@ -436,6 +454,7 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
       case (U2F_AUTHENTICATE):
         printf("U2F AUTHENTICATE cmd received\n");
         sw = u2f_authenticate(apdu, obuf, &obuf_len);
+        printf("  -setting SW to 0x%x\n", sw);
         if (fips_fatal != FIPS_INITIALIZED) {
           obuf_len = 0;
           sw = U2F_SW_WTF + 6;
@@ -461,7 +480,7 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
   obuf[obuf_len - 2] = sw >> 8;
   obuf[obuf_len - 1] = sw;
 
-  printf(" : %04x\n", sw);
+  printf(" SW status: %04x\n", sw);
 
   {
     int i = 0;

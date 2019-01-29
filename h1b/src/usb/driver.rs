@@ -154,7 +154,7 @@ impl<'a> Driver for U2fSyscallDriver<'a> {
                         app.tx_buffer.take().map_or(ReturnCode::ERESERVE, |buf| {
                             let rcode = self.u2f_endpoints.put_slice(buf.as_ref());
                             app.tx_buffer = Some(buf);
-                            ..print!("U2F transmit: returning to userspace.\n");
+                            //print!("U2F transmit: returning to userspace.\n");
                             rcode
                         })
                     }

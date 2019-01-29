@@ -18,7 +18,7 @@ TOCK_ARCH ?= cortex-m3
 TOCK_USERLAND_BASE_DIR = $(CURRENT_DIR)../../../third_party/libtock-c
 BUILDDIR ?= $(CURRENT_DIR)/build/$(TOCK_ARCH)
 
-STACK_SIZE := 2048
+STACK_SIZE := 4096
 C_SRCS   := $(wildcard *.c)
 
 OBJS += $(patsubst %.c,$(BUILDDIR)/%.o,$(C_SRCS))
@@ -31,7 +31,7 @@ TOCK_APP_CONFIG = -Xlinker --defsym=STACK_SIZE=$$(STACK_SIZE)\
 
 include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk
 
- override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter 
+ override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
 
 $(BUILDDIR)/%.o: %.c | $(BUILDDIR)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
