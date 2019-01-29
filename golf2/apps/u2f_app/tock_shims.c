@@ -27,7 +27,6 @@
 #include "gpio.h"
 
 static uint32_t current_key[SHA256_DIGEST_WORDS];
-static uint32_t current_hmac[SHA256_DIGEST_WORDS];
 static uint32_t current_digest[SHA256_DIGEST_WORDS];
 
 void fips_hwHMAC256_init(const uint32_t key[SHA256_DIGEST_WORDS]) {

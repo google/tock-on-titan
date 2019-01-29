@@ -210,7 +210,7 @@ int anonymous_cert(const p256_int* d, const p256_int* pk_x,
 int individual_cert(uint8_t* cert, const int n) {
   const perso_st* me = get_personality();
 
-  if (me->cert_len > n) return 0;
+  if (me->cert_len > (const unsigned int)n) return 0;
 
   memcpy(cert, me->cert, me->cert_len);
   return me->cert_len;

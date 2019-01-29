@@ -41,6 +41,7 @@ static void aes_cb(int callback_type,
   result->error = callback_type;
 }
 
+int tock_aes128_set_callback(subscribe_cb callback, void *ud);
 
 // ***** System Call Interface *****
 
@@ -63,7 +64,7 @@ int tock_aes128_set_output(unsigned char* data, unsigned char len) {
 }
 
 // Internal function to configure a initial counter to be used on counter-mode
-int tock_aes128_set_ctr(unsigned char* ctr, unsigned char len) {
+int tock_aes128_set_ctr(const unsigned char* ctr, unsigned char len) {
   return allow(AES_DRIVER, TOCK_AES_ALLOW_IVCTR, (void*)ctr, len);
 }
 

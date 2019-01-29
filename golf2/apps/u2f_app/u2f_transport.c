@@ -105,6 +105,7 @@ static void clear_pending(void) {
 }
 
 /* Transaction timeout function */
+/*
 static void u2fhid_timeout(void) {
   if (timeout_CID) {
     printf("%s: cid %04lx (pending %04lx)", __func__, timeout_CID, pending.cid);
@@ -112,7 +113,7 @@ static void u2fhid_timeout(void) {
     timeout_CID = 0;
     clear_pending();
   }
-}
+  }*/
 //DECLARE_DEFERRED(u2fhid_timeout);
 
 static void cancel_timeout(void) {
@@ -153,11 +154,11 @@ static int u2fhid_cmd_ping(const uint8_t *in, const uint16_t n, uint8_t *out) {
 
   return EC_SUCCESS;
 }
-
+/*
 static void cancel_lock_timeout(void) {
   printf("Lock %04lx expired\n", lock_CID);
   lock_CID = 0;
-}
+  }*/
 //DECLARE_DEFERRED(cancel_lock_timeout);
 
 /* Spec 4.2.2
@@ -433,6 +434,8 @@ static void u2fhid_cmd_init(U2FHID_FRAME *f_p) {
   usbu2f_put_frame(&response);
 }
 
+void u2fhid_process_frame(U2FHID_FRAME *f_p);
+
 void u2fhid_process_frame(U2FHID_FRAME *f_p) {
   /* From the U2F HID spec, 2.5.4 Packet sequencing The device keeps
    * track of packets arriving in correct and ascending order and
@@ -444,7 +447,7 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
    */
 
   uint16_t bcnt = 0;
-  printf("U2F: processing frame at 0x%08x.\n", f_p);
+  printf("U2F: processing frame at %p.\n", f_p);
   /* Channel error checking */
   /* TODO: Would be nice to check anything related to the channel here. */
   /* ERROR: Nothing should ever be on channel 0 */
@@ -592,14 +595,15 @@ void u2f_wakeup(void) {
 /* N.B. HOOK_INIT happens *before* the initial task scheduling, so you
  * cannot block on TASK_WAKE_EVENT.
  */
+/*
 static void u2f_task_init(void) {
-  /*  const struct SignedHeader *hdr =
+    const struct SignedHeader *hdr =
   (const struct SignedHeader *)get_program_memory_addr(
           system_get_image_copy());
   const struct SignedHeader *ro_hdr =
     (const struct SignedHeader *)get_program_memory_addr(
           system_get_ro_image_copy());
-          int i; */
+          int i;
 
   if (kl_init()) {
     printf("kl_init() FAIL!\n");
@@ -608,7 +612,7 @@ static void u2f_task_init(void) {
   // Clear channel state
   lock_CID = 0;
   timeout_CID = 0;
-  /*
+
   // Pad out $BOARD with '_' as id
   for (i = 0; i < sizeof(U2F_sysinfo.id) && BOARD_STRING[i]; ++i)
     U2F_sysinfo.id[i] = BOARD_STRING[i];
@@ -649,6 +653,6 @@ static void u2f_task_init(void) {
     default: // Shouldn't happen!
       U2F_sysinfo.id[sizeof(U2F_sysinfo.id) - 1] = '!';
   }
-*/
 }
+*/
 //DECLARE_HOOK(HOOK_INIT, u2f_task_init, HOOK_PRIO_DEFAULT);

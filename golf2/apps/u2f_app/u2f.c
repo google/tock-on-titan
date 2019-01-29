@@ -33,7 +33,7 @@
 int pop_check_presence(int consume, int bpm);
 
 int pop_check_presence(int consume, int bpm) {
-  tock_pop_check_presence(consume);
+  return tock_pop_check_presence(consume);
 }
 
 /**

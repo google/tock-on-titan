@@ -15,6 +15,8 @@
 #include "include/drbg.h"
 #include "include/sha256.h"
 
+void set_8words(uint32_t* dst, uint32_t v);
+
 void set_8words(uint32_t* dst, uint32_t v) {
   dst[0] = v;
   dst[1] = v;
@@ -87,7 +89,7 @@ int DRBG_generate(DRBG* ctx, void* output, size_t output_len,
     _updateV(ctx);
 
     memcpy(output, &ctx->V, n);
-    output += n;
+    output = (void*)(((unsigned char*)output) + n);
     output_len -= n;
   }
 

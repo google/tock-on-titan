@@ -41,7 +41,15 @@ extern "C" {
 //
 // data           - buffer with data
 // len            - length of the data buffer
-int tock_aes128_set_data(unsigned char *data, unsigned char len);
+int tock_aes128_set_input(unsigned char *data, unsigned char len);
+
+// configures a buffer to be used as output for encryption or decryption;
+// if no output buffer is provided then the operation is in-place (on
+// input buffer).
+//
+// data           - buffer
+// len            - length of the buffer
+int tock_aes128_set_output(unsigned char *data, unsigned char len);
 
 
 // configures a buffer with the initial counter to be used for encryption or
@@ -49,7 +57,7 @@ int tock_aes128_set_data(unsigned char *data, unsigned char len);
 //
 // ctr            - buffer with initial counter
 // len            - length of the initial counter buffer
-int tock_aes128_set_ctr(unsigned char *ctr, unsigned char len);
+int tock_aes128_set_ctr(const unsigned char *ctr, unsigned char len);
 
 // configures an encryption key to be used for encryption and decryption
 //
