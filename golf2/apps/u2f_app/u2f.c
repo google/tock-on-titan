@@ -26,31 +26,14 @@
 #include "include/p256_ecdsa.h"
 #include "include/trng.h"
 #include "include/kl.h"
+#include "include/x509.h"
 
-enum touch_state {
-  POP_TOUCH_NO = 0,  /* waiting for a user touch */
-  POP_TOUCH_YES = 1, /* touch recorded and latched */
-};
-
-static volatile enum touch_state touch_latch = POP_TOUCH_NO;
-
-void expire_pop(void) {
-  touch_latch = POP_TOUCH_NO;
-}
-
-void set_pop(void) {
-  touch_latch = POP_TOUCH_YES;
-}
+#include "include/u2f_syscalls.h"
 
 int pop_check_presence(int consume, int bpm);
 
 int pop_check_presence(int consume, int bpm) {
-  enum touch_state old = touch_latch;
-  printf("pop_check_presence consume=%i, bpm=%i; returning %i\n", consume, bpm, old);
-  if (consume) {
-    expire_pop();
-  }
-  return old;
+  tock_pop_check_presence(consume);
 }
 
 /**
@@ -305,13 +288,13 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
     /* Anon attestation keypair; use origin key to self-sign */
     printf("anon attest\n");
     cert_len =
-        anonymous_cert(&od, &opk_x, &opk_y, resp->keyHandleCertSig + m_off,
+      anonymous_cert(&od, &opk_x, &opk_y, resp->keyHandleCertSig + m_off,
                        U2F_MAX_ATT_CERT_SIZE);
     att_d = od;
   }
   if (cert_len == 0) return U2F_SW_WTF + 4;
 
-  printf("copied n = %d byte cert into response\n", cert_len);
+  printf("copied n = %lu byte cert into response\n", cert_len);
   l += cert_len;
   m_off += cert_len;
 
@@ -434,8 +417,9 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
     apdu.data += 2;
   }
 
-  printf("\n\nAPDU rcv'd: %.7h\n", ibuf);
-  printf("  APDU.len: %x\n", apdu.len);
+  printf("\n\n");
+  printf("APDU rcv'd: %p\n", ibuf);
+  printf("  APDU.len: 0x%x\n", apdu.len);
 
   if (CLA == 0x00) { /* Always 0x00 */
     sw = U2F_SW_INS_NOT_SUPPORTED;

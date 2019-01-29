@@ -45,7 +45,7 @@ int fips_cmac_generate(const void* key, const void* data, size_t data_len,
   uint8_t accu[16];
   uint8_t K1[16];
   uint8_t K2[16];
-  int i, j;
+  size_t i, j;
 
   // setup key
   if (!fips_aes_init(key, 128, NULL, AES_CIPHER_MODE_ECB, AES_ENCRYPT_MODE)) {
@@ -90,7 +90,7 @@ int fips_cmac_generate(const void* key, const void* data, size_t data_len,
 int fips_cmac_verify(const void* key, const void* data, size_t data_len,
                      const void* mac, size_t mac_len) {
   uint8_t tag[16];
-  int i, or = 0;
+  size_t i, or = 0;
 
   // compute expected mac
   if (fips_cmac_generate(key, data, data_len, tag) != EC_SUCCESS)

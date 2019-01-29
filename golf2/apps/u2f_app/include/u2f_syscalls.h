@@ -44,6 +44,14 @@ int tock_chip_category(void);
 // Robust counter
 int increment_counter(void);
 
-void tock_enable_pop_detection();
+enum touch_state {
+  POP_TOUCH_NO  = 0,
+  POP_TOUCH_YES = 1,
+};
+
+void tock_pop_enable_detection(void);
+void tock_pop_set(void);
+void tock_pop_clear(void);
+enum touch_state tock_pop_check_presence(int consume);
 
 #endif

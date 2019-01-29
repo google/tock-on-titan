@@ -84,7 +84,7 @@ int main(void) {
   int ret = 0;
   printf("= Booting U2F Transport Application =\n");
   init_fips();
-  tock_enable_pop_detection();
+  tock_pop_enable_detection();
   printf("= Running U2F Transport Application =\n");
   check_device_setup();
 
