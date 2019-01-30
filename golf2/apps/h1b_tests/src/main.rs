@@ -16,18 +16,14 @@
 #![no_std]
 
 extern crate alloc;
+extern crate simple_print;
 extern crate tock;
 
 fn main() {
-    use tock::console::Console;
-
-    let mut console = Console::new();
+    use simple_print::{console,hex};
+    console!("Cat video count: ", 9001, "\nWhere we eat: ", hex(51966usize), "\n");
     loop {
-        use core::fmt::Write;
-        use tock::timer;
-        console
-            .write_str("Hello, World!\n")
-            .expect("Failed console write");
-        timer::sleep(timer::Duration::from_ms(1000));
+        tock::timer::sleep(tock::timer::Duration::from_ms(1000));
+        console!("tick\n");
     }
 }
