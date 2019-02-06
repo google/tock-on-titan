@@ -246,7 +246,7 @@ pub unsafe fn reset_handler() {
     let u2f = static_init!(
         h1b::usb::driver::U2fSyscallDriver<'static>,
         h1b::usb::driver::U2fSyscallDriver::new(&mut h1b::usb::USB0, kernel.create_grant(&grant_cap)));
-    h1b::usb::UsbHidU2f::set_u2f_client(&h1b::usb::USB0, u2f);
+    h1b::usb::u2f::UsbHidU2f::set_u2f_client(&h1b::usb::USB0, u2f);
 
 
     h1b::trng::TRNG0.init();

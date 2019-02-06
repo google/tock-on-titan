@@ -19,6 +19,7 @@ pub mod driver;
 mod registers;
 mod serialize;
 pub mod types;
+pub mod u2f;
 
 use cortexm3::support;
 use kernel::ReturnCode;
@@ -40,6 +41,7 @@ use self::types::{DeviceDescriptor, ConfigurationDescriptor};
 use self::types::{InterfaceDescriptor, EndpointDescriptor, HidDeviceDescriptor};
 use self::types::{EndpointAttributes, EndpointUsageType, EndpointTransferType};
 use self::types::{EndpointSynchronizationType};
+use self::u2f::{UsbHidU2f, UsbHidU2fClient};
 
 // Simple macros for USB debugging output: default definitions do nothing,
 // but you can uncomment print defintions to get detailed output on the
@@ -72,49 +74,6 @@ macro_rules! int_debug { // Debug messages for interrupt handling
     ($fmt:expr, $($arg:tt)+) => ({});
 }
 
-/// Trait a USB peripheral stack must implement to support the U2F syscall
-/// capsule. Mostly a Rust translation of abstractions used in C implementation.
-pub trait UsbHidU2f<'a> {
-    fn set_u2f_client(&self, client: &'a UsbHidU2fClient<'a>);
-
-    /// Reset the device and endpoints
-    fn setup_u2f_descriptors(&self);
-
-    /// For a reconnect: disconnect, wait, then connect
-    fn force_reconnect(&self) -> ReturnCode;
-
-    /// Enable reception of next frame; call after `get_slice` or `get_frame`.
-    fn enable_rx(&self) -> ReturnCode;
-
-    /// Sends the U2F report descriptor over the control channel (EP0)
-    fn iface_respond(&self) -> ReturnCode;
-
-    /// Blindly copies a frame out of the RXFIFO: run in response to `frame_received`.
-    fn get_frame(&self, frame: &mut [u32; 16]);
-
-    /// Blindly copies a frame out of the RXFIFO: run in response to `frame_received`.
-    fn get_slice(&self, frame: &mut [u8]) -> ReturnCode;
-
-    /// Returns whether the TXFIFO is available for sending.
-    fn transmit_ready(&self) -> bool;
-
-    /// Transmits a frame, fails if TXFIFO is not ready. Simple word copy (requires no byte
-    /// reordering), use this when possible.
-    fn put_frame(&self, frame: &[u32; 16]) -> ReturnCode;
-
-    /// Transmits a frame, fails if TXFIFO is not ready. Requires byte-by-byte copy, use
-    /// only when caller buffer couldn't be aligned or presized. Included to prevent
-    /// double-copy from userspace buffers.
-    fn put_slice(&self, frame: &[u8]) -> ReturnCode;
-}
-
-/// Client for the UsbHidU2f trait.
-pub trait UsbHidU2fClient<'a> {
-    fn reconnected(&self);
-    fn frame_received(&self);
-    fn frame_transmitted(&self);
-}
-
 /// USBState encodes the current state of the USB driver's state
 /// machine. It can be in three states: waiting for a message from
 /// the host, sending data in reply to a query from the host, or sending
@@ -130,9 +89,6 @@ enum USBState {
 // Constants for how many buffers to use for EP0.
 const EP0_IN_BUFFER_COUNT:  usize = 4;
 const EP0_OUT_BUFFER_COUNT: usize = 2;
-// Constants defining buffer sizes for all endpoints.
-const EP_BUFFER_SIZE_WORDS:    usize = 16;
-const EP_BUFFER_SIZE_BYTES:    usize = 64;
 
 /// Driver for the Synopsys DesignWare Cores USB 2.0 Hi-Speed
 /// On-The-Go (OTG) controller.

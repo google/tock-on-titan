@@ -40,6 +40,11 @@ const MAX_NORMAL_ENDPOINTS:  u16 = 16;
 pub const MAX_PACKET_SIZE:   u16 = 64;
 pub const U2F_REPORT_SIZE:   u16 = 64;
 
+// Constants defining buffer sizes for all endpoints.
+pub const EP_BUFFER_SIZE_BYTES:    usize = MAX_PACKET_SIZE as usize;
+pub const EP_BUFFER_SIZE_WORDS:    usize = EP_BUFFER_SIZE_BYTES / 4;
+
+
 // Ask Amit
 pub const RX_FIFO_SIZE: u16 = (4 * MAX_CONTROL_ENDPOINTS + 6) +
                               (2 * (MAX_PACKET_SIZE / 4 + 1)) +
