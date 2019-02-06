@@ -17,7 +17,6 @@
 #include "include/cmac.h"
 #include "include/common.h"
 #include "include/console.h"
-#include "include/registers.h"
 #include "include/aes.h"
 
 static void _ls1(const uint8_t* in, uint8_t* out) {

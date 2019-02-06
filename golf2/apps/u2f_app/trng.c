@@ -3,7 +3,6 @@
  * found in the LICENSE file.
  */
 
-#include "include/registers.h"
 #include "include/trng.h"
 #include "include/fips.h"
 #include "include/fips_err.h"

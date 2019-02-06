@@ -1,3 +1,5 @@
+// FIDO alliance specification: fidoalliance.org
+//
 // Common U2F raw message format header - Review Draft
 // 2014-10-08
 // Editor: Jakob Ehrensvard, Yubico, jakob@yubico.com
