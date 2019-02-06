@@ -385,7 +385,7 @@ impl<'a> DcryptoEngine<'a> {
 
         registers.int_state.set(flag as u32);
         let prior_state = self.state.get();
-        let status = match (registers.status.get() & 0x3) {
+        let status = match registers.status.get() & 0x3 {
             0 => HwState::Halt,
             1 => HwState::Run,
             2 => HwState::Break,

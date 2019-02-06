@@ -41,10 +41,11 @@ use self::types::{InterfaceDescriptor, EndpointDescriptor, HidDeviceDescriptor};
 use self::types::{EndpointAttributes, EndpointUsageType, EndpointTransferType};
 use self::types::{EndpointSynchronizationType};
 
-// Simple macro for USB debugging output: default definitions do nothing,
+// Simple macros for USB debugging output: default definitions do nothing,
 // but you can uncomment print defintions to get detailed output on the
 // messages sent and received.
-macro_rules! usb_debug {
+
+macro_rules! control_debug { // Debug messages for enumeration/EP0 control
 //    () => ({print!();});
 //    ($fmt:expr) => ({print!($fmt);});
 //    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
@@ -53,7 +54,7 @@ macro_rules! usb_debug {
     ($fmt:expr, $($arg:tt)+) => ({});
 }
 
-macro_rules! data_debug {
+macro_rules! data_debug { // Debug messages for data/EP1
 //    () => ({print!();});
 //    ($fmt:expr) => ({print!($fmt);});
 //    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
@@ -62,8 +63,7 @@ macro_rules! data_debug {
     ($fmt:expr, $($arg:tt)+) => ({});
 }
 
-// Debug interrupts
-macro_rules! int_debug {
+macro_rules! int_debug { // Debug messages for interrupt handling
 //    () => ({print!();});
 //    ($fmt:expr) => ({print!($fmt);});
 //    ($fmt:expr, $($arg:tt)+) => ({print!($fmt, $($arg)+);});
@@ -127,19 +127,26 @@ enum USBState {
     // e.g. in response to set command
 }
 
+// Constants for how many buffers to use for EP0.
+const EP0_IN_BUFFER_COUNT:  usize = 4;
+const EP0_OUT_BUFFER_COUNT: usize = 2;
+// Constants defining buffer sizes for all endpoints.
+const EP_BUFFER_SIZE_WORDS:    usize = 16;
+const EP_BUFFER_SIZE_BYTES:    usize = 64;
+
 /// Driver for the Synopsys DesignWare Cores USB 2.0 Hi-Speed
 /// On-The-Go (OTG) controller.
 ///
 /// Page/figure references are for the Synopsys DesignWare Cores USB
 /// 2.0 Hi-Speed On-The-Go (OTG) Programmer's Guide.
 ///
-/// The driver can enumerate (appear as a device to a host OS) but
-/// cannot perform any other operations (yet). The driver operates as
-/// a device in Scatter-Gather DMA mode (Figure 1-1) and performs the
-/// initial handshakes with the host on endpoint 0. It appears as an
-/// "Unknown counterfeit flash drive" (ID 0011:7788) under Linux; this
-/// was chosen as it won't collide with other valid devices and Linux
-/// doesn't expect anything.
+/// The driver can enumerate (appear as a device to a host OS) and
+/// exchange data on EP1. The driver operates as a device in
+/// Scatter-Gather DMA mode (Figure 1-1) and performs the initial
+/// handshakes with the host on endpoint 0. An uninitialized drive
+/// appears as a counterfeit flash device (vendor id: 0011, product
+/// id: 7788); a call to init() should initialize the correct vendor
+/// ID and product ID.
 ///
 /// Scatter-gather mode operates using lists of descriptors. Each
 /// descriptor points to a 64 byte memory buffer. A transfer larger
@@ -160,52 +167,65 @@ enum USBState {
 /// StringDescriptors, which are provided by the boot sequence. The
 /// meaning of each StringDescriptor is defined by its index, in
 /// usb::constants.
-
 pub struct USB<'a> {
     registers: StaticRef<Registers>,
-
     core_clock: Clock,
     timer_clock: Clock,
-
-    // Current state of the driver
     state: Cell<USBState>,
 
-    // Descriptor and buffers should never be empty after a call
-    // to init.
-    ep0_out_descriptors: TakeCell<'static, [DMADescriptor; 2]>,
-    ep0_out_buffers: Cell<Option<&'static [[u32; 16]; 2]>>,
-    ep0_in_descriptors: TakeCell<'static, [DMADescriptor; 4]>,
-    // `ep0_in_buffers` is one large buffer so we can copy into it as
-    // one big blob; `ep0_in_descriptors` can point into the middle of
-    // this buffer.
-    ep0_in_buffers: TakeCell<'static, [u32; 16 * 4]>,
+    // Descriptor and buffers should exist after a call to init.
 
-    ep1_out_descriptor: TakeCell<'static, DMADescriptor>,
-    ep1_out_buffer: Cell<Option<&'static [u32; 16]>>,
-    ep1_in_descriptor: TakeCell<'static, DMADescriptor>,
-    ep1_in_buffer: TakeCell<'static,[u32; 16]>,
+    // EP0 is used for control messages (enumeration, etc.): they
+    // are handled by the kernel (this module).
+    // EP0 out (data out from host to device) is stored as two
+    // separate buffers for double-buffering. EP1 in (data into
+    // host from device) is one large buffer so this firmware
+    // can easily copy larger objects into it. The EP0 in descriptors
+    // can index into this larger buffer.
+    ep0_out_descriptors: TakeCell<'static, [DMADescriptor; EP0_OUT_BUFFER_COUNT]>,
+    ep0_out_buffers: Cell<Option<&'static [[u32; 16]; EP0_OUT_BUFFER_COUNT]>>,
+    ep0_in_descriptors: TakeCell<'static, [DMADescriptor; EP0_IN_BUFFER_COUNT]>,
+    ep0_in_buffers: TakeCell<'static, [u32; 16 * EP0_IN_BUFFER_COUNT]>,
 
     // Track the index of which ep0_out descriptor is currently set
     // for reception and which descriptor received the most
     // recent packet.
-    next_out_idx: Cell<usize>,
-    last_out_idx: Cell<usize>,
+    next_ep0_out_idx: Cell<usize>,
+    last_ep0_out_idx: Cell<usize>,
 
+    // EP1 is used for application messages: userspace applications
+    // can communicate using them through system calls. EP1 in and out
+    // are both 64-byte buffers.
+    ep1_out_descriptor: TakeCell<'static, DMADescriptor>,
+    ep1_out_buffer: Cell<Option<&'static [u32; EP_BUFFER_SIZE_WORDS]>>,
+    ep1_in_descriptor: TakeCell<'static, DMADescriptor>,
+    ep1_in_buffer: TakeCell<'static,[u32; EP_BUFFER_SIZE_WORDS]>,
+
+
+    // Numeric configurations set by instantation. These values are
+    // filled into USB Descriptors as part of enumeration.
     device_class: Cell<u8>,
     vendor_id: Cell<u16>,
     product_id: Cell<u16>,
 
-    // `configuration_descriptor` stores the bytes of the full
-    // ConfigurationDescriptor, whose length is stored in
-    // `configuration_total_length`.  The field is populated by
-    // serializing all of the descriptors into it. Currently limited
+    // `configuration_descriptor` stores the bytes of the full USB
+    // ConfigurationDescriptor. `configuration_total_length` is the
+    // length. The function `generate_full_configuration_descriptor`
+    // populates these values. The ConfigurationDescriptor is limited
     // to a single 64 byte buffer.
-    configuration_descriptor: TakeCell<'static, [u8; 64]>,
+    configuration_descriptor: TakeCell<'static, [u8; EP_BUFFER_SIZE_BYTES]>,
     configuration_total_length: Cell<u16>,
-    // Which configuration is currently being used.
+
+    // Which USB configuration is currently being used.
     configuration_current_value: Cell<u8>,
+
+    // The strings of the USB StringDescriptors (vendor name, device name,
+    // etc.). Because different Descriptors index into this array, changing
+    // the number of elements or their ordering requires changing other
+    // aspects of code (e.g., `generate_full_configuration_descriptor`).
     strings: TakeCell<'static, [StringDescriptor]>,
 
+    // Client to give callbacks to.
     u2f_client: OptionalCell<&'a UsbHidU2fClient<'a>>,
 }
 
@@ -213,38 +233,9 @@ pub struct USB<'a> {
 const BASE_ADDR: *const Registers = 0x40300000 as *const Registers;
 pub static mut USB0: USB<'static> = unsafe { USB::new() };
 
-const EP0_IN_COUNT:  usize = 4;
-const EP0_OUT_COUNT: usize = 2;
-
-
-// Statically allocated buffers for initializing USB stack.
-pub static mut EP0_OUT_DESCRIPTORS: [DMADescriptor; EP0_OUT_COUNT] = [DMADescriptor {
-    flags: DescFlag::HOST_BUSY,
-    addr: 0,
-}; EP0_OUT_COUNT];
-pub static mut EP0_IN_DESCRIPTORS: [DMADescriptor; EP0_IN_COUNT] = [DMADescriptor {
-    flags: DescFlag::HOST_BUSY,
-    addr: 0,
-}; EP0_IN_COUNT];
-
-pub static mut EP1_OUT_DESCRIPTOR: DMADescriptor = DMADescriptor {flags: DescFlag::HOST_BUSY,
-                                                                  addr: 0};
-pub static mut EP1_IN_DESCRIPTOR:  DMADescriptor = DMADescriptor {flags: DescFlag::HOST_BUSY,
-                                                                  addr: 0};
-pub static mut EP0_OUT_BUFFERS: [[u32; 16]; EP0_OUT_COUNT] = [[0; 16]; EP0_OUT_COUNT];
-pub static mut EP1_OUT_BUFFER: [u32; 16] = [0; 16];
-pub static mut EP1_IN_BUFFER: [u32; 16] = [0; 16];
-// EP0 in buffers are allocated differently. In case EP0 needs to send
-// more than 64 bytes, its four buffers are one contiguous block of
-// memory. This allows the code to write >64 bytes contiguously,
-// rather than explicitly fragmenting it across buffers.
-pub static mut EP0_IN_BUFFERS: [u32; 16 * EP0_IN_COUNT] = [0; 16 * EP0_IN_COUNT];
-
-// Buffer used to store device configuration (descriptors) initialized at startup.
-pub static mut CONFIGURATION_BUFFER: [u8; 64] = [0; 64];
-
 impl<'a> USB<'a> {
-    /// Creates a new value referencing the single USB driver.
+    /// Creates a new value referencing the single USB driver. After instantiation,
+    /// init() needs to be called to initialize buffers and identifiers.
     ///
     /// ## Safety
     ///
@@ -266,19 +257,20 @@ impl<'a> USB<'a> {
             ep1_in_descriptor: TakeCell::empty(),
             ep1_in_buffer: TakeCell::empty(),
             configuration_descriptor: TakeCell::empty(),
-            next_out_idx: Cell::new(0),
-            last_out_idx: Cell::new(0),
+            next_ep0_out_idx: Cell::new(0),
+            last_ep0_out_idx: Cell::new(0),
             device_class: Cell::new(0x00),
-            vendor_id: Cell::new(0x0011),    // Unknown
-            product_id: Cell::new(0x5026),   // unknown counterfeit flash drive
+            vendor_id: Cell::new(0x0011),   // Dummy values for a bad USB device, should
+            product_id: Cell::new(0x7788),  // be replaced in call to init()
             configuration_current_value: Cell::new(0),
             configuration_total_length: Cell::new(0),
             strings: TakeCell::empty(),
             u2f_client: OptionalCell::empty(),
         }
     }
+
     /// Initialize descriptors for endpoint 0 IN and OUT, resetting
-    /// the endpoint 0 descriptors to a clean state.
+    /// them to a clean state.
     fn init_ep0_descriptors(&self) {
         // Setup descriptor for OUT endpoint 0
         self.ep0_out_descriptors.map(|descs| {
@@ -287,7 +279,7 @@ impl<'a> USB<'a> {
                     desc.flags = DescFlag::HOST_BUSY;
                     desc.addr = buf.as_ptr() as usize;
                 }
-                self.next_out_idx.set(0);
+                self.next_ep0_out_idx.set(0);
                 self.registers.out_endpoints[0].dma_address.set(&descs[0]);
             });
         });
@@ -306,7 +298,7 @@ impl<'a> USB<'a> {
 
     /// Reset the device in response to a USB RESET.
     fn usb_reset(&self) {
-        usb_debug!("USB: WaitingForSetupPacket in reset.\n");
+        control_debug!("USB: WaitingForSetupPacket in reset.\n");
         self.state.set(USBState::WaitingForSetupPacket);
         // Reset device address field (bits 10:4) of device config
         //self.registers.device_config.set(self.registers.device_config.get() & !(0b1111111 << 4));
@@ -353,9 +345,7 @@ impl<'a> USB<'a> {
     }
 
 
-    fn usb_reconnect(&self) {
-
-    }
+    fn usb_reconnect(&self) {}
 
     /// Perform a soft reset on the USB core; timeout if the reset
     /// takes too long.
@@ -457,10 +447,10 @@ impl<'a> USB<'a> {
     // packet to 64 bytes the Last and Interrupt-on-completion bits
     // and max size to 64 bytes.
     fn expect_setup_packet(&self) {
-        usb_debug!("USB: WaitingForSetupPacket in expect_setup_packet.\n");
+        control_debug!("USB: WaitingForSetupPacket in expect_setup_packet.\n");
         self.state.set(USBState::WaitingForSetupPacket);
         self.ep0_out_descriptors.map(|descs| {
-            descs[self.next_out_idx.get()].flags =
+            descs[self.next_ep0_out_idx.get()].flags =
                 (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
         });
 
@@ -474,6 +464,8 @@ impl<'a> USB<'a> {
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
     }
 
+    /// Handles events for endpoint 1 (data to/from USB client). Clear
+    /// pending interrupts and issue callbcks to client.
     fn handle_endpoint1_events(&self, out_interrupt: bool, in_interrupt: bool) {
         data_debug!("Handling endpoint 1 events: out {}, in {}\n", out_interrupt, in_interrupt);
         if in_interrupt {
@@ -501,8 +493,8 @@ impl<'a> USB<'a> {
 
     }
 
-    /// Handle all endpoint 0 IN/OUT events; clear pending interrupt
-    /// flags, swap buffers if needed, then either stall, dispatch to
+    /// Handle all endpoint 0 events; clear pending interrupt flags,
+    /// swap buffers if needed, then either stall, dispatch to
     /// `handle_setup`, or dispatch to `expect_setup_packet` depending
     /// on whether the setup packet is ready.
     fn handle_endpoint0_events(&self, out_interrupt: bool, in_interrupt: bool) {
@@ -525,32 +517,32 @@ impl<'a> USB<'a> {
         }
 
         let transfer_type = TableCase::decode_interrupt(ep_out_interrupts);
-        usb_debug!("USB: handle endpoint 0, transfer type: {:?}\n", transfer_type);
+        control_debug!("USB: handle endpoint 0, transfer type: {:?}\n", transfer_type);
         let flags = self.ep0_out_descriptors
-            .map(|descs| descs[self.last_out_idx.get()].flags)
+            .map(|descs| descs[self.last_ep0_out_idx.get()].flags)
             .unwrap();
         let setup_ready = flags & DescFlag::SETUP_READY == DescFlag::SETUP_READY;
 
         match self.state.get() {
             USBState::WaitingForSetupPacket => {
-                usb_debug!("USB: waiting for setup in\n");
+                control_debug!("USB: waiting for setup in\n");
                 if transfer_type == TableCase::A || transfer_type == TableCase::C {
                     if setup_ready {
                         self.handle_setup(transfer_type);
                     } else {
 
-                        usb_debug!("Unhandled USB event out:{:#x} in:{:#x} ",
+                        control_debug!("Unhandled USB event out:{:#x} in:{:#x} ",
                                    ep_out_interrupts,
                                    ep_in_interrupts);
-                        usb_debug!("flags: \n");
-                        if (flags & DescFlag::LAST) == DescFlag::LAST                {usb_debug!(" +LAST\n");}
-                        if (flags & DescFlag::SHORT) == DescFlag::SHORT              {usb_debug!(" +SHORT\n");}
-                        if (flags & DescFlag::IOC) == DescFlag::IOC                  {usb_debug!(" +IOC\n");}
-                        if (flags & DescFlag::SETUP_READY) == DescFlag::SETUP_READY  {usb_debug!(" +SETUP_READY\n");}
-                        if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_READY     {usb_debug!(" +HOST_READY\n");}
-                        if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_BUSY       {usb_debug!(" +DMA_BUSY\n");}
-                        if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_DONE       {usb_debug!(" +DMA_DONE\n");}
-                        if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_BUSY      {usb_debug!(" +HOST_BUSY\n");}
+                        control_debug!("flags: \n");
+                        if (flags & DescFlag::LAST) == DescFlag::LAST                {control_debug!(" +LAST\n");}
+                        if (flags & DescFlag::SHORT) == DescFlag::SHORT              {control_debug!(" +SHORT\n");}
+                        if (flags & DescFlag::IOC) == DescFlag::IOC                  {control_debug!(" +IOC\n");}
+                        if (flags & DescFlag::SETUP_READY) == DescFlag::SETUP_READY  {control_debug!(" +SETUP_READY\n");}
+                        if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_READY     {control_debug!(" +HOST_READY\n");}
+                        if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_BUSY       {control_debug!(" +DMA_BUSY\n");}
+                        if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_DONE       {control_debug!(" +DMA_DONE\n");}
+                        if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_BUSY      {control_debug!(" +HOST_BUSY\n");}
                         panic!("Waiting for set up packet but non-setup packet received.");
                     }
                 } else if transfer_type == TableCase::B {
@@ -560,7 +552,7 @@ impl<'a> USB<'a> {
                 }
             }
             USBState::DataStageIn => {
-                usb_debug!("USB: state is data stage in\n");
+                control_debug!("USB: state is data stage in\n");
                 if in_interrupt &&
                     ep_in_interrupts & (InInterrupt::XferComplete as u32) != 0 {
                         self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
@@ -605,28 +597,26 @@ impl<'a> USB<'a> {
     }
 
     /// Handle a SETUP packet to endpoint 0 OUT, dispatching to a
-    /// helper function depending on what kind of a request it is;
-    /// currently supports Standard requests to Device and Interface,
-    /// or Class requests to Interface.
-    ///
+    /// helper function depending on what kind of a request it is.
     /// `transfer_type` is the `TableCase` found by inspecting
-    /// endpoint-0's interrupt register. Currently only Standard
-    /// requests to Devices are supported: requests to an Interface
-    /// will panic. Based on the direction of the request and data
-    /// size, this function calls one of handle_setup_device_to_host,
-    /// handle_setup_host_to_device (not supported), or
-    /// handle_setup_no_data_phase.
+    /// endpoint-0's interrupt register. Based on the direction of the
+    /// request and data size, this function calls one of
+    ///   - handle_standard_device_to_host: getting status, descriptors, etc.,
+    ///   - handle_standard_host_to_device: none supported yet (panics),
+    ///   - handle_standard_no_data_phase: setting configuration and address,
+    ///   - handle_class_interface_to_host: getting HID report descriptor, or
+    ///   - handle_class_host_to_interface: setting idle interval.
     fn handle_setup(&self, transfer_type: TableCase) {
         // Assuming `ep0_out_buffers` was properly set in `init`, this will
         // always succeed.
-        usb_debug!("Handle setup, case {:?}\n", transfer_type);
+        control_debug!("Handle setup, case {:?}\n", transfer_type);
         self.ep0_out_buffers.get().map(|bufs| {
-            let request = SetupRequest::new(&bufs[self.last_out_idx.get()]);
-            usb_debug!("  - type={:?} recip={:?} dir={:?} request={:?}\n", request.req_type(), request.recipient(), request.data_direction(), request.request());
+            let request = SetupRequest::new(&bufs[self.last_ep0_out_idx.get()]);
+            control_debug!("  - type={:?} recip={:?} dir={:?} request={:?}\n", request.req_type(), request.recipient(), request.data_direction(), request.request());
 
             if request.req_type() == SetupRequestClass::Standard {
                 if request.recipient() == SetupRecipient::Device {
-                    usb_debug!("Standard request on device.\n");
+                    control_debug!("Standard request on device.\n");
                     if request.data_direction() == SetupDirection::DeviceToHost {
                         self.handle_standard_device_to_host(transfer_type, &request);
                     } else if request.w_length > 0 { // Data requested
@@ -635,7 +625,7 @@ impl<'a> USB<'a> {
                         self.handle_standard_no_data_phase(transfer_type, &request);
                     }
                 } else if request.recipient() == SetupRecipient::Interface {
-                    usb_debug!("Standard request on interface.\n");
+                    control_debug!("Standard request on interface.\n");
                     if request.data_direction() == SetupDirection::DeviceToHost {
                         self.handle_standard_interface_to_host(transfer_type, &request);
                     } else {
@@ -649,7 +639,7 @@ impl<'a> USB<'a> {
                     self.handle_class_host_to_interface(transfer_type, &request);
                 }
             } else {
-                usb_debug!("  - unknown case.\n");
+                control_debug!("  - unknown case.\n");
             }
         });
     }
@@ -659,7 +649,9 @@ impl<'a> USB<'a> {
         unimplemented!();
     }
 
-
+    /// Handles requests for data from device to host, including the device descriptor,
+    /// configuration descriptors, interface descriptors, string descriptors, the current
+    /// configuration and the device status.
     fn handle_standard_device_to_host(&self, transfer_type: TableCase, request: &SetupRequest) {
         use self::types::SetupRequestType::*;
         use self::serialize::Serialize;
@@ -680,7 +672,7 @@ impl<'a> USB<'a> {
                                               DescFlag::IOC).bytes(len as u16);
                         });
 
-                        usb_debug!("Trying to send device descriptor.\n");
+                        control_debug!("Trying to send device descriptor.\n");
                         self.expect_data_phase_in(transfer_type);
                     },
                     GET_DESCRIPTOR_CONFIGURATION => {
@@ -696,7 +688,7 @@ impl<'a> USB<'a> {
                                 }
                             });
                         });
-                        usb_debug!("USB: Trying to send configuration descriptor, len {}\n  ", len);
+                        control_debug!("USB: Trying to send configuration descriptor, len {}\n  ", len);
                         len = ::core::cmp::min(len, request.w_length);
                         self.ep0_in_descriptors.map(|descs| {
                             descs[0].flags = (DescFlag::HOST_READY |
@@ -722,7 +714,7 @@ impl<'a> USB<'a> {
                         self.expect_data_phase_in(transfer_type);
                     },
                     GET_DESCRIPTOR_DEVICE_QUALIFIER => {
-                        usb_debug!("Trying to send device qualifier: stall both fifos.\n");
+                        control_debug!("Trying to send device qualifier: stall both fifos.\n");
                         self.stall_both_fifos();
                     }
                     GET_DESCRIPTOR_STRING => {
@@ -742,14 +734,14 @@ impl<'a> USB<'a> {
                             });
                             self.expect_data_phase_in(transfer_type);
 
-                            usb_debug!("USB: requesting string descriptor {}, len: {}: {:?}", index, len, str);
+                            control_debug!("USB: requesting string descriptor {}, len: {}: {:?}", index, len, str);
                         });
                     }
                     _ => {
                         // The specification says that a not-understood request should send an
                         // error response. Cr52 just stalls, this seems to work. -pal
                         self.stall_both_fifos();
-                        usb_debug!("USB: unhandled setup descriptor type: {}", descriptor_type);
+                        control_debug!("USB: unhandled setup descriptor type: {}", descriptor_type);
                     }
                 }
             }
@@ -788,7 +780,7 @@ impl<'a> USB<'a> {
     /// only handles GetDescriptor requests for Report descriptors, otherwise
     /// panics.
     fn handle_standard_interface_to_host(&self, transfer_type: TableCase, request: &SetupRequest) {
-        usb_debug!("Handle setup interface, device to host.\n");
+        control_debug!("Handle setup interface, device to host.\n");
         let request_type = request.request();
         match request_type {
             SetupRequestType::GetDescriptor => {
@@ -796,7 +788,7 @@ impl<'a> USB<'a> {
                 let descriptor = Descriptor::from_u8((value >> 8) as u8);
                 let _index      = (value & 0xff) as u8;
                 let len        = request.length() as usize;
-                usb_debug!("  - Descriptor: {:?}, index: {}, length: {}\n", descriptor, _index, len);
+                control_debug!("  - Descriptor: {:?}, index: {}, length: {}\n", descriptor, _index, len);
                 match descriptor {
                     Descriptor::Report => {
                         if U2F_REPORT_DESCRIPTOR.len() != len {
@@ -844,13 +836,13 @@ impl<'a> USB<'a> {
     /// otherwise panics.
     fn handle_class_host_to_interface(&self, _transfer_type: TableCase, request: &SetupRequest) {
         use self::types::SetupClassRequestType;
-        usb_debug!("Handle setup class, host to device.\n");
+        control_debug!("Handle setup class, host to device.\n");
         match request.class_request() {
             SetupClassRequestType::SetIdle => {
                 let val = request.value();
                 let _interval: u8 = (val & 0xff) as u8;
                 let _id: u8 = (val >> 8) as u8;
-                usb_debug!("SetIdle: {} to {}, stall fifos.", _id, _interval);
+                control_debug!("SetIdle: {} to {}, stall fifos.", _id, _interval);
                 self.stall_both_fifos();
             },
             _ => {
@@ -859,15 +851,18 @@ impl<'a> USB<'a> {
         }
     }
 
+
+    /// Handles requests with no accompanying data phase. This includes simple commands
+    /// like setting the device address or its which of its configurations to use.
     fn handle_standard_no_data_phase(&self, transfer_type: TableCase, request: &SetupRequest) {
         use self::types::SetupRequestType::*;
-        usb_debug!(" - setup (no data): {:?}\n", request.request());
+        control_debug!(" - setup (no data): {:?}\n", request.request());
         match request.request() {
             GetStatus => {
                 panic!("USB: GET_STATUS no data setup packet.");
             }
             SetAddress => {
-                usb_debug!("Setting address: {:#x}.\n", request.w_value & 0x7f);
+                control_debug!("Setting address: {:#x}.\n", request.w_value & 0x7f);
                 // Even though USB wants the address to be set after the
                 // IN packet handshake, the hardware knows to wait, so
                 // we should just set it now.
@@ -881,7 +876,7 @@ impl<'a> USB<'a> {
                 self.expect_status_phase_in(transfer_type);
             }
             SetConfiguration => {
-                usb_debug!("SetConfiguration: {:?} Type {:?} transfer\n", request.w_value, transfer_type);
+                control_debug!("SetConfiguration: {:?} Type {:?} transfer\n", request.w_value, transfer_type);
                 self.configuration_current_value.set(request.w_value as u8);
                 self.expect_status_phase_in(transfer_type);
             }
@@ -892,18 +887,18 @@ impl<'a> USB<'a> {
     }
 
 
-    /// Call to send data to the host; assumes that the data has already
-    /// been put in the IN0 descriptors.
+    /// Send data to the host over endpoint 0; assumes that IN0 buffers and descriptors
+    /// have already been prepared.
     fn expect_data_phase_in(&self, transfer_type: TableCase) {
         self.state.set(USBState::DataStageIn);
-        usb_debug!("USB: expect_data_phase_in, case: {:?}\n", transfer_type);
+        control_debug!("USB: expect_data_phase_in, case: {:?}\n", transfer_type);
         self.ep0_in_descriptors.map(|descs| {
             // 2. Flush fifos
             self.flush_tx_fifo(0);
 
             // 3. Set EP0 in DMA
             self.registers.in_endpoints[0].dma_address.set(&descs[0]);
-            usb_debug!("USB: expect_data_phase_in: endpoint 0 descriptor: flags={:08x} addr={:08x} \n", descs[0].flags.0, descs[0].addr);
+            control_debug!("USB: expect_data_phase_in: endpoint 0 descriptor: flags={:08x} addr={:08x} \n", descs[0].flags.0, descs[0].addr);
 
             // If we clear the NAK (write CNAK) then this responds to
             // a non-setup packet, leading to failure as the code
@@ -915,7 +910,7 @@ impl<'a> USB<'a> {
             }
 
             self.ep0_out_descriptors.map(|descs| {
-                descs[self.next_out_idx.get()].flags =
+                descs[self.next_ep0_out_idx.get()].flags =
                     (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
             });
 
@@ -927,7 +922,7 @@ impl<'a> USB<'a> {
             } else {
                 self.registers.out_endpoints[0].control.set(EpCtl::ENABLE);
             }
-            usb_debug!("Registering for IN0 and OUT0 interrupts.\n");
+            control_debug!("Registering for IN0 and OUT0 interrupts.\n");
             self.registers
                 .device_all_ep_interrupt_mask
                 .set(self.registers.device_all_ep_interrupt_mask.get() |
@@ -939,7 +934,7 @@ impl<'a> USB<'a> {
     /// Setup endpoint 0 for a status phase with no data phase.
     fn expect_status_phase_in(&self, transfer_type: TableCase) {
         self.state.set(USBState::NoDataStage);
-        usb_debug!("USB: expect_status_phase_in, case: {:?}\n", transfer_type);
+        control_debug!("USB: expect_status_phase_in, case: {:?}\n", transfer_type);
 
         self.ep0_in_descriptors.map(|descs| {
             // 1. Expect a zero-length in for the status phase
@@ -965,7 +960,7 @@ impl<'a> USB<'a> {
 
 
             self.ep0_out_descriptors.map(|descs| {
-                descs[self.next_out_idx.get()].flags =
+                descs[self.next_ep0_out_idx.get()].flags =
                     (DescFlag::HOST_READY | DescFlag::LAST | DescFlag::IOC).bytes(64);
             });
 
@@ -1055,9 +1050,18 @@ impl<'a> USB<'a> {
 
     }
 
-
+    /// Generate the binary representation of the configuration descriptor for the
+    /// device. This is currently hardcoded to include:
+    ///   - The U2F Interface Descriptor
+    ///   - The HID Device Descriptor
+    ///   - The EP1 out Endpoint Descriptor (U2F)
+    ///   - The EP1 in Endpoint Descriptor (U2F)
+    ///   - The Shell Device Descriptor
     fn generate_full_configuration_descriptor(&self) {
         self.configuration_descriptor.map(|desc| {
+
+            let mut config = ConfigurationDescriptor::new(1, STRING_PLATFORM, 50);
+
             let attributes_u2f_in = EndpointAttributes {
                 transfer: EndpointTransferType::Interrupt,
                 synchronization: EndpointSynchronizationType::None,
@@ -1069,7 +1073,20 @@ impl<'a> USB<'a> {
                 usage: EndpointUsageType::Data,
             };
 
-            let attributes_shell_in = EndpointAttributes {
+            let u2f = InterfaceDescriptor::new(STRING_INTERFACE2, 0, 3, 0, 0);
+            let hid = HidDeviceDescriptor::new();
+            let ep1out = EndpointDescriptor::new(0x01, attributes_u2f_out, 2);
+            let ep1in  = EndpointDescriptor::new(0x81, attributes_u2f_in, 2);
+
+            let mut size: usize = config.length();
+            size += u2f.into_u8_buf(&mut desc[size..size + u2f.length()]);
+            size += hid.into_u8_buf(&mut desc[size..size + hid.length()]);
+            size += ep1out.into_u8_buf(&mut desc[size..size + ep1out.length()]);
+            size += ep1in.into_u8_buf(&mut desc[size..size + ep1in.length()]);
+
+            // In case we want to start including a shell like the normal gnubby.
+            // Note this requires changing config to have 2 interfaces, not 1.
+            /*let attributes_shell_in = EndpointAttributes {
                 transfer: EndpointTransferType::Bulk,
                 synchronization: EndpointSynchronizationType::None,
                 usage: EndpointUsageType::Data,
@@ -1079,24 +1096,14 @@ impl<'a> USB<'a> {
                 synchronization: EndpointSynchronizationType::None,
                 usage: EndpointUsageType::Data,
             };
-
-            let mut config = ConfigurationDescriptor::new(2, STRING_PLATFORM, 50);
-            let u2f = InterfaceDescriptor::new(STRING_INTERFACE2, 0, 3, 0, 0);
-            let hid = HidDeviceDescriptor::new();
-            let ep1out = EndpointDescriptor::new(0x01, attributes_u2f_out, 2);
-            let ep1in  = EndpointDescriptor::new(0x81, attributes_u2f_in, 2);
             let shell = InterfaceDescriptor::new(STRING_INTERFACE1, 1, 0xFF, 80, 1);
             let ep2in  = EndpointDescriptor::new(0x82, attributes_shell_in, 10);
             let ep2out = EndpointDescriptor::new(0x02, attributes_shell_out, 0);
 
-            let mut size: usize = config.length();
-            size += u2f.into_u8_buf(&mut desc[size..size + u2f.length()]);
-            size += hid.into_u8_buf(&mut desc[size..size + hid.length()]);
-            size += ep1out.into_u8_buf(&mut desc[size..size + ep1out.length()]);
-            size += ep1in.into_u8_buf(&mut desc[size..size + ep1in.length()]);
+
             size += shell.into_u8_buf(&mut desc[size..size + shell.length()]);
             size += ep2in.into_u8_buf(&mut desc[size..size + ep2in.length()]);
-            size += ep2out.into_u8_buf(&mut desc[size..size + ep2out.length()]);
+            size += ep2out.into_u8_buf(&mut desc[size..size + ep2out.length()]);*/
 
             config.set_total_length(size as u16);
             config.into_u8_buf(&mut desc[0..config.length()]);
@@ -1119,10 +1126,10 @@ impl<'a> USB<'a> {
     // message forces the host to send a new SETUP. This can be used to
     // indicate the request wasn't understood or needs to be resent.
     fn stall_both_fifos(&self) {
-        usb_debug!("USB: WaitingForSetupPacket in stall_both_fifos.\n");
+        control_debug!("USB: WaitingForSetupPacket in stall_both_fifos.\n");
         self.state.set(USBState::WaitingForSetupPacket);
         self.ep0_out_descriptors.map(|descs| {
-            descs[self.next_out_idx.get()].flags = (DescFlag::LAST | DescFlag::IOC).bytes(64);
+            descs[self.next_ep0_out_idx.get()].flags = (DescFlag::LAST | DescFlag::IOC).bytes(64);
         });
 
         // Enable OUT and disable IN interrupts
@@ -1141,14 +1148,16 @@ impl<'a> USB<'a> {
     // processing the current one.
     fn swap_ep0_out_descriptors(&self) {
         self.ep0_out_descriptors.map(|descs| {
-            let mut noi = self.next_out_idx.get();
-            self.last_out_idx.set(noi);
+            let mut noi = self.next_ep0_out_idx.get();
+            self.last_ep0_out_idx.set(noi);
             noi = (noi + 1) % descs.len();
-            self.next_out_idx.set(noi);
+            self.next_ep0_out_idx.set(noi);
             self.registers.out_endpoints[0].dma_address.set(&descs[noi]);
         });
     }
 
+    // Construct a USB Device Descriptor from the configuration parameters
+    // of the USB driver.
     fn generate_device_descriptor(&self) -> DeviceDescriptor {
         DeviceDescriptor {
             b_length: 18,
@@ -1172,9 +1181,9 @@ impl<'a> USB<'a> {
     /// Initialize the USB driver in device mode, so it can be begin
     /// communicating with a connected host.
     pub fn init(&self,
-                ep0_out_descriptors: &'static mut [DMADescriptor; EP0_OUT_COUNT],
-                ep0_out_buffers: &'static mut [[u32; 16]; EP0_OUT_COUNT],
-                ep0_in_descriptors: &'static mut [DMADescriptor; EP0_IN_COUNT],
+                ep0_out_descriptors: &'static mut [DMADescriptor; EP0_OUT_BUFFER_COUNT],
+                ep0_out_buffers: &'static mut [[u32; 16]; EP0_OUT_BUFFER_COUNT],
+                ep0_in_descriptors: &'static mut [DMADescriptor; EP0_IN_BUFFER_COUNT],
                 ep0_in_buffers: &'static mut [u32; 16 * 4],
                 ep1_out_descriptor: &'static mut DMADescriptor,
                 ep1_out_buffer: &'static mut [u32; 16],
@@ -1595,3 +1604,28 @@ fn print_usb_interrupt_status(status: u32) {
     if (status & Interrupt::SessionRequest as u32) != 0     {int_debug!("  +Session request\n");}
     if (status & Interrupt::ResumeWakeup as u32) != 0       {int_debug!("  +Resume/wakeup\n");}
 }
+
+// These are HW, not USB descriptors: they describe the
+// current state of hardware for USB endpoints, including
+// status flags and a pointer into a data buffer.
+pub static mut EP0_OUT_DESCRIPTORS: [DMADescriptor; EP0_OUT_BUFFER_COUNT] = [DMADescriptor {
+    flags: DescFlag::HOST_BUSY,
+    addr: 0,
+}; EP0_OUT_BUFFER_COUNT];
+pub static mut EP0_IN_DESCRIPTORS: [DMADescriptor; EP0_IN_BUFFER_COUNT] = [DMADescriptor {
+    flags: DescFlag::HOST_BUSY,
+    addr: 0,
+}; EP0_IN_BUFFER_COUNT];
+
+pub static mut EP0_OUT_BUFFERS: [[u32; EP_BUFFER_SIZE_WORDS]; EP0_OUT_BUFFER_COUNT] = [[0; EP_BUFFER_SIZE_WORDS]; EP0_OUT_BUFFER_COUNT];
+pub static mut EP0_IN_BUFFER: [u32; EP_BUFFER_SIZE_WORDS * EP0_IN_BUFFER_COUNT] = [0; EP_BUFFER_SIZE_WORDS * EP0_IN_BUFFER_COUNT];
+
+pub static mut EP1_OUT_DESCRIPTOR: DMADescriptor = DMADescriptor {flags: DescFlag::HOST_BUSY,
+                                                                  addr: 0};
+pub static mut EP1_IN_DESCRIPTOR:  DMADescriptor = DMADescriptor {flags: DescFlag::HOST_BUSY,
+                                                                  addr: 0};
+pub static mut EP1_OUT_BUFFER: [u32; EP_BUFFER_SIZE_WORDS] = [0; EP_BUFFER_SIZE_WORDS];
+pub static mut EP1_IN_BUFFER: [u32; EP_BUFFER_SIZE_WORDS] = [0; EP_BUFFER_SIZE_WORDS];
+
+// Buffer used to store device configuration (descriptors) initialized at startup.
+pub static mut CONFIGURATION_BUFFER: [u8; EP_BUFFER_SIZE_BYTES] = [0; EP_BUFFER_SIZE_BYTES];

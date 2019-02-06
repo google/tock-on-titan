@@ -289,25 +289,17 @@ pub unsafe fn reset_handler() {
     }
 
     let mut _ctr = 0;
-    let end = timerhs.now();
-
-    println!("Tock 1.0 booting. Initialization took {} tics.",
-             end.wrapping_sub(start));
-
     let chip = static_init!(h1b::chip::Hotel, h1b::chip::Hotel::new());
-
     chip.mpu().enable_mpu();
 
-    for _i in 0..1_000_000 {
-        _ctr += timerhs.now();
-    }
-
-    println!("Tock 1.0 booting. About to initialize USB.");
+    let end = timerhs.now();
+    println!("Tock: booted in {} tics; initializing USB and loading processes.",
+             end.wrapping_sub(start));
 
     h1b::usb::USB0.init(&mut h1b::usb::EP0_OUT_DESCRIPTORS,
                         &mut h1b::usb::EP0_OUT_BUFFERS,
                         &mut h1b::usb::EP0_IN_DESCRIPTORS,
-                        &mut h1b::usb::EP0_IN_BUFFERS,
+                        &mut h1b::usb::EP0_IN_BUFFER,
                         &mut h1b::usb::EP1_OUT_DESCRIPTOR,
                         &mut h1b::usb::EP1_OUT_BUFFER,
                         &mut h1b::usb::EP1_IN_DESCRIPTOR,
@@ -315,8 +307,8 @@ pub unsafe fn reset_handler() {
                         &mut h1b::usb::CONFIGURATION_BUFFER,
                         h1b::usb::PHY::A,
                         None,
-                        Some(0x18d1),
-                        Some(0x5026),
+                        Some(0x18d1),  // Google vendor ID
+                        Some(0x5026),  // proto2
                         &mut STRINGS);
     let golf2 = Golf {
         console: console,
@@ -331,8 +323,8 @@ pub unsafe fn reset_handler() {
         uint_printer: debug_syscall::UintPrinter::new(),
     };
 
-// dcrypto_test::run_dcrypto();
-//    rng_test::run_rng();
+    // dcrypto_test::run_dcrypto();
+    //    rng_test::run_rng();
 
     extern "C" {
         /// Beginning of the ROM region containing app images.
@@ -347,7 +339,7 @@ pub unsafe fn reset_handler() {
         FAULT_RESPONSE,
         &process_mgmt_cap,
     );
-    debug!("Start main loop.");
+    debug!("Tock: starting main loop.");
     debug!(" ");
 
     kernel.kernel_loop(&golf2, chip, Some(&golf2.ipc), &main_cap);
