@@ -3,6 +3,7 @@
 	url = https://github.com/tock/libtock-c
 
 [submodule "third_party/libtock-rs"]
+	branch = google
 	path = third_party/libtock-rs
 	url = https://github.com/tock/libtock-rs
 
