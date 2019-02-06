@@ -1350,6 +1350,9 @@ impl<'a> USB<'a> {
 
 }
 
+
+/// Implementation of the HID U2F API for the USB device. It assumes
+/// that U2F is over endpoint 1.
 impl<'a> UsbHidU2f<'a> for USB<'a> {
     fn set_u2f_client(&self, client: &'a UsbHidU2fClient<'a>) {
         self.u2f_client.set(client);
@@ -1605,6 +1608,9 @@ fn print_usb_interrupt_status(status: u32) {
     if (status & Interrupt::ResumeWakeup as u32) != 0       {int_debug!("  +Resume/wakeup\n");}
 }
 
+/* Statically allocated in-memory state and message buffers.*/
+
+
 // These are HW, not USB descriptors: they describe the
 // current state of hardware for USB endpoints, including
 // status flags and a pointer into a data buffer.
@@ -1617,15 +1623,17 @@ pub static mut EP0_IN_DESCRIPTORS: [DMADescriptor; EP0_IN_BUFFER_COUNT] = [DMADe
     addr: 0,
 }; EP0_IN_BUFFER_COUNT];
 
-pub static mut EP0_OUT_BUFFERS: [[u32; EP_BUFFER_SIZE_WORDS]; EP0_OUT_BUFFER_COUNT] = [[0; EP_BUFFER_SIZE_WORDS]; EP0_OUT_BUFFER_COUNT];
-pub static mut EP0_IN_BUFFER: [u32; EP_BUFFER_SIZE_WORDS * EP0_IN_BUFFER_COUNT] = [0; EP_BUFFER_SIZE_WORDS * EP0_IN_BUFFER_COUNT];
+pub static mut EP0_OUT_BUFFERS: [[u32; EP_BUFFER_SIZE_WORDS]; EP0_OUT_BUFFER_COUNT] =
+                                  [[0; EP_BUFFER_SIZE_WORDS]; EP0_OUT_BUFFER_COUNT];
+pub static mut EP0_IN_BUFFER: [u32; EP_BUFFER_SIZE_WORDS * EP0_IN_BUFFER_COUNT] =
+                                [0; EP_BUFFER_SIZE_WORDS * EP0_IN_BUFFER_COUNT];
 
 pub static mut EP1_OUT_DESCRIPTOR: DMADescriptor = DMADescriptor {flags: DescFlag::HOST_BUSY,
                                                                   addr: 0};
 pub static mut EP1_IN_DESCRIPTOR:  DMADescriptor = DMADescriptor {flags: DescFlag::HOST_BUSY,
                                                                   addr: 0};
 pub static mut EP1_OUT_BUFFER: [u32; EP_BUFFER_SIZE_WORDS] = [0; EP_BUFFER_SIZE_WORDS];
-pub static mut EP1_IN_BUFFER: [u32; EP_BUFFER_SIZE_WORDS] = [0; EP_BUFFER_SIZE_WORDS];
+pub static mut EP1_IN_BUFFER:  [u32; EP_BUFFER_SIZE_WORDS] = [0; EP_BUFFER_SIZE_WORDS];
 
-// Buffer used to store device configuration (descriptors) initialized at startup.
+// Buffer used to store device configuration (descriptors), initialized at startup.
 pub static mut CONFIGURATION_BUFFER: [u8; EP_BUFFER_SIZE_BYTES] = [0; EP_BUFFER_SIZE_BYTES];
