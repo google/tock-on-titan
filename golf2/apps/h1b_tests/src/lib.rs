@@ -19,11 +19,10 @@ extern crate alloc;
 extern crate simple_print;
 extern crate tock;
 
-fn main() {
+#[test]
+fn basic_test() -> bool {
     use simple_print::{console,hex};
-    console!("Cat video count: ", 9001, "\nWhere we eat: ", hex(51966usize), "\n");
-    loop {
-        tock::timer::sleep(tock::timer::Duration::from_ms(1000));
-        console!("tick\n");
-    }
+    console!("Cat video count: ", 9001, "\nWhat we eat: ", hex(3405705229usize), "\n");
+    tock::timer::sleep(tock::timer::Duration::from_ms(1000));
+    true
 }
