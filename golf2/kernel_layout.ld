@@ -244,9 +244,11 @@ SECTIONS
 
         . = ALIGN(4);
         _ezero = .;
+    } > ram
 
 
-
+	.app_memory :
+	{
         /* Application Memory.
          *
          * Tock uses the remainder of SRAM for application memory.
@@ -258,7 +260,7 @@ SECTIONS
          */
         . = ALIGN(MPU_MIN_ALIGN);
         *(.app_memory)
-    } > ram
+    } > appram
 }
 
 ASSERT((_etext-_stext) + (_erelocate-_srelocate) < LENGTH(rom), "

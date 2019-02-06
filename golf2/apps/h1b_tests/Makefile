@@ -45,13 +45,26 @@ doc:
 # file over afterwards.
 build/cortex-m3/cortex-m3/cortex-m3.tbf: target/thumbv7m-none-eabi/release/h1b_tests
 	mkdir -p build/cortex-m3/cortex-m3
-	elf2tab -n "h1b_tests" -o build/cortex-m3/cortex-m3/cortex-m3.tab $^ \
-		--stack=2048 --app-heap=1024 --kernel-heap=1024
+	cd ../../../third_party/elf2tab && cargo run --release -- -n "h1b_tests" \
+		-o ../../golf2/apps/h1b_tests/build/cortex-m3/cortex-m3/cortex-m3.tab \
+		../../golf2/apps/h1b_tests/$^ --stack=2048 --app-heap=1024 \
+		--kernel-heap=1024 --protected-region-size=64
 	mv target/thumbv7m-none-eabi/release/h1b_tests.tbf \
 		build/cortex-m3/cortex-m3/cortex-m3.tbf
 
 # Builds the h1b_tests Elf file using cargo. Marked as phony because we rely on
-# Cargo to determine when to rebuild.
+# Cargo to determine when to rebuild. We build using `cargo test` so that rustc
+# builds the test code and tests list. We can't just pass --test to rustc
+# through rustflags because that causes cargo to fail to parse rustc's output
+# for some invocations. Cargo names the test h1b_test-<hex string>, and outputs
+# another file with the same name plus ".d", so we need to use find with a
+# regexp to locate the test executable. Note that we first clear out existing
+# test binaries because Cargo does not do so; the `find` call relies on there
+# only being a single test binary.
 .PHONY: target/thumbv7m-none-eabi/release/h1b_tests
 target/thumbv7m-none-eabi/release/h1b_tests:
-	cargo build --release
+	rm -f target/thumbv7m-none-eabi/release/h1b_tests-*
+	cargo test --no-run --release
+	find target/thumbv7m-none-eabi/release/ -maxdepth 1 \
+		-regex 'target/thumbv7m-none-eabi/release/h1b_tests-[^.]+' \
+		-exec cp '{}' target/thumbv7m-none-eabi/release/h1b_tests ';'

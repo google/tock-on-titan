@@ -1,8 +1,13 @@
+[submodule "third_party/elf2tab"]
+	path = third_party/elf2tab
+	url = https://github.com/tock/elf2tab
+
 [submodule "third_party/libtock-c"]
 	path = third_party/libtock-c
 	url = https://github.com/tock/libtock-c
 
 [submodule "third_party/libtock-rs"]
+	branch = google
 	path = third_party/libtock-rs
 	url = https://github.com/tock/libtock-rs
 
