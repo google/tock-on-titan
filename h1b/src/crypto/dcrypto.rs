@@ -15,7 +15,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-//! Software interface to the dcrypto peripheral of the Hotel chip
+//! Software interface to the dcrypto peripheral of the H1B chip
 //! for the Tock operating system.
 //!
 //! dcrypto is a processor designed to offload the SC300 CPU and
@@ -401,13 +401,19 @@ impl<'a> DcryptoEngine<'a> {
         };
 
         self.state.set(new_state);
-
+        // The U2F dcrypto code has several mod out of bounds errors but
+        // seems to work correctly. If we throw error interrupts back to
+        // userspace then the application fails. So ignore errors for
+        // now (cr52 C implementation doesn't handle them). Note that
+        // a fatal error will lead to a done interrupt so we won't
+        // wedge. -pal
+        /*
         if new_state != State::Running {
             self.client.get().map(|client| {
                 println!("DCRYPTO engine had a {:?} error but was in state {:?}, HW state is {:?}.", cause, prior_state, status);
                 client.execution_complete(ReturnCode::FAIL, cause);
             });
-        }
+        }*/
     }
 
     pub fn handle_receive_interrupt(&self) {
@@ -448,6 +454,12 @@ impl<'a> DcryptoEngine<'a> {
 
     pub fn handle_break_interrupt(&self) {
         panic!("DCRYPTO threw a break interrupt but no code should trigger this.");
+    }
+
+    pub fn handle_wipe_interrupt(&self) {
+        let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
+        registers.int_state.set(InterruptFlag::DoneWipeSecrets as u32);
+        // Do nothing; automatically transition back to halt state.
     }
 }
 
@@ -608,6 +620,9 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
     }
 
     fn wipe_secrets(&self) -> ReturnCode {
-        ReturnCode::FAIL
+        let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
+        self.state.set(State::Wiping);
+        registers.wipe_secrets.set(0);
+        ReturnCode::SUCCESS
     }
 }

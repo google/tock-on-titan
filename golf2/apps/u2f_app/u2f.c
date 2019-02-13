@@ -211,7 +211,7 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   if (apdu.len != sizeof(U2F_REGISTER_REQ)) {
     printf(
         "ERR: U2F REGISTER INS error wrong "
-        "length, return 0x%x\n", U2F_SW_WRONG_LENGTH);
+        "length (%i should be %i), return 0x%x\n", apdu.len, sizeof(U2F_REGISTER_REQ), U2F_SW_WRONG_LENGTH);
     return U2F_SW_WRONG_LENGTH;
   }
 
@@ -428,10 +428,11 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
       case (U2F_REGISTER):
         printf("U2F REGISTER cmd received\n");
         sw = u2f_register(apdu, obuf, &obuf_len);
+        printf("  - result 0x%x\n", sw);
         if (fips_fatal != FIPS_INITIALIZED) {
           obuf_len = 0;
           sw = U2F_SW_WTF + 6;
-          printf("  change SW to 0x%x\n", sw);
+          printf("  fips uninitialized (0x%x) change SW to 0x%x\n", fips_fatal, sw);
         }
         break;
 
