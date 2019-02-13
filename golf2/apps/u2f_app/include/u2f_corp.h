@@ -26,7 +26,7 @@ typedef struct {
   uint8_t fmt; /* 0x02 */
   uint8_t len;
   // potential leading 0 => +1
-  uint8_t bytes[U2F_EC_KEY_SIZE + 1];
+  uint8_t bytes[P256_SCALAR_SIZE + 1];
 } ASN1DER_INT;
 
 typedef struct {

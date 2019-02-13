@@ -17,6 +17,13 @@ extern "C" {
 #pragma pack(push, 1)
 #endif
 
+// Error constants
+
+#define U2F_SW_NO_ERROR                 0x9000
+#define U2F_SW_INS_NOT_SUPPORTED        0x6D00
+#define U2F_SW_CONDITIONS_NOT_SATISFIED 0x6985
+#define U2F_SW_WRONG_DATA               0x6A80
+
 // General constants
 
 #define P256_SCALAR_SIZE  32  // nistp256 in bytes
@@ -79,10 +86,11 @@ typedef struct {
 // Flags values
 #define U2F_TOUCHED  0x01
 #define U2F_ALTERNATE_INTERFACE  0x02
+#define U2F_CTR_SIZE 4
 
 typedef struct {
   uint8_t flags;
-  uint32_t ctr;
+  uint8_t ctr[U2F_CTR_SIZE];
   uint8_t sig[MAX_ECDSA_SIG_SIZE];
 } U2F_AUTHENTICATE_RESP;
 

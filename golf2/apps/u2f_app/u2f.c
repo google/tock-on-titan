@@ -200,7 +200,7 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   /* sha256({RFU, app ID, nonce, keyhandle, public key}) */
   p256_int h;
   const uint8_t rfu = U2F_REGISTER_HASH_ID;
-  const uint8_t pk_start = U2F_POINT_UNCOMPRESSED;
+  const uint8_t pk_start = UNCOMPRESSED_POINT;
   p256_int att_d;
   uint32_t cert_len;
   LITE_SHA256_CTX ctx;  // SHA256 output container
@@ -251,7 +251,7 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   SHA256_INIT(&ctx);
   SHA256_UPDATE(&ctx, &rfu, sizeof(rfu));
   SHA256_UPDATE(&ctx, req->appId, U2F_APPID_SIZE);
-  SHA256_UPDATE(&ctx, req->chal, U2F_CHAL_SIZE);
+  SHA256_UPDATE(&ctx, req->nonce, U2F_NONCE_SIZE);
   SHA256_UPDATE(&ctx, kh, sizeof(kh));
   SHA256_UPDATE(&ctx, &pk_start, sizeof(pk_start));
 
@@ -266,7 +266,7 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   /* Construct remainder of the response */
   resp->registerId = U2F_REGISTER_ID;
   l = sizeof(resp->registerId);
-  resp->pubKey.pointFormat = U2F_POINT_UNCOMPRESSED;
+  resp->pubKey.format = UNCOMPRESSED_POINT;
   l += sizeof(resp->pubKey);
   resp->keyHandleLen = sizeof(kh);
   l += sizeof(resp->keyHandleLen);
@@ -283,13 +283,13 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
     }
     printf("indiv attest\n");
     cert_len =
-        individual_cert(resp->keyHandleCertSig + m_off, U2F_MAX_ATT_CERT_SIZE);
+        individual_cert(resp->keyHandleCertSig + m_off, MAX_CERT_SIZE);
   } else {
     /* Anon attestation keypair; use origin key to self-sign */
     printf("anon attest\n");
     cert_len =
       anonymous_cert(&od, &opk_x, &opk_y, resp->keyHandleCertSig + m_off,
-                       U2F_MAX_ATT_CERT_SIZE);
+                       MAX_CERT_SIZE);
     att_d = od;
   }
   if (cert_len == 0) return U2F_SW_WTF + 4;
@@ -333,7 +333,7 @@ static uint16_t u2f_authenticate(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
 
   DRBG drbg_ctx;
 
-  if (apdu.len != U2F_APPID_SIZE + U2F_CHAL_SIZE + 1 + KH_LEN) {
+  if (apdu.len != U2F_APPID_SIZE + U2F_NONCE_SIZE + 1 + KH_LEN) {
     printf(
         "ERR: U2F AUTHENTICATE INS error wrong "
         "length\n");
@@ -376,7 +376,7 @@ static uint16_t u2f_authenticate(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   SHA256_UPDATE(&ctx, req->appId, U2F_APPID_SIZE);
   SHA256_UPDATE(&ctx, &resp->flags, sizeof(uint8_t));
   SHA256_UPDATE(&ctx, resp->ctr, U2F_CTR_SIZE);
-  SHA256_UPDATE(&ctx, req->chal, U2F_CHAL_SIZE);
+  SHA256_UPDATE(&ctx, req->nonce, U2F_NONCE_SIZE);
   PT_FROM_BIN(SHA256_FINAL(&ctx), &h);
 
   if (origin_keypair(od_seed, &origin_d, NULL, NULL)) return U2F_SW_WTF + 2;
@@ -425,7 +425,7 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
     sw = U2F_SW_INS_NOT_SUPPORTED;
 
     switch (INS) {
-      case (U2F_REGISTER):
+      case (U2F_INS_REGISTER):
         printf("U2F REGISTER cmd received\n");
         sw = u2f_register(apdu, obuf, &obuf_len);
         printf("  - result 0x%x\n", sw);
@@ -436,7 +436,7 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
         }
         break;
 
-      case (U2F_AUTHENTICATE):
+    case (U2F_INS_AUTHENTICATE):
         printf("U2F AUTHENTICATE cmd received\n");
         sw = u2f_authenticate(apdu, obuf, &obuf_len);
         printf("  -setting SW to 0x%x\n", sw);
@@ -446,7 +446,7 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
         }
         break;
 
-      case (U2F_VERSION):
+      case (U2F_INS_VERSION):
         printf("U2F VERSION\n");
         sw = u2f_version(apdu, obuf, &obuf_len);
         break;
