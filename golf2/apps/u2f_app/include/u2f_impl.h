@@ -1,7 +1,16 @@
-/* Copyright 2017 The Chromium OS Authors. All rights reserved.
- * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file.
- */
+// Copyright 2019 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 /* U2F implementation-specific callbacks and parameters. */
 
@@ -13,10 +22,10 @@
 
 /* APDU fields to pass around */
 struct apdu {
-	uint8_t p1;
-	uint8_t p2;
-	uint16_t len;
-	const uint8_t *data;
+        uint8_t p1;
+        uint8_t p2;
+        uint16_t len;
+        const uint8_t *data;
 };
 
 /*
@@ -29,8 +38,8 @@ unsigned u2f_apdu_rcv(uint8_t *buffer, unsigned in_len, unsigned max_len);
 /* ---- Physical presence ---- */
 
 enum touch_state {
-	POP_TOUCH_NO   = 0,  /* waiting for a user touch */
-	POP_TOUCH_YES  = 1,  /* touch recorded and latched */
+        POP_TOUCH_NO   = 0,  /* waiting for a user touch */
+        POP_TOUCH_YES  = 1,  /* touch recorded and latched */
 };
 
 /*
@@ -56,7 +65,7 @@ enum touch_state pop_check_presence(int consume);
  * @return EC_SUCCESS if a valid keypair was created.
  */
 int u2f_origin_keypair(uint8_t *seed, p256_int *d,
-		       p256_int *pk_x, p256_int *pk_y);
+                       p256_int *pk_x, p256_int *pk_y);
 
 /**
  * Reconstitute the origin ECDSA private key from its seed.
@@ -106,6 +115,6 @@ int use_g2f(void);
 
 /* call extensions for unsupported U2F INS */
 unsigned u2f_custom_dispatch(uint8_t ins, struct apdu apdu, uint8_t *buf,
-			     unsigned *ret_len) __attribute__((weak));
+                             unsigned *ret_len) __attribute__((weak));
 
 #endif /* __CROS_EC_U2F_IMPL_H */
