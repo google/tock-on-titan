@@ -4,6 +4,8 @@
 CHROMIUM_CFILES =  $(wildcard $(CHROMIUMOS_DIR)/*.c)
 CHROMIUM_OBJS   =  $(notdir $(patsubst %.c, %.o, $(CHROMIUM_CFILES)))
 
+$(C_SRCS):	$(CHROMIUMOS_DIR)/
+
 define CHROMIUM_EC_RULES
 
 $$(BUILDDIR)/$(1)/chromiumos-ec:
