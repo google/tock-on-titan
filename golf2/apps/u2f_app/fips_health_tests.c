@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "include/fips_health_tests.h"
-#include "include/fips_err.h"
-#include "include/common.h"
+#include "fips_health_tests.h"
+#include "fips_err.h"
+#include "common.h"
 
 /**************************/
 /* NIST TRNG health tests */

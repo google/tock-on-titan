@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "include/asn1.h"
-#include "include/kl.h"
-#include "include/signed_header.h"
-#include "include/storage.h"
-#include "include/system.h"
-#include "include/u2f_corp.h"
-#include "include/u2f_hid_corp.h"
-#include "include/x509.h"
-#include "include/drbg.h"
-#include "include/fips.h"
-#include "include/p256.h"
-#include "include/sha256.h"
-#include "include/p256_ecdsa.h"
+#include "asn1.h"
+#include "kl.h"
+#include "signed_header.h"
+#include "storage.h"
+#include "system.h"
+#include "u2f_corp.h"
+#include "u2f_hid_corp.h"
+#include "x509.h"
+#include "drbg.h"
+#include "fips.h"
+#include "p256.h"
+#include "sha256.h"
+#include "p256_ecdsa.h"
 
 // Tock
-#include "include/u2f_syscalls.h"
+#include "u2f_syscalls.h"
 
 static void get_serial(p256_int* n) {
 

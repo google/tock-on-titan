@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "include/fips.h"
-#include "include/p256_ecdsa.h"
-#include "include/drbg.h"
-#include "include/dcrypto.h"
-#include "include/trng.h"
+#include "fips.h"
+#include "p256_ecdsa.h"
+#include "drbg.h"
+#include "dcrypto.h"
+#include "trng.h"
 
-#include "include/console.h"
+#include "console.h"
 
 /* Firmware blob for crypto accelerator */
 

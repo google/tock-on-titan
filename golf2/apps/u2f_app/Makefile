@@ -15,7 +15,11 @@
 CURRENT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 TOCK_ARCH ?= cortex-m3
-TOCK_USERLAND_BASE_DIR = $(CURRENT_DIR)../../../third_party/libtock-c
+
+THIRD_PARTY = $(CURRENT_DIR)../../../third_party/
+TOCK_USERLAND_BASE_DIR = $(THIRD_PARTY)libtock-c
+CHROMIUMOS_DIR         = $(THIRD_PARTY)chromiumos-ec
+
 BUILDDIR ?= $(CURRENT_DIR)/build/$(TOCK_ARCH)
 
 STACK_SIZE := 4096
@@ -28,10 +32,10 @@ TOCK_APP_CONFIG = -Xlinker --defsym=STACK_SIZE=$$(STACK_SIZE)\
 		  -Xlinker --defsym=KERNEL_HEAP_SIZE=$$(KERNEL_HEAP_SIZE)
 
 
+EXTERN_LIBS = $(CHROMIUMOS_DIR)
 
 include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk
 
- override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
 
-$(BUILDDIR)/%.o: %.c | $(BUILDDIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+ override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
+ override CPPFLAGS += -I./include

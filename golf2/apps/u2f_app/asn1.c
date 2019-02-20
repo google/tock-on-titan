@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "include/asn1.h"
-#include "include/fips.h"
-#include "include/p256.h"
+#include "asn1.h"
+#include "fips.h"
+#include "p256.h"
 
 // start a tag and return write ptr
 uint8_t* asn1_tag(ASN1* ctx, uint8_t tag) {

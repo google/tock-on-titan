@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Fill in KL random functions with calls to random
-#include "include/kl.h"
+#include "kl.h"
 
 int kl_init(void) {
   return 0;

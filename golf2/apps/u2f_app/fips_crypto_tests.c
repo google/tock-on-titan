@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "include/fips_err.h"
-#include "include/u2f_corp.h"
-
-#include "include/fips.h"
-#include "include/aes.h"
-#include "include/sha256.h"
-#include "include/p256_ecdsa.h"
-#include "include/cmac.h"
-#include "include/fips_crypto_tests.h"
-
-#include "include/console.h"
+#include "fips_err.h"
+#include "u2f_corp.h"
+#include "fips.h"
+#include "fips_aes.h"
+#include "sha256.h"
+#include "p256_ecdsa.h"
+#include "cmac.h"
+#include "fips_crypto_tests.h"
+#include "console.h"
 
 /* Fixed values for ECDSA FIPS testing. These are exposed externally
  * for the sake of FIPS initialization in fips.c.

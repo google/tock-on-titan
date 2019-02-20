@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <tock.h>
-#include "include/dcrypto.h"
+#include "dcrypto.h"
 
 
 int last_error = 0;

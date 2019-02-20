@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "include/fips.h"
-#include "include/storage.h"
+#include "fips.h"
+#include "storage.h"
 
 // libtock-c
 #include "rng.h"

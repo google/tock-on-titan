@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <tock.h>
-#include "include/u2f_syscalls.h"
+#include "u2f_syscalls.h"
 
 
 static void tock_u2f_transmit_done(int error __attribute__((unused)),

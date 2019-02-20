@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "include/fips.h"
-#include "include/fips_err.h"
-#include "include/sha256.h"
-#include "include/p256_ecdsa.h"
-#include "include/aes.h"
-#include "include/cmac.h"
-#include "include/trng.h"
-#include "include/fips_crypto_tests.h"
-#include "include/fips_health_tests.h"
-#include "include/storage.h"
+#include "fips.h"
+#include "fips_err.h"
+#include "sha256.h"
+#include "p256_ecdsa.h"
+#include "fips_aes.h"
+#include "cmac.h"
+#include "trng.h"
+#include "fips_crypto_tests.h"
+#include "fips_health_tests.h"
+#include "storage.h"
 
 // libtock-c
 #include "led.h"

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "include/drbg.h"
-#include "include/sha256.h"
+#include "drbg.h"
+#include "sha256.h"
 
 void set_8words(uint32_t* dst, uint32_t v);
 

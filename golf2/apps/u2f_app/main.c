@@ -21,10 +21,10 @@
 
 #define U2F_FRAME_SIZE 64
 
-#include "include/fips.h"
-#include "include/storage.h"
-#include "include/u2f_syscalls.h"
-#include "include/u2f_hid.h"
+#include "fips.h"
+#include "storage.h"
+#include "u2f_syscalls.h"
+#include "u2f_hid.h"
 
 
 static void check_device_setup(void);

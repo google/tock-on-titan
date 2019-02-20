@@ -24,35 +24,19 @@
  *  and make this consistent.
  */
 
-//#include "include/common.h" /* before u2fhid.h -> uint*_t */
-//#include "include/board.h"
-//#include "include/flash.h"
-#include "include/kl.h"
-//#include "include/gpio.h"
-//#include "include/hooks.h"
-//#include "include/personality.h"
-//#include "include/registration.h"
-//#include "include/signed_header.h"
-//#include "include/system.h"
-//#include "include/system_chip.h"
-//#include "include/storage.h"
-//#include "include/task.h"
-//#include "include/timer.h"
-#include "include/u2f_corp.h"
-#include "include/u2f_hid_corp.h"
-#include "include/hid_dfu.h"
-//#include "include/util.h"
-//#include "include/usb_api.h"
-//#include "include/watchdog.h"
+#include "kl.h"
+#include "u2f_corp.h"
+#include "u2f_hid_corp.h"
+#include "hid_dfu.h"
 
-#include "include/fips.h"
-#include "include/p256_ecdsa.h"
-#include "include/fips_err.h"
+#include "fips.h"
+#include "p256_ecdsa.h"
+#include "fips_err.h"
 #if defined(CONFIG_FIPS_TEST)
-#include "include/fips-commands.h"
+#include "fips-commands.h"
 #endif
 
-#include "include/console.h"
+#include "console.h"
 
 /* Next CID to allocate. */
 static uint32_t next_CID = 0x1;

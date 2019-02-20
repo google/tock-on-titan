@@ -35,8 +35,8 @@
  * SUCH DAMAGE.
  */
 
-#include "include/sha256.h"
-#include "include/digest_syscalls.h"
+#include "sha256.h"
+#include "digest_syscalls.h"
 
 #define SHFR(x, n)    (x >> n)
 #define ROTR(x, n)   ((x >> n) | (x << ((sizeof(x) << 3) - n)))

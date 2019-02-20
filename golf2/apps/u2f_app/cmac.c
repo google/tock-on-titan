@@ -14,10 +14,11 @@
 
 // rfc4493 cmac-aes-128
 //
-#include "include/cmac.h"
-#include "include/common.h"
-#include "include/console.h"
-#include "include/aes.h"
+#include "fips_aes.h"
+#include "cmac.h"
+#include "common.h"
+#include "console.h"
+
 
 static void _ls1(const uint8_t* in, uint8_t* out) {
   uint16_t accu = 0;

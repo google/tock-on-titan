@@ -12,18 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "include/aes.h"
-#include "include/sha256.h"
-#include "include/trng.h"
-#include "include/u2f_hid_corp.h"
+#include "fips_aes.h"
+#include "sha256.h"
+#include "trng.h"
+#include "u2f_hid_corp.h"
 
-#include "include/digest_syscalls.h"
-#include "include/u2f_syscalls.h"
-#include "include/aes_ecb_syscalls.h"
+#include "digest_syscalls.h"
+#include "u2f_syscalls.h"
+#include "aes_ecb_syscalls.h"
 
 #include "tock.h"
 #include "rng.h"
-//#include "aes.h"
 #include "gpio.h"
 
 static uint32_t current_key[SHA256_DIGEST_WORDS];

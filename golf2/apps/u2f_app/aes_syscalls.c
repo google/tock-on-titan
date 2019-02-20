@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-#include "include/aes_ecb_syscalls.h"
+#include "aes_ecb_syscalls.h"
 
 // Struct used for creating synchronous versions of functions.
 //
