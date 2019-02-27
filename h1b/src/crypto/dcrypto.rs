@@ -366,7 +366,6 @@ impl<'a> DcryptoEngine<'a> {
             11 => ProgramFault::Trap,
             _ => ProgramFault::Unknown,
         };
-        //println!("DCRYPTO handling {:?} error interrupt.", cause);
 
         // Clear the corresponding interrupt flag
         let flag = match nvic {
@@ -401,19 +400,24 @@ impl<'a> DcryptoEngine<'a> {
         };
 
         self.state.set(new_state);
-        // The U2F dcrypto code has several mod out of bounds errors but
-        // seems to work correctly. If we throw error interrupts back to
-        // userspace then the application fails. So ignore errors for
-        // now (cr52 C implementation doesn't handle them). Note that
-        // a fatal error will lead to a done interrupt so we won't
-        // wedge. -pal
-        /*
-        if new_state != State::Running {
+
+        // The U2F dcrypto code has several mod out of bounds errors
+        // but seems to work correctly. If we throw error interrupts
+        // back to userspace then the application fails. So ignore mod
+        // out of bounds errors for now (cr52 C implementation doesn't
+        // handle them). Pass other errors back to userspace. -pal
+        if new_state != State::Running &&
+           (cause == ProgramFault::DataAccess ||
+            cause == ProgramFault::DataAccess ||
+            cause == ProgramFault::LoopOverflow ||
+            cause == ProgramFault::LoopUnderflow ||
+            cause == ProgramFault::StackOverflow)
+        {
             self.client.get().map(|client| {
                 println!("DCRYPTO engine had a {:?} error but was in state {:?}, HW state is {:?}.", cause, prior_state, status);
                 client.execution_complete(ReturnCode::FAIL, cause);
             });
-        }*/
+        }
     }
 
     pub fn handle_receive_interrupt(&self) {

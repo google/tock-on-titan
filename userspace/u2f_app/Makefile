@@ -14,13 +14,13 @@
 
 CURRENT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
-#TOCK_ARCH ?= cortex-m3
+TOCK_ARCH ?= cortex-m3
 
-THIRD_PARTY = ../../../third_party
+THIRD_PARTY = ../../third_party
 TOCK_USERLAND_BASE_DIR = $(THIRD_PARTY)/libtock-c
 CHROMIUMOS_DIR         = $(THIRD_PARTY)/chromiumos-ec
 
-#BUILDDIR ?= $(CURRENT_DIR)/build/$(TOCK_ARCH)
+BUILDDIR ?= $(CURRENT_DIR)/build/$(TOCK_ARCH)
 
 STACK_SIZE := 4096
 C_SRCS   := $(wildcard *.c)
