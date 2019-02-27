@@ -18,7 +18,7 @@
 #include <stdlib.h>
 
 // TODO These need to be standardized
-#define HOTEL_DRIVER_DIGEST 0x40003
+#define H1B_DRIVER_DIGEST 0x40003
 
 // command() type ids
 #define TOCK_DIGEST_CMD_INITIALIZE 0

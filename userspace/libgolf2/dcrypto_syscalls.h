@@ -17,7 +17,7 @@
 
 #include <stdlib.h>
 
-#define HOTEL_DRIVER_DCRYPTO 0x40004
+#define H1B_DRIVER_DCRYPTO 0x40004
 
 #define TOCK_DCRYPTO_CMD_CHECK 0
 #define TOCK_DCRYPTO_CMD_RUN   1
