@@ -124,7 +124,7 @@ enum USBState {
     WaitingForSetupPacket,   // Waiting for message from host
     DataStageIn,             // Sending data to host
     NoDataStage,             // Sending status (not data) to host,
-    // e.g. in response to set command
+                             // e.g. in response to set command
 }
 
 /// Driver for the Synopsys DesignWare Cores USB 2.0 Hi-Speed
