@@ -45,9 +45,9 @@ doc:
 # file over afterwards.
 build/cortex-m3/cortex-m3/cortex-m3.tbf: target/thumbv7m-none-eabi/release/h1b_tests
 	mkdir -p build/cortex-m3/cortex-m3
-	cd ../../../third_party/elf2tab && cargo run --release -- -n "h1b_tests" \
-		-o ../../golf2/apps/h1b_tests/build/cortex-m3/cortex-m3/cortex-m3.tab \
-		../../golf2/apps/h1b_tests/$^ --stack=2048 --app-heap=1024 \
+	cd ../../third_party/elf2tab && cargo run --release -- -n "h1b_tests" \
+		-o ../../userspace/h1b_tests/build/cortex-m3/cortex-m3/cortex-m3.tab \
+		../../userspace/h1b_tests/$^ --stack=2048 --app-heap=1024 \
 		--kernel-heap=1024 --protected-region-size=64
 	mv target/thumbv7m-none-eabi/release/h1b_tests.tbf \
 		build/cortex-m3/cortex-m3/cortex-m3.tbf

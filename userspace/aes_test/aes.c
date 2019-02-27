@@ -13,38 +13,21 @@
 // limitations under the License.
 
 #include <stdio.h>
-
 #include "tock.h"
+#include "aes.h"
 #include "aes_ecb_syscalls.h"
 int bytes_encrypted = 0;
 
-//#define TOCK_AES_CMD_CHECK 0
-#define TOCK_AES_CMD_ECB_ENC 1
-#define TOCK_AES_CMD_ECB_DEC 2
-//#define TOCK_AES_CMD_CTR_ENC 3
-//#define TOCK_AES_CMD_CTR_DEC 4
-//#define TOCK_AES_CMD_CBC_ENC 5
-//#define TOCK_AES_CMD_CBC_DEC 6
-
-//#define TOCK_AES_ALLOW_KEY    0
-#define TOCK_AES_ALLOW_INPUT  1
-//#define TOCK_AES_ALLOW_OUTPUT 2
-//#define TOCK_AES_ALLOW_IVCTR  3
-
-#define TOCK_AES_SUBSCRIBE_CRYPT 0
+static void tock_aes_encrypt_done_cb(int count,
+                                    int unused2 __attribute__((unused)),
+                                    int unused3 __attribute__((unused)),
+                                    void *callback_args);
 
 static void tock_aes_encrypt_done_cb(int count,
                                     int unused2 __attribute__((unused)),
                                     int unused3 __attribute__((unused)),
                                     void *callback_args) {
   bytes_encrypted = count;
-  *(bool *)callback_args = true;
-}
-
-static void tock_aes_mark_true_cb(int unused __attribute__((unused)),
-                                  int unused2 __attribute__((unused)),
-                                  int unused3 __attribute__((unused)),
-                                  void *callback_args) {
   *(bool *)callback_args = true;
 }
 

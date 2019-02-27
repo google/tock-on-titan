@@ -24,6 +24,7 @@
 #include <timer.h>
 
 #define LED_0 0
+#define BUTTON_PIN 1
 
 void output_cb(int arg0, int arg2, int arg3, void* userdata);
 void gpio_output(void);
@@ -53,6 +54,7 @@ void gpio_output(void) {
   timer_every(500, output_cb, NULL, &timer);
 }
 
+int counter = 0;
 //**************************************************
 // GPIO input example
 //**************************************************
@@ -60,17 +62,18 @@ void input_cb(__attribute__ ((unused)) int arg0,
               __attribute__ ((unused)) int arg1,
               __attribute__ ((unused)) int arg2,
               __attribute__ ((unused)) void* ud) {
-  int pin_val = gpio_read(LED_0);
-  printf("\tValue(%d)\n", pin_val);
+  int pin_val = gpio_read(BUTTON_PIN);
+  counter++;
+  printf("\t[%04x]: Value(%d)\n", counter, pin_val);
 }
 
 void gpio_input(void) {
-  printf("Periodically reading value of the LED pin\n");
-  printf("Jump pin high to test (defaults to low)\n");
+  printf("Periodically reading value of the button pin\n");
+  printf("Press button to test\n");
 
   // set LED pin as input and start repeating timer
   // pin is configured with a pull-down resistor, so it should read 0 as default
-  gpio_enable_input(LED_0, PullDown);
+  gpio_enable_input(LED_0, PullUp);
   timer_every(500, input_cb, NULL, &timer);
 }
 
@@ -85,14 +88,14 @@ void interrupt_cb(__attribute__ ((unused)) int arg0,
 }
 
 void gpio_interrupt(void) {
-  printf("Print LED pin reading whenever its value changes\n");
-  printf("Jump pin high to test\n");
+  printf("Print button pin reading whenever its value changes\n");
+  printf("Press user button to test\n");
 
   // set callback for GPIO interrupts
   gpio_interrupt_callback(interrupt_cb, NULL);
   // set LED as input and enable interrupts on it
-  gpio_enable_input(LED_0, PullDown);
-  gpio_enable_interrupt(LED_0, Change);
+  gpio_enable_input(BUTTON_PIN, PullUp);
+  gpio_enable_interrupt(BUTTON_PIN, Change);
 }
 
 
@@ -101,8 +104,8 @@ int main(void) {
   printf("GPIO Test Application\n");
 
   // uncomment whichever example you want
-  gpio_output();
+  //gpio_output();
   //gpio_input();
-  //gpio_interrupt();
+  gpio_interrupt();
   return 0;
 }

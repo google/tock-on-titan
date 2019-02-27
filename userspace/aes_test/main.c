@@ -16,45 +16,34 @@
 #include <stdio.h>
 #include <string.h>
 #include "aes_ecb_syscalls.h"
-
+#include "aes.h"
 
 static unsigned char key[16] =    "1234567890123456";
 static unsigned char data[16]   = "Data to encrypt.";
 static unsigned char output[16];
-static char expected[] = {
-    0x25, 0x97, 0xea, 0xce, 0x3a, 0x51, 0xce, 0x0d, 0xd8, 0x97, 0xae, 0x00,
-    0x2a, 0x4e, 0xcd, 0xac, 0xe6, 0x31, 0xf6, 0x42, 0xa3, 0xbe, 0x5f, 0xaf,
-    0x3e, 0x8f, 0x04, 0x39, 0xf5, 0x9c, 0x40, 0x96, 0x6f, 0x21, 0x4b, 0xce,
-    0x1a, 0x1f, 0xbc, 0xdf, 0x95, 0x26, 0xc4, 0xf1, 0xff, 0xed, 0xf1, 0x22};
-
-//static char output[8000 / 8];
-//static char decrypted[8000 / 8];
-
-void print_buffer(char *buffer, size_t length, const char *format);
-
-void print_buffer(char *buffer, size_t length, const char *format) {
-  for (size_t i = 0; i < length; i++) {
-    printf(format, buffer[i]);
-    fflush(stdout);
-  }
-  printf("\n");
-}
 
 int main(void) {
   printf("==== Starting Encryption ====\n");
   printf("Setting up key.\n");
-  aes128_set_key_sync(key, strlen(key));
+  aes128_set_key_sync(key, strlen((char*)key));
   printf("Copying data %p to buffer %p.\n", data, output);
   memcpy(output, data, 16);
   printf("Encrypting %p: %s.\n", output, output);
-  print_buffer(output, 16, "%02x ");
+
+  for (int i = 0; i < 16; i++) {
+    printf("%02x", output[i]);
+  }
+  printf("\n");
 
   int rcode;
 
   rcode = aes128_encrypt_ecb(output, 16);
   if (rcode >= 0) {
     printf("Result    [%d]:\n", rcode);
-    print_buffer(output, 16, "%02x ");
+    for (int i = 0; i < 16; i++) {
+      printf("%02x", output[i]);
+    }
+    printf("\n");
   } else {
     printf("Error while encrypting: %d\n", -rcode);
     return -1;
@@ -64,7 +53,10 @@ int main(void) {
   rcode = aes128_decrypt_ecb(output, 16);
   if (rcode >= 0) {
     printf("Result    [%d]:\n", rcode);
-    print_buffer(output, 16, "%02x ");
+    for (int i = 0; i < 16; i++) {
+      printf("%02x", output[i]);
+    }
+    printf("\n");
   } else {
     printf("Error while decrypting: %d\n", -rcode);
     return -1;
