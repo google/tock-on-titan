@@ -19,11 +19,11 @@ authors = ["jrvanwhy <jrvanwhy@google.com>"]
 publish = false
 
 [dependencies]
-simple_print = { path = "../../../simple_print" }
-tock = { path = "../../../third_party/libtock-rs" }
+simple_print = { path = "../../simple_print" }
+tock = { path = "../../third_party/libtock-rs" }
 
 [dev-dependencies]
-test = { path = "../../../test_harness" }
+test = { path = "../../test_harness" }
 
 [profile.dev]
 panic = "abort"
