@@ -1,3 +1,7 @@
+[submodule "shared-ci"]
+	path = shared-ci
+	url = sso://opentitan/shared-ci
+
 [submodule "third_party/elf2tab"]
 	path = third_party/elf2tab
 	url = https://github.com/tock/elf2tab
