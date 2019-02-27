@@ -15,7 +15,7 @@
 #include "fips.h"
 #include "p256_ecdsa.h"
 #include "drbg.h"
-#include "dcrypto.h"
+#include "dcrypto_syscalls.h"
 #include "trng.h"
 
 #include "console.h"

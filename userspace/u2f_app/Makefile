@@ -19,6 +19,7 @@ TOCK_ARCH ?= cortex-m3
 THIRD_PARTY = ../../third_party
 TOCK_USERLAND_BASE_DIR = $(THIRD_PARTY)/libtock-c
 CHROMIUMOS_DIR         = $(THIRD_PARTY)/chromiumos-ec
+LIBGOLF2_DIR           = ../libgolf2
 
 BUILDDIR ?= $(CURRENT_DIR)/build/$(TOCK_ARCH)
 
@@ -32,10 +33,11 @@ TOCK_APP_CONFIG = -Xlinker --defsym=STACK_SIZE=$$(STACK_SIZE)\
 		  -Xlinker --defsym=KERNEL_HEAP_SIZE=$$(KERNEL_HEAP_SIZE)
 
 
-EXTERN_LIBS += $(CHROMIUMOS_DIR)
+EXTERN_LIBS += $(CHROMIUMOS_DIR) $(LIBGOLF2_DIR)
 
 include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk
 include $(CHROMIUMOS_DIR)/Makefile
+include $(LIBGOLF2_DIR)/Makefile
 
  override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
  override CPPFLAGS += -I./include

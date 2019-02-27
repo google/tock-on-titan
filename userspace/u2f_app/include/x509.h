@@ -23,7 +23,7 @@
 #include "p256.h"
 #include "sha256.h"
 #else
-#include "dcrypto.h"
+#include "dcrypto_syscalls.h"
 #endif
 
 /**
