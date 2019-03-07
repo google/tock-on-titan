@@ -18,6 +18,7 @@ use core::ops::Deref;
 use super::serialize::Serialize;
 use usb::constants::Descriptor;
 use usb::constants::MAX_PACKET_SIZE;
+use usb::constants::U2F_REPORT_SIZE;
 
 /// A StaticRef is a pointer to statically allocated mutable data such
 /// as memory mapped I/O registers.
@@ -111,7 +112,7 @@ impl ConfigurationDescriptor {
             b_max_power: b_max_power,
         }
     }
-    
+
     /// Take the configuration and write it out as bytes into
     /// the u32 buffer, returning the number of bytes written.
     pub fn into_u32_buf(&self, buf: &mut [u32; 64]) -> usize {
@@ -140,7 +141,7 @@ impl ConfigurationDescriptor {
         buf[8] = self.b_max_power as u8;
         CONFIGURATION_DESCRIPTOR_LENGTH as usize
     }
-    
+
     pub fn get_total_length(&self) -> u16 {
         self.w_total_length
     }
@@ -170,7 +171,7 @@ impl StringDescriptor {
             b_string: str,
         }
     }
-    
+
     pub fn into_u32_buf(&self, buf: &mut [u32; 64]) -> usize {
         let count = self.b_string.len();
         if count == 0 {
@@ -227,9 +228,9 @@ impl InterfaceDescriptor {
             b_interface_number: which,
             b_alternate_setting: 0,
             b_num_endpoints: 2,
-            b_interface_class: class, 
-            b_interface_sub_class: sub_class, 
-            b_interface_protocol: protocol, 
+            b_interface_class: class,
+            b_interface_sub_class: sub_class,
+            b_interface_protocol: protocol,
             i_interface: interface_string,
         }
     }
@@ -310,7 +311,7 @@ impl Into<u8> for EndpointAttributes {
             EndpointTransferType::Isochronous => self.transfer as u8,
             _ => {
                 self.transfer as u8 |
-                (self.synchronization as u8) << 2 | 
+                (self.synchronization as u8) << 2 |
                 (self.usage as u8) << 4
             }
         }
@@ -554,7 +555,7 @@ impl SetupRequest {
             _  => SetupClassRequestType::Undefined,
         }
     }
-    
+
     pub fn request(&self) -> SetupRequestType {
         match self.b_request {
             0 => SetupRequestType::GetStatus,
@@ -585,4 +586,30 @@ impl SetupRequest {
     pub fn length(&self) -> u16 {
         self.w_length
     }
+}
+
+pub struct U2fHidCommandFrame {
+    pub channel_id: u32,
+    pub command: u8,
+    pub bcount_high: u8,
+    pub bcount_low: u8,
+    pub data: [u8; U2F_REPORT_SIZE as usize - 7],
+}
+
+impl U2fHidCommandFrame {
+    pub fn into_u32_buf(&self, buf: &mut [u32; 16]) {
+        buf[0] = self.channel_id;
+        buf[1] = (self.command as u32) << 0 |
+                 (self.bcount_high as u32) << 8 |
+                 (self.bcount_low as u32) << 16 |
+                 (self.data[0] as u32) << 24;
+
+    }
+}
+
+pub struct U2fHidSequenceFrame {
+    channel_id: u32,
+    frame_type: u8,
+    sequence_num: u8,
+    data: [u8; U2F_REPORT_SIZE as usize - 6],
 }

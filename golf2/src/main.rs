@@ -72,6 +72,7 @@ pub struct Golf {
     //rng: &'static capsules::rng::SimpleRng<'static, h1b::trng::Trng<'static>>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
     uint_printer: debug_syscall::UintPrinter,
+    u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
 }
 
 static mut STRINGS: [StringDescriptor; 7] = [
@@ -238,24 +239,10 @@ pub unsafe fn reset_handler() {
 
     h1b::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
 
-    /*    h1b::trng::TRNG0.init();
-    let rng = static_init!(
-        capsules::rng::SimpleRng<'static, h1b::trng::Trng>,
-        capsules::rng::SimpleRng::new(&mut h1b::trng::TRNG0, kernel::grant::Grant::create()),
-        8);
-    h1b::trng::TRNG0.set_client(rng);*/
-
-    let golf2 = Golf {
-        console: console,
-        gpio: gpio,
-        timer: timer,
-        ipc: kernel::ipc::IPC::new(kernel, &grant_cap),
-        digest: digest,
-        aes: aes,
-        dcrypto: dcrypto,
-//        rng: rng,
-        uint_printer: debug_syscall::UintPrinter::new(),
-    };
+    let u2f = static_init!(
+        h1b::usb::driver::U2fSyscallDriver<'static>,
+        h1b::usb::driver::U2fSyscallDriver::new(&mut h1b::usb::USB0, kernel.create_grant(&grant_cap)));
+    h1b::usb::UsbHidU2f::set_u2f_client(&h1b::usb::USB0, u2f);
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
@@ -296,10 +283,14 @@ pub unsafe fn reset_handler() {
 
     println!("Tock 1.0 booting. About to initialize USB.");
 
-    h1b::usb::USB0.init(&mut h1b::usb::OUT_DESCRIPTORS,
-                        &mut h1b::usb::OUT_BUFFERS,
-                        &mut h1b::usb::IN_DESCRIPTORS,
-                        &mut h1b::usb::IN_BUFFERS,
+    h1b::usb::USB0.init(&mut h1b::usb::EP0_OUT_DESCRIPTORS,
+                        &mut h1b::usb::EP0_OUT_BUFFERS,
+                        &mut h1b::usb::EP0_IN_DESCRIPTORS,
+                        &mut h1b::usb::EP0_IN_BUFFERS,
+                        &mut h1b::usb::EP1_OUT_DESCRIPTOR,
+                        &mut h1b::usb::EP1_OUT_BUFFER,
+                        &mut h1b::usb::EP1_IN_DESCRIPTOR,
+                        &mut h1b::usb::EP1_IN_BUFFER,
                         &mut h1b::usb::CONFIGURATION_BUFFER,
                         h1b::usb::PHY::A,
                         None,
@@ -307,10 +298,18 @@ pub unsafe fn reset_handler() {
                         Some(0x5026),
                         &mut STRINGS);
 
-
-
-
-
+    let golf2 = Golf {
+        console: console,
+        gpio: gpio,
+        timer: timer,
+        ipc: kernel::ipc::IPC::new(kernel, &grant_cap),
+        digest: digest,
+        aes: aes,
+        dcrypto: dcrypto,
+        //        rng: rng,
+        uint_printer: debug_syscall::UintPrinter::new(),
+        u2f_usb: u2f,
+    };
 // dcrypto_test::run_dcrypto();
 //    rng_test::run_rng();
 
@@ -347,6 +346,7 @@ impl Platform for Golf {
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
             debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
+            h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
             _ =>  f(None),
         }
     }
