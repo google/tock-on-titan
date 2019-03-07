@@ -15,17 +15,25 @@
 CURRENT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 TOCK_ARCH ?= cortex-m3
-TOCK_USERLAND_BASE_DIR = $(CURRENT_DIR)../../../third_party/libtock-c
+
+THIRD_PARTY = ../../third_party
+TOCK_USERLAND_BASE_DIR = $(CURRENT_DIR)../../third_party/libtock-c
+CHROMIUMOS_DIR         = $(THIRD_PARTY)/chromiumos-ec
+LIBGOLF2_DIR           = ../libgolf2
+
 BUILDDIR ?= $(CURRENT_DIR)/build/$(TOCK_ARCH)
 
+STACK_SIZE := 2048
 C_SRCS   := $(wildcard *.c)
 
-OBJS += $(patsubst %.c,$(BUILDDIR)/%.o,$(C_SRCS))
+TOCK_APP_CONFIG = -Xlinker --defsym=STACK_SIZE=$$(STACK_SIZE)\
+		  -Xlinker --defsym=APP_HEAP_SIZE=$$(APP_HEAP_SIZE)\
+		  -Xlinker --defsym=KERNEL_HEAP_SIZE=$$(KERNEL_HEAP_SIZE)
 
-CPPFLAGS += -DSTACK_SIZE=2048
+EXTERN_LIBS += $(LIBGOLF2_DIR)
 
 include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk
+include $(LIBGOLF2_DIR)/Makefile
 
-$(BUILDDIR)/%.o: %.c | $(BUILDDIR)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
-
+override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
+override CPPFLAGS += -I./include

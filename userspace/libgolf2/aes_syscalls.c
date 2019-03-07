@@ -27,7 +27,7 @@
 
 #define TOCK_AES_ALLOW_KEY    0
 #define TOCK_AES_ALLOW_INPUT  1
-#define TOCK_AES_ALLOW_OUTPUT 2
+//#define TOCK_AES_ALLOW_OUTPUT 2
 #define TOCK_AES_ALLOW_IVCTR  3
 
 #define TOCK_AES_SUBSCRIBE_CRYPT 0
@@ -40,6 +40,9 @@ typedef struct {
   bool fired;
   int error;
 } aes_data_t;
+
+static int tock_aes128_set_callback(subscribe_cb callback, void *ud);
+static int tock_aes128_set_input(unsigned char *data, unsigned char len);
 
 // Internal callback for creating synchronous functions
 //
@@ -56,26 +59,19 @@ static void aes_cb(int callback_type,
   result->error = callback_type;
 }
 
-int tock_aes128_set_callback(subscribe_cb callback, void *ud);
-
 // ***** System Call Interface *****
+
+int tock_aes128_check(void) {
+  return command(AES_DRIVER, TOCK_AES_CMD_CHECK, 0, 0);
+}
 
 // Internal callback for encryption and decryption
 static int tock_aes128_set_callback(subscribe_cb callback, void *ud) {
   return subscribe(AES_DRIVER, TOCK_AES_SUBSCRIBE_CRYPT, callback, ud);
 }
 
-
-int tock_aes128_set_input(unsigned char *data, unsigned char len) {
+static int tock_aes128_set_input(unsigned char *data, unsigned char len) {
   return allow(AES_DRIVER, TOCK_AES_ALLOW_INPUT, (void*)data, len);
-}
-
-int tock_aes128_set_key(const unsigned char* data, unsigned char len) {
-  return allow(AES_DRIVER, TOCK_AES_ALLOW_KEY, (void*)data, len);
-}
-
-int tock_aes128_set_output(unsigned char* data, unsigned char len) {
-  return allow(AES_DRIVER, TOCK_AES_ALLOW_OUTPUT, (void*)data, len);
 }
 
 // Internal function to configure a initial counter to be used on counter-mode
@@ -95,8 +91,13 @@ static void increment_counter(unsigned char* buf) {
   }
 }
 
+
 // ***** Synchronous Calls *****
 
+
+int tock_aes128_set_key(unsigned char* data, unsigned char len) {
+  return allow(AES_DRIVER, TOCK_AES_ALLOW_KEY, (void*)data, len);
+}
 
 // Operates on a single 16-byte block.
 // buf and ctr are assumed to be >= 16 bytes.
@@ -104,16 +105,13 @@ static int aes128_encrypt_ctr_block(unsigned char* buf, unsigned char* ctr) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
 
-  if ((buf_len % 16 != 0) || (ctr_len != 16)) {
-    return TOCK_ESIZE;
-  }
   err = tock_aes128_set_callback(aes_cb, &result);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_input(buf, buf_len);
+  err = tock_aes128_set_input(buf, 16);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_ctr(ctr, ctr_len);
+  err = tock_aes128_set_ctr(ctr, 16);
   if (err < TOCK_SUCCESS) return err;
 
   err = command(AES_DRIVER, TOCK_AES_CMD_CTR_ENC, 0, 0);
@@ -134,16 +132,13 @@ static int aes128_decrypt_ctr_block(unsigned char* buf, unsigned char* ctr) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
 
-  if ((buf_len % 16 != 0) || (ctr_len != 16)) {
-    return TOCK_ESIZE;
-  }
   err = tock_aes128_set_callback(aes_cb, &result);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_input(buf, buf_len);
+  err = tock_aes128_set_input(buf, 16);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_ctr(ctr, ctr_len);
+  err = tock_aes128_set_ctr(ctr, 16);
   if (err < TOCK_SUCCESS) return err;
 
   err = command(AES_DRIVER, TOCK_AES_CMD_CTR_DEC, 0, 0);
@@ -156,7 +151,6 @@ static int aes128_decrypt_ctr_block(unsigned char* buf, unsigned char* ctr) {
   }
 
   return result.error;
-
 }
 
 int tock_aes128_encrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
@@ -190,6 +184,7 @@ int tock_aes128_decrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
       return err;
     }
   }
+  return err;
 }
 
 // Assumes buf is 16 bytes long.
@@ -209,7 +204,6 @@ static int aes128_encrypt_ecb_block(unsigned char* buf) {
   yield_for(&result.fired);
 
   return result.error;
-
 }
 
 // Assumes buf is 16 bytes long
@@ -244,6 +238,7 @@ int tock_aes128_encrypt_ecb_sync(unsigned char* buf, unsigned char buf_len) {
       return err;
     }
   }
+  return err;
 }
 
 int tock_aes128_decrypt_ecb_sync(unsigned char* buf, unsigned char buf_len) {
@@ -259,8 +254,11 @@ int tock_aes128_decrypt_ecb_sync(unsigned char* buf, unsigned char buf_len) {
       return err;
     }
   }
+  return err;
 }
 
+// Encrypt a block using CBC mode. Assumes both buf and iv are
+// 16 bytes long.
 static int aes128_encrypt_cbc_block(unsigned char* buf, unsigned char* iv) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
@@ -268,10 +266,10 @@ static int aes128_encrypt_cbc_block(unsigned char* buf, unsigned char* iv) {
   err = tock_aes128_set_callback(aes_cb, &result);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_input(buf, buf_len);
+  err = tock_aes128_set_input(buf, 16);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_ctr(iv, iv_len);
+  err = tock_aes128_set_ctr(iv, 16);
   if (err < TOCK_SUCCESS) return err;
 
   err = command(AES_DRIVER, TOCK_AES_CMD_CBC_ENC, 0, 0);
@@ -288,6 +286,9 @@ static int aes128_encrypt_cbc_block(unsigned char* buf, unsigned char* iv) {
   return result.error;
 }
 
+
+// Decrypt a block using CBC mode. Assumes both buf and iv are
+// 16 bytes long.
 static int aes128_decrypt_cbc_block(unsigned char* buf, unsigned char* iv) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
@@ -299,10 +300,10 @@ static int aes128_decrypt_cbc_block(unsigned char* buf, unsigned char* iv) {
   err = tock_aes128_set_callback(aes_cb, &result);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_input(buf, buf_len);
+  err = tock_aes128_set_input(buf, 16);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_ctr(iv, iv_len);
+  err = tock_aes128_set_ctr(iv, 16);
   if (err < TOCK_SUCCESS) return err;
 
   err = command(AES_DRIVER, TOCK_AES_CMD_CBC_DEC, 0, 0);
@@ -334,6 +335,7 @@ int tock_aes128_encrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
       return err;
     }
   }
+  return err;
 }
 
 
@@ -351,4 +353,5 @@ int tock_aes128_decrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
       return err;
     }
   }
+  return err;
 }

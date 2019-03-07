@@ -20,11 +20,15 @@
 extern "C" {
 #endif
 
+// Checks whether there is an AES system call driver. Returns TOCK_SUCCESS
+// if there is, ENOSUPPORT otherwise.
+int tock_aes128_check(void);
+
 // Configures the encryption key to be used for encryption and decryption.
 //
 // key - a buffer containing the key (must be 16 bytes)
 // len - length of the buffer (must be 16)
-int tock_aes128_set_key(const unsigned char* key, unsigned char len);
+int tock_aes128_set_key(unsigned char* key, unsigned char len);
 
 
 // Encrypts a payload according to aes-128 counter-mode. The counter
