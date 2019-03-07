@@ -244,14 +244,6 @@ pub unsafe fn reset_handler() {
         h1b::usb::driver::U2fSyscallDriver::new(&mut h1b::usb::USB0, kernel.create_grant(&grant_cap)));
     h1b::usb::UsbHidU2f::set_u2f_client(&h1b::usb::USB0, u2f);
 
-
-    /*    h1b::trng::TRNG0.init();
-    let rng = static_init!(
-        capsules::rng::SimpleRng<'static, h1b::trng::Trng>,
-        capsules::rng::SimpleRng::new(&mut h1b::trng::TRNG0, kernel::grant::Grant::create()),
-        8);
-    h1b::trng::TRNG0.set_client(rng);*/
-
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
     {

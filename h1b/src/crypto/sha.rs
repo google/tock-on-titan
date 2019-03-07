@@ -55,14 +55,20 @@ impl ShaEngine {
 
 pub static mut KEYMGR0_SHA: ShaEngine = unsafe { ShaEngine::new(KEYMGR0_REGS) };
 
+const HMAC_KEY_SIZE_BYTES: usize = 32;
+const HMAC_KEY_SIZE_WORDS: usize = HMAC_KEY_SIZE_BYTES / 4;
+
 impl DigestEngine for ShaEngine {
     fn initialize(&self, mode: DigestMode) -> Result<(), DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
 
+        regs.itop.set(0); // clear status
+
         // Compile-time check for DigestMode exhaustiveness
         match mode {
             DigestMode::Sha1 |
-            DigestMode::Sha256 => (),
+            DigestMode::Sha256 |
+            DigestMode::Sha256Hmac => (),
         };
         self.current_mode.set(Some(mode));
 
@@ -72,6 +78,7 @@ impl DigestEngine for ShaEngine {
         match mode {
             DigestMode::Sha1 => flags |= ShaCfgEnMask::Sha1 as u32,
             DigestMode::Sha256 => (),
+            DigestMode::Sha256Hmac => flags |= ShaCfgEnMask::Hmac as u32,
         }
         regs.cfg_en.set(flags);
 
@@ -80,10 +87,39 @@ impl DigestEngine for ShaEngine {
         Ok(())
     }
 
+    fn  initialize_hmac(&self, key: &[u8]) -> Result<(), DigestError> {
+        let ref regs = unsafe { &*self.regs }.sha;
+
+        regs.itop.set(0); // clear status
+        self.current_mode.set(Some(DigestMode::Sha256Hmac));
+
+        if key.len() < HMAC_KEY_SIZE_BYTES {
+            print!("Key too small: {}\n", key.len());
+            return Err(DigestError::BufferTooSmall(HMAC_KEY_SIZE_BYTES));
+        }
+        for i in 0..HMAC_KEY_SIZE_WORDS {
+            let word: u32 = (key[4 * i + 0] as u32) << 0  |
+                            (key[4 * i + 1] as u32) << 8  |
+                            (key[4 * i + 2] as u32) << 16 |
+                            (key[4 * i + 3] as u32) << 24;
+            regs.key_w[i].set(word);
+        }
+
+        let flags = ShaCfgEnMask::Livestream as u32 |
+                    ShaCfgEnMask::IntEnDone as u32 |
+                    ShaCfgEnMask::Hmac as u32;
+
+        regs.cfg_en.set(flags);
+        regs.trig.set(ShaTrigMask::Go as u32);
+
+        return Ok(());
+    }
+
     fn update(&self, data: &[u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
 
         if self.current_mode.get().is_none() {
+            print!("ERROR: SHA::update called but engine not initialized!\n");
             return Err(DigestError::NotConfigured);
         }
 
@@ -93,7 +129,6 @@ impl DigestEngine for ShaEngine {
         for b in data {
             fifo_u8.set(*b);
         }
-
         Ok(data.len())
     }
 

@@ -29,7 +29,7 @@ int main(void) {
   while (1) {
     printf("1. Receiving a U2F frame over USB.\n");
     ret = tock_u2f_receive(u2f_received_frame, 64);
-    printf("   Received");
+    printf("   Received with code %i", ret);
     for (int i = 0; i < 64; i++) {
       if (i % 32 == 0) {
         printf("\n");
