@@ -20,79 +20,71 @@
 extern "C" {
 #endif
 
-#define AES_DRIVER 0x40000
-
-#define TOCK_AES_CMD_CHECK 0
-#define TOCK_AES_CMD_ECB_ENC 1
-#define TOCK_AES_CMD_ECB_DEC 2
-#define TOCK_AES_CMD_CTR_ENC 3
-#define TOCK_AES_CMD_CTR_DEC 4
-#define TOCK_AES_CMD_CBC_ENC 5
-#define TOCK_AES_CMD_CBC_DEC 6
-
-#define TOCK_AES_ALLOW_KEY    0
-#define TOCK_AES_ALLOW_INPUT  1
-#define TOCK_AES_ALLOW_OUTPUT 2
-#define TOCK_AES_ALLOW_IVCTR  3
-
-#define TOCK_AES_SUBSCRIBE_CRYPT 0
-
-// configures a buffer with data to be used for encryption or decryption
+// Configures the encryption key to be used for encryption and decryption.
 //
-// data           - buffer with data
-// len            - length of the data buffer
-int tock_aes128_set_input(unsigned char *data, unsigned char len);
+// key - a buffer containing the key (must be 16 bytes)
+// len - length of the buffer (must be 16 bytes)
+int tock_aes128_set_key(const unsigned char* key, unsigned char len);
 
-// configures a buffer to be used as output for encryption or decryption;
-// if no output buffer is provided then the operation is in-place (on
-// input buffer).
+
+// Encrypts a payload according to aes-128 counter-mode. The caller is
+// responsible for incrementing/managing the counter.
 //
-// data           - buffer
-// len            - length of the buffer
-int tock_aes128_set_output(unsigned char *data, unsigned char len);
-
-
-// configures a buffer with the initial counter to be used for encryption or
-// decryption
-//
-// ctr            - buffer with initial counter
-// len            - length of the initial counter buffer
-int tock_aes128_set_ctr(const unsigned char *ctr, unsigned char len);
-
-// configures an encryption key to be used for encryption and decryption
-//
-// key - a buffer containing the key (should be 16 bytes for aes128)
-// len - length of the buffer (should be 16 bytes for aes128)
-int tock_aes128_set_key_sync(const unsigned char* key, unsigned char len);
-
-
-// encrypts a payload according to aes-128 counter-mode
-//
-// buf      - buffer to encrypt (currently max 128 bytes are supported)
+// buf      - buffer to encrypt (should be <= 16 bytes, will be zero-padded)
 // buf_len  - length of the buffer to encrypt
 // ctr      - buffer with the initial counter (should be 16 bytes)
 // ctr_len  - length of buffer with the initial counter (should be 16 bytes)
 int tock_aes128_encrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
-                            const unsigned char* ctr, unsigned char ctr_len);
+                                 unsigned char* ctr, unsigned char ctr_len);
 
-
-// decrypts a payload according to aes-128 counter-mode
+// Decrypts a payload according to aes-128 counter-mode. The caller
+// is responsible for incrementing/managing the counter.
 //
-// buf      - buffer to decrypt (currently max 128 bytes are supported)
+// buf      - buffer to decrypt (should be <= 16 bytes, will be zero-padded)
 // buf_len  - length of the buffer to decrypt
 // ctr      - buffer with the initial counter (should be 16 bytes)
 // ctr_len  - length of buffer with the initial counter (should be 16 bytes)
 int tock_aes128_decrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
-                            const unsigned char* ctr, unsigned char ctr_len);
+                                 unsigned char* ctr, unsigned char ctr_len);
 
+// Encrypts a payload according to aes-128 electronic codebook mode. Note
+// that this encryption mode is generally frowned upon, two identical
+// cleartexts have the same ciphertext (it leaks information).
+//
+// buf      - buffer to encrypt (should be <= 16 bytes, will be zero-padded)
+// buf_len  - length of the buffer to encrypt
+// ctr      - buffer with the initial counter (should be 16 bytes)
+// ctr_len  - length of buffer with the initial counter (should be 16 bytes)
 int tock_aes128_encrypt_ecb_sync(unsigned char* buf, unsigned char buf_len);
+
+// Decrypts a payload according to aes-128 electronic codebook mode. Note
+// that this encryption mode is generally frowned upon, two identical
+// cleartexts have the same ciphertext (it leaks information).
+//
+// buf      - buffer to decrypt (should be <= 16 bytes, will be zero-padded)
+// buf_len  - length of the buffer to decrypt
+// ctr      - buffer with the initial counter (should be 16 bytes)
+// ctr_len  - length of buffer with the initial counter (should be 16 bytes)
 int tock_aes128_decrypt_ecb_sync(unsigned char* buf, unsigned char buf_len);
 
-int tock_aes128_encrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
-                            const unsigned char* iv, unsigned char iv_len);
 
+// Encrypts a payload according to aes-128 cipher-block-chaining mode.
+//
+// buf      - buffer to encrypt (should be <= 16 bytes, will be zero-padded)
+// buf_len  - length of the buffer to encrypt
+// iv       - the initialization vector (must be 16 bytes)
+// iv_len   - length of buffer with the IV (must be 16 bytes)
+int tock_aes128_encrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
+                                 unsigned char* iv, unsigned char iv_len);
+
+// Decrypts a payload according to aes-128 cipher-block-chaining mode.
+//
+// buf      - buffer to decrypt (should be <= 16 bytes, will be zero-padded)
+// buf_len  - length of the buffer to decrypt
+// iv       - the initialization vector (must be 16 bytes)
+// iv_len   - length of buffer with the IV (must be 16 bytes)
 int tock_aes128_decrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
-                            const unsigned char* iv, unsigned char iv_len);
+                                 unsigned char* iv, unsigned char iv_len);
 
 
 #ifdef __cplusplus
