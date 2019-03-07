@@ -47,15 +47,15 @@ use h1b::crypto::dcrypto::Dcrypto;
 use h1b::usb::{Descriptor, StringDescriptor};
 
 // State for loading apps
-const NUM_PROCS: usize = 2;
+const NUM_PROCS: usize = 1;
 
 // how should the kernel respond when a process faults
 const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultResponse::Panic;
 
 #[link_section = ".app_memory"]
-static mut APP_MEMORY: [u8; 16384] = [0; 16384];
+static mut APP_MEMORY: [u8; 32768] = [0; 32768];
 
-static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; NUM_PROCS] = [None, None];
+static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; NUM_PROCS] = [None];
 
 /// Dummy buffer that causes the linker to reserve enough space for the stack.
 #[no_mangle]
@@ -231,6 +231,7 @@ pub unsafe fn reset_handler() {
         aes::AesDriver,
         aes::AesDriver::new(&mut h1b::crypto::aes::KEYMGR0_AES, kernel.create_grant(&grant_cap)));
     h1b::crypto::aes::KEYMGR0_AES.set_client(aes);
+    aes.initialize(&mut aes::AES_BUF);
 
     h1b::crypto::dcrypto::DCRYPTO.initialize();
     let dcrypto = static_init!(
