@@ -24,7 +24,7 @@ OBJS += $(patsubst %.c,$(BUILDDIR)/%.o,$(C_SRCS))
 
 TOCK_APP_CONFIG = -Xlinker --defsym=STACK_SIZE=$$(STACK_SIZE)\
                   -Xlinker --defsym=APP_HEAP_SIZE=$$(APP_HEAP_SIZE)\
-                   -Xlinker --defsym=KERNEL_HEAP_SIZE=$$(KERNEL_HEAP_SIZE)
+                  -Xlinker --defsym=KERNEL_HEAP_SIZE=$$(KERNEL_HEAP_SIZE)
 
 
 include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk

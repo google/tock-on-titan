@@ -18,18 +18,6 @@
 
 #include "u2f.h"
 
-static char u2f_command_frame [] = {0x00, 0x00, 0x00, 0xaa, // Channel ID
-                                    0x80 | 0x3f, // Command: U2F error
-                                    0x00, // bcount high
-                                    0x01, // bcount low
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 8-15
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 16-23
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 24-31
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 32-39
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 40-47
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 48-55
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // 56-63
-
 static char u2f_received_frame[64];
 
 int main(void) {
@@ -49,8 +37,5 @@ int main(void) {
       printf("%02x ", u2f_received_frame[i]);
     }
     printf("\n");
-    //printf("1. Transmitting a U2F error packet over transport.\n");
-    //ret = tock_u2f_transmit(u2f_command_frame, 64);
-    //printf("Return value: %i.\n", ret);
   }
 }

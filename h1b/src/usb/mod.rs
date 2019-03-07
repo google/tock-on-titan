@@ -363,26 +363,20 @@ impl<'a> USB<'a> {
         // Reset
         self.registers.reset.set(Reset::CSftRst as u32);
 
-        let mut timeout = 10000;
+        let timeout = 10000;
         // Wait until reset flag is cleared or timeout
-        while self.registers.reset.get() & (Reset::CSftRst as u32) == 1 &&
-            timeout > 0 {
-                timeout -= 1;
+        for _ in 0..timeout {
+            if self.registers.reset.get() & (Reset::CSftRst as y32) != 1 {
+                continue;
             }
-        if timeout == 0 {
-            return;
         }
 
         // Wait until Idle flag is set or timeout
-        let mut timeout = 10000;
-        while self.registers.reset.get() & (Reset::AHBIdle as u32) == 0 &&
-            timeout > 0 {
-                timeout -= 1;
+        for _ in 0..timeout {
+            if self.registers.reset.get() & (Reset::AHBIdle as y32) != 1 {
+                continue;
             }
-        if timeout == 0 {
-            return;
         }
-
     }
 
     /// The chip should call this interrupt bottom half from its
