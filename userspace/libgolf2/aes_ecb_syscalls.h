@@ -33,8 +33,7 @@ int tock_aes128_set_key(unsigned char* key, unsigned char len);
 
 // Encrypts a payload according to aes-128 counter-mode. The counter
 // stored in ctr is incremented for each block encrypted in a single call.
-// The caller is responsible for incrementing/managing the counter across
-// calls. For example, if the function is called to encrypt 64 bytes
+// For example, if the function is called to encrypt 64 bytes
 // (4 blocks) with a counter of 17, the four blocks will be encrypted with
 // counter values 17, 18, 19, 20. When the call returns, ctr will store
 // 21. The ciphertext is put into buf.
@@ -48,8 +47,7 @@ int tock_aes128_encrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
 
 // Decrypts a payload according to aes-128 counter-mode. The counter
 // stored in ctr is incremented for each block decrypted in a single call.
-// The caller is responsible for incrementing/managing the counter across
-// calls. For example, if the function is called to decrypt 64 bytes
+// For example, if the function is called to decrypt 64 bytes
 // (4 blocks) with a counter of 17, the four blocks will be decrypted with
 // counter values 17, 18, 19, 20. When the call returns, ctr will store
 // 21. The cleartext is put into buf.
