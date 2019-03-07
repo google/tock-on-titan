@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use core::cell::Cell;
-use h1b::crypto::aes::AesEngine;
-use h1b::hil::aes::{AesClient, Interrupt, KeySize};
+use h1b::crypto::aes::{AesEngine, Interrupt, KeySize};
 use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
+use kernel::hil::symmetric_encryption;
 
 pub const DRIVER_NUM: usize = 0x40000;
 
@@ -35,14 +35,14 @@ pub struct AppData {
 }
 
 pub struct AesDriver<'a> {
-    device: &'a AesEngine,
+    device: &'a AesEngine<'a>,
     apps: Grant<AppData>,
     current_user: Cell<Option<AppId>>,
     bytes_encrypted: Cell<usize>,
 }
 
 impl<'a> AesDriver<'a> {
-    pub fn new(device: &'a mut AesEngine, container: Grant<AppData>) -> AesDriver<'a> {
+    pub fn new(device: &'a mut AesEngine<'a>, container: Grant<AppData>) -> AesDriver<'a> {
         AesDriver {
             device: device,
             apps: container,
@@ -203,8 +203,8 @@ impl<'a> Driver for AesDriver<'a> {
 
     fn command(&self, command_num: usize, arg1: usize, _: usize, caller_id: AppId) -> ReturnCode {
         match command_num {
-            
-            0 /* Check if present */ => ReturnCode::SUCCESS,            
+
+            0 /* Check if present */ => ReturnCode::SUCCESS,
             1 /* init encryption */ => self.setup(caller_id, arg1),
             2 /* start encryption */ => {
                 self.crypt(caller_id)
@@ -218,7 +218,7 @@ impl<'a> Driver for AesDriver<'a> {
             4 /* finish encryption */ => self.finish(caller_id),
             5 /* set encryption mode */ => {
                 self.set_encrypt_mode(caller_id, arg1)
-            }, 
+            },
             _ => ReturnCode::ENOSUPPORT,
         }
     }
@@ -261,8 +261,8 @@ impl<'a> Driver for AesDriver<'a> {
     }
 }
 
-impl<'a> AesClient for AesDriver<'a> {
-    fn done_cipher(&self) {
+impl<'a> symmetric_encryption::Client<'a> for AesDriver<'a> {
+    fn crypt_done(&self, _source: Option<&'a mut [u8]>, _dest: &'a mut [u8]) {
         self.current_user.get().map(|current_user| {
             let _ = self.apps.enter(current_user, |app_data, _| {
                 let val = match app_data.output_buffer {
@@ -272,20 +272,6 @@ impl<'a> AesClient for AesDriver<'a> {
                     None => {0}
                 };
                 app_data.callbacks.done_cipher.map(|mut cb| cb.schedule(val, 0, 0));
-            });
-        });
-    }
-    fn done_key_expansion(&self) {
-        self.current_user.get().map(|current_user| {
-            let _ = self.apps.enter(current_user, |app_data, _| {
-                app_data.callbacks.done_key_expansion.map(|mut cb| cb.schedule(0, 0, 0));
-            });
-        });
-    }
-    fn done_wipe_secrets(&self) {
-        self.current_user.get().map(|current_user| {
-            let _ = self.apps.enter(current_user, |app_data, _| {
-                app_data.callbacks.done_wipe_secrets.map(|mut cb| cb.schedule(0, 0, 0));
             });
         });
     }

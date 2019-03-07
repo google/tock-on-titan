@@ -12,28 +12,101 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use core::cell::Cell;
-use hil::aes::{self, AesClient, Interrupt, AesModule, ParsedInterrupt};
+use kernel::hil::symmetric_encryption::Client;
+use kernel::common::cells::OptionalCell;
+
 use super::keymgr::{KEYMGR0_REGS, Registers};
 
-pub struct AesEngine {
-    regs: *mut Registers,
-    client: Cell<Option<&'static AesClient>>,
+#[derive(Debug, Copy, Clone)]
+pub enum KeySize {
+    /// Uses 128 bit AES key
+    KeySize128 = 0x0,
+    /// Uses 192 bit AES key
+    KeySize192 = 0x2,
+    /// Uses 256 bit AES key
+    KeySize256 = 0x4,
 }
 
-impl AesEngine {
-    const unsafe fn new(regs: *mut Registers) -> AesEngine {
+#[derive(Debug, Copy, Clone)]
+pub enum CipherMode {
+    /// Electronic Codebook mode.
+    Ecb = 0x0,
+    /// Counter mode.
+    Ctr = 0x8,
+    /// Cypher Block Chaining mode.
+    Cbc = 0x10,
+    /// Galois/Counter mode.
+    Gcm = 0x18,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Mode {
+    /// Input data should be decrypted.
+    Decrypt = 0x0,
+    /// Input data should be encrypted.
+    Encrypt = 0x20,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum CtrEndian {
+    /// Counter should be treated as big endian (matches NIST spec).
+    Big = 0x0,
+    /// Counter should be treated as little endian.
+    Little = 0x40,
+}
+
+pub enum AesModule {
+    Reset = 0x1,
+    Enable = 0x80,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Interrupt {
+    WFIFOOverflow = 0,
+    RFIFOOverflow,
+    RFIFOUnderflow,
+    DoneCipher,
+    DoneKeyExpansion,
+    DoneWipeSecrets,
+}
+
+pub enum ParsedInterrupt {
+    Found(Interrupt),
+    None,
+}
+
+impl From<u32> for ParsedInterrupt {
+    fn from(interrupt: u32) -> Self {
+        match interrupt {
+            104 => ParsedInterrupt::Found(Interrupt::DoneCipher),
+            105 => ParsedInterrupt::Found(Interrupt::DoneKeyExpansion),
+            106 => ParsedInterrupt::Found(Interrupt::DoneWipeSecrets),
+            107 => ParsedInterrupt::Found(Interrupt::RFIFOOverflow),
+            108 => ParsedInterrupt::Found(Interrupt::RFIFOUnderflow),
+            109 => ParsedInterrupt::Found(Interrupt::WFIFOOverflow),
+            _ => ParsedInterrupt::None,
+        }
+    }
+}
+
+pub struct AesEngine<'a>{
+    regs: *mut Registers,
+    client: OptionalCell<&'a Client<'a>>,
+}
+
+impl<'a> AesEngine<'a> {
+    const unsafe fn new(regs: *mut Registers) -> AesEngine<'a> {
         AesEngine {
             regs: regs,
-            client: Cell::new(None),
+            client: OptionalCell::empty(),
         }
     }
 
-    pub fn set_client(&self, client: &'static AesClient) {
-        self.client.set(Some(client));
+    pub fn set_client(&self, client: &'a Client<'a>) {
+        self.client.set(client);
     }
 
-    pub fn setup(&self, key_size: aes::KeySize, key: &[u32; 8]) {
+    pub fn setup(&self, key_size: KeySize, key: &[u32; 8]) {
         let ref regs = unsafe { &*self.regs }.aes;
 
         self.enable_all_interrupts();
@@ -48,7 +121,7 @@ impl AesEngine {
     pub fn set_encrypt_mode(&self, encrypt: bool) {
         let ref regs = unsafe { &*self.regs }.aes;
 
-        let flag = aes::Mode::Encrypt as u32;
+        let flag = Mode::Encrypt as u32;
         if encrypt {
             regs.ctrl.set(regs.ctrl.get() | flag);
         } else {
@@ -135,10 +208,8 @@ impl AesEngine {
 
     pub fn handle_interrupt(&self, interrupt: u32) {
         if let ParsedInterrupt::Found(int) = interrupt.into() {
-            self.client.get().map(|client| match int {
-                Interrupt::DoneCipher => client.done_cipher(),
-                Interrupt::DoneKeyExpansion => client.done_key_expansion(),
-                Interrupt::DoneWipeSecrets => client.done_wipe_secrets(),
+            self.client.map(|_client| match int {
+                //Interrupt::DoneCipher => client.crypt_done(None, ),
                 _ => println!("Interrupt {:?} fired", int),
             });
             self.clear_interrupt(int);
