@@ -363,19 +363,23 @@ impl<'a> USB<'a> {
         // Reset
         self.registers.reset.set(Reset::CSftRst as u32);
 
-        let timeout = 10000;
+
         // Wait until reset flag is cleared or timeout
-        for _ in 0..timeout {
-            if self.registers.reset.get() & (Reset::CSftRst as u32) != 1 {
-                continue;
+        let mut timeout = 10000;
+        while self.registers.reset.get() & (Reset::CSftRst as u32) == 1 {
+            if timeout == 0 {
+                return;
             }
+            timeout -= 1;
         }
 
         // Wait until Idle flag is set or timeout
-        for _ in 0..timeout {
-            if self.registers.reset.get() & (Reset::AHBIdle as u32) != 1 {
-                continue;
+        let mut timeout = 10000;
+        while self.registers.reset.get() & (Reset::AHBIdle as u32) == 1 {
+            if timeout == 0 {
+                return;
             }
+            timeout -= 1;
         }
     }
 
