@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use core::cell::Cell;
-use h1b::crypto::aes::AesEngine;
+use h1b::crypto::aes::{AesEngine, AES128Ecb};
 use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
 use kernel::common::cells::TakeCell;
 use kernel::hil::symmetric_encryption;
 use kernel::hil::symmetric_encryption::{AES128_BLOCK_SIZE, AES128_KEY_SIZE};
-use kernel::hil::symmetric_encryption::{AES128, AES128CBC, AES128Ctr, AES128Ecb};
+use kernel::hil::symmetric_encryption::{AES128, AES128CBC, AES128Ctr};
 
 pub const DRIVER_NUM: usize = 0x40000;
 
@@ -106,7 +106,6 @@ impl<'a> AesDriver<'a> {
         }).unwrap_or(ReturnCode::ENOMEM)
     }
 }
-
 
 impl<'a> symmetric_encryption::Client<'a> for AesDriver<'a> {
     fn crypt_done(&self, _source: Option<&'a mut [u8]>, output: &'a mut [u8]) {
@@ -263,21 +262,5 @@ impl<'a> Driver for AesDriver<'a> {
             _ => ReturnCode::ENOSUPPORT,
 
         }
-    }
-}
-
-impl<'a> symmetric_encryption::Client<'a> for AesDriver<'a> {
-    fn crypt_done(&self, _source: Option<&'a mut [u8]>, _dest: &'a mut [u8]) {
-        self.current_user.get().map(|current_user| {
-            let _ = self.apps.enter(current_user, |app_data, _| {
-                let val = match app_data.output_buffer {
-                    Some(ref mut slice) => {
-                        self.device.read_data(slice.as_mut())
-                    },
-                    None => {0}
-                };
-                app_data.callbacks.done_cipher.map(|mut cb| cb.schedule(val, 0, 0));
-            });
-        });
     }
 }
