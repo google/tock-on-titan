@@ -366,14 +366,14 @@ impl<'a> USB<'a> {
         let timeout = 10000;
         // Wait until reset flag is cleared or timeout
         for _ in 0..timeout {
-            if self.registers.reset.get() & (Reset::CSftRst as y32) != 1 {
+            if self.registers.reset.get() & (Reset::CSftRst as u32) != 1 {
                 continue;
             }
         }
 
         // Wait until Idle flag is set or timeout
         for _ in 0..timeout {
-            if self.registers.reset.get() & (Reset::AHBIdle as y32) != 1 {
+            if self.registers.reset.get() & (Reset::AHBIdle as u32) != 1 {
                 continue;
             }
         }
@@ -1362,16 +1362,16 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
             });
         });
 
-        self.ep1_out_descriptor.map(|out_desc| {
-            self.ep1_out_buffer.get().map(|out_buf| {
+        self.ep1_out_descriptor.map(|_out_desc| {
+            self.ep1_out_buffer.get().map(|_out_buf| {
                 let out_control = (EpCtl::ENABLE | EpCtl::CNAK |
                                    EpCtl::USBACTEP | EpCtl::INTERRUPT).epn_mps(U2F_REPORT_SIZE as u32);
                 self.registers.out_endpoints[1].control.set(out_control);
             });
         });
 
-        self.ep1_in_descriptor.map(|in_desc| {
-            self.ep1_in_buffer.map(|in_buf| {
+        self.ep1_in_descriptor.map(|_in_desc| {
+            self.ep1_in_buffer.map(|_in_buf| {
                 let in_control  = (EpCtl::USBACTEP | EpCtl::INTERRUPT |
                                    EpCtl::TXFNUM_1).epn_mps(U2F_REPORT_SIZE as u32);
                 self.registers.in_endpoints[1].control.set(in_control);
