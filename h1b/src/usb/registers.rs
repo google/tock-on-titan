@@ -64,10 +64,10 @@ pub struct Registers {
 
     _reserved_3: u32,
     // 0x810
-    pub device_in_ep_interrupt_mask: VolatileCell<u32>,
-    pub device_out_ep_interrupt_mask: VolatileCell<u32>,
-    pub device_all_ep_interrupt: VolatileCell<u32>,
-    pub device_all_ep_interrupt_mask: VolatileCell<u32>,
+    pub device_in_ep_interrupt_mask: VolatileCell<u32>,  // DOIPMASK
+    pub device_out_ep_interrupt_mask: VolatileCell<u32>, // DOEPMASK
+    pub device_all_ep_interrupt: VolatileCell<u32>,      // DAINT
+    pub device_all_ep_interrupt_mask: VolatileCell<u32>, // DAINTMASK
 
     _reserved_4: [u32; 2],
     // 0x828
@@ -79,6 +79,7 @@ pub struct Registers {
     _reserved_5: [u32; 50],
     // 0x900
     pub in_endpoints: [InEndpoint; 16],
+    // 0xb00
     pub out_endpoints: [OutEndpoint; 16],
     // 0xd00
     _reserved6: [u32; 64],
@@ -123,6 +124,49 @@ impl EpCtl {
     pub const CNAK: EpCtl = EpCtl(1 << 26);
     /// Stall endpoint
     pub const STALL: EpCtl = EpCtl(1 << 21);
+    /// Snoop on bad frames
+    pub const SNOOP: EpCtl = EpCtl(1 << 20);
+    /// Make an endpoint of type Interrupt
+    pub const INTERRUPT: EpCtl = EpCtl(3 << 18);
+    /// Denotes whether endpoint is active
+    pub const USBACTEP: EpCtl = EpCtl(1 << 15);
+
+    pub const TXFNUM_0: EpCtl = EpCtl(0 << 22);
+    pub const TXFNUM_1: EpCtl = EpCtl(1 << 22);
+    pub const TXFNUM_2: EpCtl = EpCtl(2 << 22);
+    pub const TXFNUM_3: EpCtl = EpCtl(3 << 22);
+
+    pub const TXFNUM_4: EpCtl = EpCtl(4 << 22);
+    pub const TXFNUM_5: EpCtl = EpCtl(5 << 22);
+    pub const TXFNUM_6: EpCtl = EpCtl(6 << 22);
+    pub const TXFNUM_7: EpCtl = EpCtl(7 << 22);
+
+    pub const TXFNUM_8: EpCtl = EpCtl(8 << 22);
+    pub const TXFNUM_9: EpCtl = EpCtl(9 << 22);
+    pub const TXFNUM_10: EpCtl = EpCtl(10 << 22);
+    pub const TXFNUM_11: EpCtl = EpCtl(11 << 22);
+
+    pub const TXFNUM_12: EpCtl = EpCtl(12 << 22);
+    pub const TXFNUM_13: EpCtl = EpCtl(13 << 22);
+    pub const TXFNUM_14: EpCtl = EpCtl(14 << 22);
+    pub const TXFNUM_15: EpCtl = EpCtl(15 << 22);
+
+    // EP0 has a different control register layout than the other
+    // endpoints (EPN). In EP0, the MPS field is 2 bits; in EPN, it is
+    // 10 bits (sections 5.3.5.21 and 5.3.5.22 in the OTG databook. A
+    // better implementation would type check this. -pal
+    pub const MPS_EP0_64: EpCtl = EpCtl(0 << 0);
+    pub const MPS_EP0_32: EpCtl = EpCtl(1 << 0);
+    pub const MPS_EP0_16: EpCtl = EpCtl(2 << 0);
+    pub const MPS_EP0_8: EpCtl = EpCtl(3 << 0);
+
+    pub fn epn_mps(self, cnt: u32) -> EpCtl {
+        self | EpCtl(cnt & 0x3ff)
+    }
+
+    pub const fn to_u32(self) -> u32 {
+        self.0
+    }
 }
 
 impl BitOr for EpCtl {
@@ -181,6 +225,8 @@ impl DescFlag {
     /// Indicates that a setup packet has been received
     pub const SETUP_READY: DescFlag = DescFlag(1 << 24);
 
+    // Mask for pulling out status bits
+    pub const STATUS_MASK: DescFlag = DescFlag(0b11 << 30);
     /// Host Ready status
     pub const HOST_READY: DescFlag = DescFlag(0b00 << 30);
     /// DMA Busy status
