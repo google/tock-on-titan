@@ -83,17 +83,30 @@ static int tock_aes128_set_ctr(unsigned char* ctr, unsigned char len) {
   return allow(AES_DRIVER, TOCK_AES_ALLOW_IVCTR, (void*)ctr, len);
 }
 
+static void increment_counter(unsigned char* buf) {
+  // Start from least significant byte (big endian), carry left
+  for (int i = 15; i >= 0; i--) {
+    unsigned char c = buf[i] + 1;
+    buf[i] = c;
+    if (c != 0) {
+      // If it's 0 we overflowed - carry to next byte
+      return;
+    }
+  }
+}
+
 // ***** Synchronous Calls *****
 
 
-// Function to encrypt by aes128 counter-mode with a given payload and
-// initial counter synchronously
-int tock_aes128_encrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
-                                 unsigned char* ctr, unsigned char ctr_len) {
-
+// Operates on a single 16-byte block.
+// buf and ctr are assumed to be >= 16 bytes.
+static int aes128_encrypt_ctr_block(unsigned char* buf, unsigned char* ctr) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
 
+  if ((buf_len % 16 != 0) || (ctr_len != 16)) {
+    return TOCK_ESIZE;
+  }
   err = tock_aes128_set_callback(aes_cb, &result);
   if (err < TOCK_SUCCESS) return err;
 
@@ -108,18 +121,22 @@ int tock_aes128_encrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
 
   yield_for(&result.fired);
 
+  if (result.error == TOCK_SUCCESS) {
+    increment_counter(ctr);
+  }
+
   return result.error;
 }
 
-
-// Function to decrypt by tock_aes128 counter-mode with a given payload and
-// initial counter synchronously
-int tock_aes128_decrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
-                                 unsigned char* ctr, unsigned char ctr_len) {
-
+// Operates on a single 16-byte block.
+// buf and ctr are assumed to be >= 16 bytes.
+static int aes128_decrypt_ctr_block(unsigned char* buf, unsigned char* ctr) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
 
+  if ((buf_len % 16 != 0) || (ctr_len != 16)) {
+    return TOCK_ESIZE;
+  }
   err = tock_aes128_set_callback(aes_cb, &result);
   if (err < TOCK_SUCCESS) return err;
 
@@ -134,18 +151,56 @@ int tock_aes128_decrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
 
   yield_for(&result.fired);
 
+  if (result.error == TOCK_SUCCESS) {
+    increment_counter(ctr);
+  }
+
   return result.error;
+
 }
 
+int tock_aes128_encrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
+                                 unsigned char* ctr, unsigned char ctr_len) {
+  if ((buf_len % 16 != 0) || (ctr_len != 16)) {
+    return TOCK_ESIZE;
+  }
 
-int tock_aes128_encrypt_ecb_sync(unsigned char* buf, unsigned char buf_len) {
+  // Just encrypt each block
+  int err = TOCK_SUCCESS;
+  for (int i = 0; i < buf_len; i+= 16) {
+    err = aes128_encrypt_ctr_block(buf + i, ctr);
+    if (err != TOCK_SUCCESS){
+      return err;
+    }
+  }
+  return err;
+}
+
+int tock_aes128_decrypt_ctr_sync(unsigned char* buf, unsigned char buf_len,
+                                 unsigned char* ctr, unsigned char ctr_len) {
+  if ((buf_len % 16 != 0) || (ctr_len != 16)) {
+    return TOCK_ESIZE;
+  }
+
+  // Just decrypt each block
+  int err = TOCK_SUCCESS;
+  for (int i = 0; i < buf_len; i+= 16) {
+    err = aes128_decrypt_ctr_block(buf + i, ctr);
+    if (err != TOCK_SUCCESS){
+      return err;
+    }
+  }
+}
+
+// Assumes buf is 16 bytes long.
+static int aes128_encrypt_ecb_block(unsigned char* buf) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
 
   err = tock_aes128_set_callback(aes_cb, &result);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_input(buf, buf_len);
+  err = tock_aes128_set_input(buf, 16);
   if (err < TOCK_SUCCESS) return err;
 
   err = command(AES_DRIVER, TOCK_AES_CMD_ECB_ENC, 0, 0);
@@ -154,16 +209,18 @@ int tock_aes128_encrypt_ecb_sync(unsigned char* buf, unsigned char buf_len) {
   yield_for(&result.fired);
 
   return result.error;
+
 }
 
-int tock_aes128_decrypt_ecb_sync(unsigned char* buf, unsigned char buf_len) {
+// Assumes buf is 16 bytes long
+static int aes128_decrypt_ecb_block(unsigned char* buf) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
 
   err = tock_aes128_set_callback(aes_cb, &result);
   if (err < TOCK_SUCCESS) return err;
 
-  err = tock_aes128_set_input(buf, buf_len);
+  err = tock_aes128_set_input(buf, 16);
   if (err < TOCK_SUCCESS) return err;
 
   err = command(AES_DRIVER, TOCK_AES_CMD_ECB_DEC, 0, 0);
@@ -174,8 +231,37 @@ int tock_aes128_decrypt_ecb_sync(unsigned char* buf, unsigned char buf_len) {
   return result.error;
 }
 
-int tock_aes128_encrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
-                                 unsigned char* iv, unsigned char iv_len) {
+int tock_aes128_encrypt_ecb_sync(unsigned char* buf, unsigned char buf_len) {
+  if (buf_len % 16 != 0) {
+    return TOCK_ESIZE;
+  }
+
+  // Just encrypt each block
+  int err = TOCK_SUCCESS;
+  for (int i = 0; i < buf_len; i+= 16) {
+    err = aes128_encrypt_ecb_block(buf + i);
+    if (err != TOCK_SUCCESS){
+      return err;
+    }
+  }
+}
+
+int tock_aes128_decrypt_ecb_sync(unsigned char* buf, unsigned char buf_len) {
+  if (buf_len % 16 != 0) {
+    return TOCK_ESIZE;
+  }
+
+  // Just decrypt each block
+  int err = TOCK_SUCCESS;
+  for (int i = 0; i < buf_len; i+= 16) {
+    err = aes128_decrypt_ecb_block(buf + i);
+    if (err != TOCK_SUCCESS){
+      return err;
+    }
+  }
+}
+
+static int aes128_encrypt_cbc_block(unsigned char* buf, unsigned char* iv) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
 
@@ -193,13 +279,22 @@ int tock_aes128_encrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
 
   yield_for(&result.fired);
 
+  // The IV for the next block is the ciphertext of this block.
+  // Copy only on success so we don't clobber if it needs to re-execute.
+  if (result.error == TOCK_SUCCESS) {
+    memcpy(iv, buf, 16);
+  }
+
   return result.error;
 }
 
-int tock_aes128_decrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
-                                 unsigned char* iv, unsigned char iv_len) {
+static int aes128_decrypt_cbc_block(unsigned char* buf, unsigned char* iv) {
   int err;
   aes_data_t result = { .fired = false, .error = TOCK_SUCCESS };
+  char next_iv[16];
+
+  // Next IV is this block's ciphertext, so save it
+  memcpy(next_iv, buf, 16);
 
   err = tock_aes128_set_callback(aes_cb, &result);
   if (err < TOCK_SUCCESS) return err;
@@ -215,5 +310,45 @@ int tock_aes128_decrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
 
   yield_for(&result.fired);
 
+  // Copy this block's ciphertext to IV
+  // Copy only on success so we don't clobber if it needs to re-execute.
+  if (result.error == TOCK_SUCCESS) {
+    memcpy(iv, next_iv, 16);
+  }
+
   return result.error;
+}
+
+
+int tock_aes128_encrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
+                                 unsigned char* iv, unsigned char iv_len) {
+  if ((buf_len % 16 != 0) || (iv_len != 16)) {
+    return TOCK_ESIZE;
+  }
+
+  // Just decrypt each block
+  int err = TOCK_SUCCESS;
+  for (int i = 0; i < buf_len; i+= 16) {
+    err = aes128_encrypt_cbc_block(buf + i, iv);
+    if (err != TOCK_SUCCESS){
+      return err;
+    }
+  }
+}
+
+
+int tock_aes128_decrypt_cbc_sync(unsigned char* buf, unsigned char buf_len,
+                                 unsigned char* iv, unsigned char iv_len) {
+  if ((buf_len % 16 != 0) || (iv_len != 16)) {
+    return TOCK_ESIZE;
+  }
+
+  // Just decrypt each block
+  int err = TOCK_SUCCESS;
+  for (int i = 0; i < buf_len; i+= 16) {
+    err = aes128_decrypt_cbc_block(buf + i, iv);
+    if (err != TOCK_SUCCESS){
+      return err;
+    }
+  }
 }
