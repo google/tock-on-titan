@@ -93,8 +93,6 @@ impl DigestEngine for ShaEngine {
         regs.itop.set(0); // clear status
         self.current_mode.set(Some(DigestMode::Sha256Hmac));
 
-        //regs.trig.set(ShaTrigMask::Stop as u32);
-
         if key.len() < HMAC_KEY_SIZE_BYTES {
             print!("Key too small: {}\n", key.len());
             return Err(DigestError::BufferTooSmall(HMAC_KEY_SIZE_BYTES));
