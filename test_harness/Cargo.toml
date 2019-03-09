@@ -20,5 +20,5 @@ edition = "2018"
 publish = false
 
 [dependencies]
+libtock = { path = "../third_party/libtock-rs" }
 simple_print = { path = "../simple_print" }
-tock = { path = "../third_party/libtock-rs" }
