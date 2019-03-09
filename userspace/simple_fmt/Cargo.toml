@@ -12,13 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# A formatting library designed for use by simple_print.
+
 [package]
-name = "simple_print"
+name = "simple_fmt"
 version = "0.1.0"
 authors = ["jrvanwhy <jrvanwhy@google.com>"]
 edition = "2018"
 publish = false
 
-[dependencies]
-libtock = { path = "../third_party/libtock-rs" }
-simple_fmt = { path = "../userspace/simple_fmt" }
+[dev-dependencies]
+rayon = "1.0.3"
+
+# Run tests with optimization because the tests are very slow (and the compile
+# time fast).
+[profile.test]
+codegen-units = 1
+debug = false
+lto = true
+opt-level = 3
