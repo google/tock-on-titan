@@ -25,14 +25,3 @@ simple_print = { path = "../../simple_print" }
 
 [dev-dependencies]
 test = { path = "../test_harness" }
-
-[profile.dev]
-panic = "abort"
-opt-level = "z"
-debug = true
-
-[profile.release]
-panic = "abort"
-lto = true
-opt-level = "z"
-debug = true

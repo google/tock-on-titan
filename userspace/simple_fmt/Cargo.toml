@@ -23,11 +23,3 @@ publish = false
 
 [dev-dependencies]
 rayon = "1.0.3"
-
-# Run tests with optimization because the tests are very slow (and the compile
-# time fast).
-[profile.test]
-codegen-units = 1
-debug = false
-lto = true
-opt-level = 3

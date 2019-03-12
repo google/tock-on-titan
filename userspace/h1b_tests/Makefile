@@ -43,13 +43,13 @@ doc:
 # creates it in the same directory as the elf files, while the golf2 Makefile
 # expects it at build/cortex-m3/cortex-m3/cortex-m3.tbf, so we manually move the
 # file over afterwards.
-build/cortex-m3/cortex-m3/cortex-m3.tbf: target/thumbv7m-none-eabi/release/h1b_tests
+build/cortex-m3/cortex-m3/cortex-m3.tbf: ../target/thumbv7m-none-eabi/release/h1b_tests
 	mkdir -p build/cortex-m3/cortex-m3
 	cd ../../third_party/elf2tab && cargo run --release -- -n "h1b_tests" \
 		-o ../../userspace/h1b_tests/build/cortex-m3/cortex-m3/cortex-m3.tab \
 		../../userspace/h1b_tests/$^ --stack=2048 --app-heap=1024 \
 		--kernel-heap=1024 --protected-region-size=64
-	mv target/thumbv7m-none-eabi/release/h1b_tests.tbf \
+	mv ../target/thumbv7m-none-eabi/release/h1b_tests.tbf \
 		build/cortex-m3/cortex-m3/cortex-m3.tbf
 
 # Builds the h1b_tests Elf file using cargo. Marked as phony because we rely on
@@ -61,10 +61,10 @@ build/cortex-m3/cortex-m3/cortex-m3.tbf: target/thumbv7m-none-eabi/release/h1b_t
 # regexp to locate the test executable. Note that we first clear out existing
 # test binaries because Cargo does not do so; the `find` call relies on there
 # only being a single test binary.
-.PHONY: target/thumbv7m-none-eabi/release/h1b_tests
-target/thumbv7m-none-eabi/release/h1b_tests:
-	rm -f target/thumbv7m-none-eabi/release/h1b_tests-*
+.PHONY: ../target/thumbv7m-none-eabi/release/h1b_tests
+../target/thumbv7m-none-eabi/release/h1b_tests:
+	rm -f ../target/thumbv7m-none-eabi/release/h1b_tests-*
 	cargo test --no-run --release
-	find target/thumbv7m-none-eabi/release/ -maxdepth 1 \
-		-regex 'target/thumbv7m-none-eabi/release/h1b_tests-[^.]+' \
-		-exec cp '{}' target/thumbv7m-none-eabi/release/h1b_tests ';'
+	find ../target/thumbv7m-none-eabi/release/ -maxdepth 1 \
+		-regex '../target/thumbv7m-none-eabi/release/h1b_tests-[^.]+' \
+		-exec cp '{}' ../target/thumbv7m-none-eabi/release/h1b_tests ';'
