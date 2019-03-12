@@ -1,6 +1,5 @@
 .env
 target/
-doc/*
 build/*
 *.rlib
 *.sdb
