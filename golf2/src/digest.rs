@@ -108,6 +108,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                         if input_len > input_buffer.len() {
                             return ReturnCode::ESIZE
                         }
+
                         match self.engine.update(&input_buffer.as_ref()[..input_len]) {
                             Ok(_t) => ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => ReturnCode::ENOSUPPORT,

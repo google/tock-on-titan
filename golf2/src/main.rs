@@ -76,6 +76,7 @@ pub struct Golf {
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
     u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
     uint_printer: debug_syscall::UintPrinter,
+    u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
 }
 
 static mut STRINGS: [StringDescriptor; 7] = [
@@ -360,6 +361,7 @@ impl Platform for Golf {
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
             h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
             debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
+            h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
             _ =>  f(None),
         }
     }

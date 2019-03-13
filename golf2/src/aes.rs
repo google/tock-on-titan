@@ -19,15 +19,6 @@ use kernel::common::cells::TakeCell;
 use kernel::hil::symmetric_encryption;
 use kernel::hil::symmetric_encryption::{AES128_BLOCK_SIZE, AES128_KEY_SIZE};
 
-const AES192_KEY_SIZE:   usize = 192 / 8;
-const AES256_KEY_SIZE:   usize = 256 / 8;
-
-#[allow(dead_code)]
-const AES192_BLOCK_SIZE: usize = 192 / 8;
-#[allow(dead_code)]
-const AES256_BLOCK_SIZE: usize = 256 / 8;
-
-
 use kernel::hil::symmetric_encryption::{AES128, AES128CBC, AES128Ctr};
 
 pub const DRIVER_NUM: usize = 0x40000;
@@ -79,14 +70,30 @@ impl<'a> AesDriver<'a> {
     fn run_aes(&self, caller_id: AppId) -> ReturnCode {
         self.apps.enter(caller_id, |app_data, _| {
             if app_data.input_buffer.is_none() {
-                debug!("Missing input buffer.\n");
+                debug!("AES: Missing input buffer.\n");
                 return ReturnCode::ENOMEM;
             } else if app_data.key.is_none() {
-                debug!("Missing application encryption key.\n");
+                debug!("AES: Missing application encryption key.\n");
                 return ReturnCode::ENOMEM;
             } else if self.buffer.is_none() {
-                debug!("Missing kernel buffer.\n");
+                debug!("AES: Missing kernel buffer.\n");
                 return ReturnCode::ENOMEM;
+            }
+
+            let key = app_data.key.take();
+            let rcode = key.map_or(ReturnCode::EINVAL, |key| {
+                if key.len() == AES128_KEY_SIZE {
+                    self.device.set_key(key.as_ref());
+                    app_data.key = Some(key);
+                    ReturnCode::SUCCESS
+                } else {
+                    debug!("AES: application encryption key is wrong size.\n");
+                    ReturnCode::EINVAL
+                }
+            });
+
+            if rcode != ReturnCode::SUCCESS {
+                return rcode;
             }
 
             // Copy application data into the kernel buffer
@@ -109,7 +116,6 @@ impl<'a> AesDriver<'a> {
         }).unwrap_or(ReturnCode::ENOMEM)
     }
 }
-
 
 impl<'a> symmetric_encryption::Client<'a> for AesDriver<'a> {
     fn crypt_done(&self, _source: Option<&'a mut [u8]>, output: &'a mut [u8]) {
@@ -185,13 +191,13 @@ impl<'a> Driver for AesDriver<'a> {
                 self.device.set_mode_aes128cbc(false);
                 self.run_aes(caller_id)
             },
-            7 /* expand key */ => {
+            7 /* install key */ => {
                 self.apps.enter(caller_id, |app_data, _| {
                     let key = app_data.key.take();
                     let rcode = key.map_or(ReturnCode::ENOMEM, |key| {
                         if key.len() == AES128_KEY_SIZE {
                             self.device.set_key(key.as_ref());
-                    }
+                        }
                         app_data.key = Some(key);
                         ReturnCode::SUCCESS
                     });
@@ -216,9 +222,7 @@ impl<'a> Driver for AesDriver<'a> {
                     self.apps
                         .enter(app_id, |app_data, _| {
                             if let Some(s) = slice {
-                                if s.len() != AES128_KEY_SIZE &&
-                                   s.len() != AES192_KEY_SIZE &&
-                                   s.len() != AES256_KEY_SIZE {
+                                if s.len() != AES128_KEY_SIZE {
                                     return ReturnCode::ESIZE;
                                 }
                                 app_data.key = Some(s);

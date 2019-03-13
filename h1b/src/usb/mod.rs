@@ -123,6 +123,7 @@ const EP0_OUT_BUFFER_COUNT: usize = 2;
 /// StringDescriptors, which are provided by the boot sequence. The
 /// meaning of each StringDescriptor is defined by its index, in
 /// usb::constants.
+
 pub struct USB<'a> {
     registers: StaticRef<Registers>,
     core_clock: Clock,
@@ -142,6 +143,11 @@ pub struct USB<'a> {
     ep0_out_buffers: Cell<Option<&'static [[u32; 16]; EP0_OUT_BUFFER_COUNT]>>,
     ep0_in_descriptors: TakeCell<'static, [DMADescriptor; EP0_IN_BUFFER_COUNT]>,
     ep0_in_buffers: TakeCell<'static, [u32; 16 * EP0_IN_BUFFER_COUNT]>,
+
+    ep1_out_descriptor: TakeCell<'static, DMADescriptor>,
+    ep1_out_buffer: Cell<Option<&'static [u32; 16]>>,
+    ep1_in_descriptor: TakeCell<'static, DMADescriptor>,
+    ep1_in_buffer: TakeCell<'static,[u32; 16]>,
 
     // Track the index of which ep0_out descriptor is currently set
     // for reception and which descriptor received the most
@@ -190,8 +196,9 @@ const BASE_ADDR: *const Registers = 0x40300000 as *const Registers;
 pub static mut USB0: USB<'static> = unsafe { USB::new() };
 
 impl<'a> USB<'a> {
-    /// Creates a new value referencing the single USB driver. After instantiation,
-    /// init() needs to be called to initialize buffers and identifiers.
+    /// Creates a new value referencing the single USB driver.  After
+    /// instantiation, init() needs to be called to initialize buffers
+    /// and identifiers.
     ///
     /// ## Safety
     ///
@@ -300,7 +307,6 @@ impl<'a> USB<'a> {
         })
     }
 
-
     fn usb_reconnect(&self) {}
 
     /// Perform a soft reset on the USB core; timeout if the reset
@@ -309,26 +315,24 @@ impl<'a> USB<'a> {
         // Reset
         self.registers.reset.set(Reset::CSftRst as u32);
 
-        let mut timeout = 10000;
+
         // Wait until reset flag is cleared or timeout
-        while self.registers.reset.get() & (Reset::CSftRst as u32) == 1 &&
-            timeout > 0 {
-                timeout -= 1;
+        let mut timeout = 10000;
+        while self.registers.reset.get() & (Reset::CSftRst as u32) == 1 {
+            if timeout == 0 {
+                return;
             }
-        if timeout == 0 {
-            return;
+            timeout -= 1;
         }
 
         // Wait until Idle flag is set or timeout
         let mut timeout = 10000;
-        while self.registers.reset.get() & (Reset::AHBIdle as u32) == 0 &&
-            timeout > 0 {
-                timeout -= 1;
+        while self.registers.reset.get() & (Reset::AHBIdle as u32) == 1 {
+            if timeout == 0 {
+                return;
             }
-        if timeout == 0 {
-            return;
+            timeout -= 1;
         }
-
     }
 
     /// The chip should call this interrupt bottom half from its
@@ -1052,14 +1056,34 @@ impl<'a> USB<'a> {
                 synchronization: EndpointSynchronizationType::None,
                 usage: EndpointUsageType::Data,
             };
+<<<<<<< HEAD
+=======
+
+            let mut config = ConfigurationDescriptor::new(2, STRING_PLATFORM, 50);
+            let u2f = InterfaceDescriptor::new(STRING_INTERFACE2, 0, 3, 0, 0);
+            let hid = HidDeviceDescriptor::new();
+            let ep1out = EndpointDescriptor::new(0x01, attributes_u2f_out, 2);
+            let ep1in  = EndpointDescriptor::new(0x81, attributes_u2f_in, 2);
+>>>>>>> 1c4ec41554423ed6a5c0de8893618664db480711
             let shell = InterfaceDescriptor::new(STRING_INTERFACE1, 1, 0xFF, 80, 1);
             let ep2in  = EndpointDescriptor::new(0x82, attributes_shell_in, 10);
             let ep2out = EndpointDescriptor::new(0x02, attributes_shell_out, 0);
 
+<<<<<<< HEAD
 
             size += shell.into_u8_buf(&mut desc[size..size + shell.length()]);
             size += ep2in.into_u8_buf(&mut desc[size..size + ep2in.length()]);
             size += ep2out.into_u8_buf(&mut desc[size..size + ep2out.length()]);*/
+=======
+            let mut size: usize = config.length();
+            size += u2f.into_u8_buf(&mut desc[size..size + u2f.length()]);
+            size += hid.into_u8_buf(&mut desc[size..size + hid.length()]);
+            size += ep1out.into_u8_buf(&mut desc[size..size + ep1out.length()]);
+            size += ep1in.into_u8_buf(&mut desc[size..size + ep1in.length()]);
+            size += shell.into_u8_buf(&mut desc[size..size + shell.length()]);
+            size += ep2in.into_u8_buf(&mut desc[size..size + ep2in.length()]);
+            size += ep2out.into_u8_buf(&mut desc[size..size + ep2out.length()]);
+>>>>>>> 1c4ec41554423ed6a5c0de8893618664db480711
 
             config.set_total_length(size as u16);
             config.into_u8_buf(&mut desc[0..config.length()]);
@@ -1305,7 +1329,6 @@ impl<'a> USB<'a> {
     }
 
 }
-
 
 /// Implementation of the HID U2F API for the USB device. It assumes
 /// that U2F is over endpoint 1.
