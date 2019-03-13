@@ -12,8 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kernel::hil::symmetric_encryption::Client;
+use core::cell::Cell;
+use kernel::hil::symmetric_encryption::{AES128, AES128Ctr, AES128CBC,  Client};
+use kernel::hil::symmetric_encryption::{AES128_BLOCK_SIZE};
 use kernel::common::cells::OptionalCell;
+use kernel::common::cells::TakeCell;
+use kernel::ReturnCode;
+
+pub trait AES128Ecb {
+    /// Call before `AES128::crypt()` to perform AES128Ecb
+    fn set_mode_aes128ecb(&self, encrypting: bool);
+}
 
 use super::keymgr::{KEYMGR0_REGS, Registers};
 
@@ -92,26 +101,188 @@ impl From<u32> for ParsedInterrupt {
 pub struct AesEngine<'a>{
     regs: *mut Registers,
     client: OptionalCell<&'a Client<'a>>,
+    output: TakeCell<'a, [u8]>, // If output is None, put result into input buffer
+    input: TakeCell<'a, [u8]>,
+    read_index: Cell<usize>,
+    write_index: Cell<usize>,
+    stop_index: Cell<usize>,
 }
+
+impl<'a> AES128<'a> for AesEngine<'a> {
+    fn enable(&self) {
+        self.setup();
+    }
+
+    fn disable(&self) {}
+
+    fn set_client(&'a self, client: &'a Client<'a>) {
+        self.set_client(client);
+    }
+
+    fn set_key(&self, key: &[u8]) -> ReturnCode {
+        if key.len() != 16 {
+            return ReturnCode::ESIZE;
+        }
+        let mut key32: [u32; 8] = [0; 8];
+        for i in 0..4 {
+            key32[i] = (key[4 * i + 0] as u32) |
+                       (key[4 * i + 1] as u32) << 8 |
+                       (key[4 * i + 2] as u32) << 16 |
+                       (key[4 * i + 3] as u32) << 24;
+        }
+        self.install_key(KeySize::KeySize128, &key32);
+        ReturnCode::SUCCESS
+    }
+
+
+    fn set_iv(&self, iv: &[u8]) -> ReturnCode {
+        let ref regs = unsafe { &*self.regs }.aes;
+        if iv.len() != AES128_BLOCK_SIZE {
+            return ReturnCode::ESIZE;
+        }
+        // For each of 4 words in CTR
+        for i in 0..4 {
+            let mut val: u32 = 0;
+            // OR in each byte of the word
+            for b in 0..4 {
+                let index = (4 * i) + b;
+                val |= (iv[index] as u32) << (b * 8);
+            }
+            regs.ctr[i].set(val);
+        }
+        ReturnCode::SUCCESS
+    }
+
+    fn start_message(&self) {
+        // Initialization vector not supported yet.
+    }
+
+    fn crypt(
+        &'a self,
+        source: Option<&'a mut [u8]>,
+        dest: &'a mut [u8],
+        start_index: usize,
+        stop_index: usize,
+    ) -> Option<(ReturnCode, Option<&'a mut [u8]>, &'a mut [u8])> {
+        if self.input.is_some() {
+            Some((ReturnCode::EBUSY, source, dest))
+        } else {
+            self.input.put(source);
+            self.output.replace(dest);
+            if self.try_set_indices(start_index, stop_index) {
+                if self.input.is_some() {
+                    self.input.map(|buf| self.crypt(&buf[start_index..stop_index]));
+                } else {
+                    self.output.map(|buf| self.crypt(&buf[start_index..stop_index]));
+                }
+                None
+            } else {
+                Some((ReturnCode::EINVAL,
+                      self.input.take(),
+                      self.output.take().unwrap(),
+                ))
+            }
+        }
+    }
+}
+
+impl<'a> AES128Ecb for AesEngine<'a> {
+    fn set_mode_aes128ecb(&self, encrypting: bool) {
+        self.set_cipher_mode(CipherMode::Ecb);
+        self.set_encrypt_mode(encrypting);
+    }
+}
+
+impl<'a> AES128CBC for AesEngine<'a> {
+    fn set_mode_aes128cbc(&self, encrypting: bool) {
+        self.set_cipher_mode(CipherMode::Cbc);
+        self.set_encrypt_mode(encrypting);
+    }
+}
+
+impl<'a> AES128Ctr for AesEngine<'a> {
+    fn set_mode_aes128ctr(&self, _encrypting: bool) {
+        self.set_cipher_mode(CipherMode::Ctr);
+        self.set_encrypt_mode(true);
+    }
+}
+
+
 
 impl<'a> AesEngine<'a> {
     const unsafe fn new(regs: *mut Registers) -> AesEngine<'a> {
         AesEngine {
             regs: regs,
             client: OptionalCell::empty(),
+            input: TakeCell::empty(),
+            output: TakeCell::empty(),
+            read_index: Cell::new(0),
+            write_index: Cell::new(0),
+            stop_index: Cell::new(0),
         }
+    }
+
+    fn try_set_indices(&self, start_index: usize, stop_index: usize)  -> bool {
+        stop_index.checked_sub(start_index).map_or(false, |sublen| {
+            sublen % AES128_BLOCK_SIZE == 0 && {
+                self.input.map_or_else(
+                    || {
+                        // The destination buffer is also the input
+                        if self.output.map_or(false, |dest| stop_index <= dest.len()) {
+                            self.write_index.set(start_index);
+                            self.read_index.set(start_index);
+                            self.stop_index.set(stop_index);
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                    |source| {
+                        if sublen == source.len()
+                            && self.output.map_or(false, |dest| stop_index <= dest.len())
+                        {
+                            // We will start writing to the AES from the beginning of `source`,
+                            // and end at its end
+                            self.write_index.set(0);
+
+                            // We will start reading from the AES into `dest` at `start_index`,
+                            // and continue until `stop_index`
+                            self.read_index.set(start_index);
+                            self.stop_index.set(stop_index);
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            }
+        })
     }
 
     pub fn set_client(&self, client: &'a Client<'a>) {
         self.client.set(client);
     }
 
-    pub fn setup(&self, key_size: KeySize, key: &[u32; 8]) {
+    pub fn setup(&self) {
         let ref regs = unsafe { &*self.regs }.aes;
+        self.enable_interrupt(Interrupt::DoneCipher);
+        self.enable_interrupt(Interrupt::DoneKeyExpansion);
+        let mut control = regs.ctrl.get();
+        control |= AesModule::Enable as u32;
+        regs.ctrl.set(control);
+    }
 
-        self.enable_all_interrupts();
-        regs.ctrl.set(regs.ctrl.get() | key_size as u32 | AesModule::Enable as u32);
+    pub fn set_cipher_mode(&self, mode: CipherMode) {
+        let ref regs = unsafe { &*self.regs }.aes;
+        let mut control = regs.ctrl.get();
+        control &= !0x18; // strip out cipher mode bits
+        control |= (mode as u32) << 3; //
+        regs.ctrl.set(control);
+    }
 
+    pub fn install_key(&self, key_size: KeySize, key: &[u32; 8]) {
+        let ref regs = unsafe { &*self.regs }.aes;
+        regs.ctrl.set((regs.ctrl.get() & !0x6) | (key_size as u32) << 1);
         for (i, word) in key.iter().enumerate() {
             regs.key[i].set(*word);
         }
@@ -151,7 +322,6 @@ impl<'a> AesEngine<'a> {
         for _ in written_words..4 {
             regs.wfifo_data.set(0);
         }
-
         written_bytes
     }
 
@@ -208,9 +378,9 @@ impl<'a> AesEngine<'a> {
 
     pub fn handle_interrupt(&self, interrupt: u32) {
         if let ParsedInterrupt::Found(int) = interrupt.into() {
-            self.client.map(|_client| match int {
-                //Interrupt::DoneCipher => client.crypt_done(None, ),
-                _ => println!("Interrupt {:?} fired", int),
+            self.client.map(|client| match int {
+                Interrupt::DoneCipher => client.crypt_done(self.input.take(), self.output.take().unwrap() ),
+                _ => {}
             });
             self.clear_interrupt(int);
         } else {
