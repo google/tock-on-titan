@@ -16,21 +16,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "aes_ecb_syscalls.h"
+#include "h1b_aes_syscalls.h"
 
 static unsigned char key[] = "1234567890123456";
 static unsigned char data[] = "Data to encrypt. We shall see if this works.....";
-static unsigned char expected[] = {
-    0x25, 0x97, 0xea, 0xce, 0x3a, 0x51, 0xce, 0x0d, 0xd8, 0x97, 0xae, 0x00,
-    0x2a, 0x4e, 0xcd, 0xac, 0xe6, 0x31, 0xf6, 0x42, 0xa3, 0xbe, 0x5f, 0xaf,
-    0x3e, 0x8f, 0x04, 0x39, 0xf5, 0x9c, 0x40, 0x96, 0x6f, 0x21, 0x4b, 0xce,
-    0x1a, 0x1f, 0xbc, 0xdf, 0x95, 0x26, 0xc4, 0xf1, 0xff, 0xed, 0xf1, 0x22};
+static unsigned char buffer[48];
 
-static char buffer[48];
+void print_buffer(unsigned char *buffer, size_t length);
 
-void print_buffer(char *buffer, size_t length);
-
-void print_buffer(char *buffer, size_t length) {
+void print_buffer(unsigned char *buffer, size_t length) {
   for (size_t i = 0; i < length; i++) {
     printf("%02x ", buffer[i]);
     fflush(stdout);
@@ -43,9 +37,9 @@ int main(void) {
   //  printf("Expecting [%d]: 0x", sizeof(expected));
   // print_buffer(expected, sizeof(expected), "%02x");
   printf("Setting up key.\n");
-  tock_aes128_set_key(key, strlen(key));
-  printf("Encrypting %i bytes.\n", strlen(data));
-  memcpy(buffer, data, strlen(data) + 1);
+  tock_aes128_set_key(key, strlen((const char*)key));
+  printf("Encrypting %i bytes.\n", strlen((const char*)data));
+  memcpy(buffer, data, strlen((const char*)data) + 1);
   int len = tock_aes128_encrypt_ecb_sync(buffer, sizeof(buffer));
 
   if (len >= 0) {
@@ -60,11 +54,11 @@ int main(void) {
   printf("==== Starting Decryption ====\n");
 
   printf("Expecting [%d]: ", sizeof(data));
-  print_buffer(data, strlen(data));
+  print_buffer(data, strlen((const char*)data));
 
   int res;
   printf("Setting up key.\n");
-  res = tock_aes128_set_key(key, strlen(key));
+  res = tock_aes128_set_key(key, strlen((const char*)key));
   if (res < 0) {
     printf("Got error while setup: %d\n", res);
   }
