@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-#include "aes_ecb_syscalls.h"
+#include "h1b_aes_syscalls.h"
 
 #define AES_DRIVER 0x40000
 
