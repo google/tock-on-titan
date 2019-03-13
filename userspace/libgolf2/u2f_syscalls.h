@@ -17,7 +17,7 @@
 
 #include <stdlib.h>
 
-#define HOTEL_DRIVER_U2F 0x20008
+#define H1B_DRIVER_U2F 0x20008
 
 #define TOCK_U2F_CMD_CHECK    0
 

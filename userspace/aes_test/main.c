@@ -15,51 +15,54 @@
 #include <gpio.h>
 #include <stdio.h>
 #include <string.h>
-#include "aes_ecb_syscalls.h"
-#include "aes.h"
+#include "h1b_aes_syscalls.h"
 
-static unsigned char key[16] =    "1234567890123456";
-static unsigned char data[16]   = "Data to encrypt.";
-static unsigned char output[16];
+static unsigned char key[] = "1234567890123456";
+static unsigned char data[] = "Data to encrypt. We shall see if this works.....";
+static unsigned char buffer[48];
+
+void print_buffer(unsigned char *buffer, size_t length);
+
+void print_buffer(unsigned char *buffer, size_t length) {
+  for (size_t i = 0; i < length; i++) {
+    printf("%02x ", buffer[i]);
+    fflush(stdout);
+  }
+  printf("\n");
+}
 
 int main(void) {
   printf("==== Starting Encryption ====\n");
+  //  printf("Expecting [%d]: 0x", sizeof(expected));
+  // print_buffer(expected, sizeof(expected), "%02x");
   printf("Setting up key.\n");
-  aes128_set_key_sync(key, strlen((char*)key));
-  printf("Copying data %p to buffer %p.\n", data, output);
-  memcpy(output, data, 16);
-  printf("Encrypting %p: %s.\n", output, output);
+  tock_aes128_set_key(key, strlen((const char*)key));
+  printf("Encrypting %i bytes.\n", strlen((const char*)data));
+  memcpy(buffer, data, strlen((const char*)data) + 1);
+  int len = tock_aes128_encrypt_ecb_sync(buffer, sizeof(buffer));
 
-  for (int i = 0; i < 16; i++) {
-    printf("%02x", output[i]);
+  if (len >= 0) {
+    printf("Result    [%d]: 0x", len);
+    print_buffer(buffer, sizeof(buffer));
+  } else {
+    printf("Got error while encrypting: %d\n", -len);
+    return -1;
   }
+
   printf("\n");
 
-  int rcode;
+  printf("Expecting [%d]: ", sizeof(data));
+  print_buffer(data, strlen((const char*)data));
 
-  rcode = aes128_encrypt_ecb(output, 16);
-  if (rcode >= 0) {
-    printf("Result    [%d]:\n", rcode);
-    for (int i = 0; i < 16; i++) {
-      printf("%02x", output[i]);
-    }
-    printf("\n");
-  } else {
-    printf("Error while encrypting: %d\n", -rcode);
-    return -1;
+  int res;
+  printf("Setting up key.\n");
+  res = tock_aes128_set_key(key, strlen((const char*)key));
+  if (res < 0) {
+    printf("Got error while setup: %d\n", res);
   }
-  printf("Decrypting %p\n", output);
+  printf("Decrypting.\n");
+  int dec_len = tock_aes128_decrypt_ecb_sync(buffer, sizeof(buffer));
 
-  rcode = aes128_decrypt_ecb(output, 16);
-  if (rcode >= 0) {
-    printf("Result    [%d]:\n", rcode);
-    for (int i = 0; i < 16; i++) {
-      printf("%02x", output[i]);
-    }
-    printf("\n");
-  } else {
-    printf("Error while decrypting: %d\n", -rcode);
-    return -1;
-  }
-
+  printf("Result    [%d]: ", dec_len);
+  print_buffer(buffer, sizeof(buffer));
 }

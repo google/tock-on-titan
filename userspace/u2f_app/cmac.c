@@ -48,7 +48,7 @@ int fips_cmac_generate(const void* key, const void* data, size_t data_len,
   size_t i, j;
 
   // setup key
-  if (!fips_aes_init(key, 128, NULL, AES_CIPHER_MODE_ECB, AES_ENCRYPT_MODE)) {
+  if (!fips_aes_init((const unsigned char*)key, 128, NULL, AES_CIPHER_MODE_ECB, AES_ENCRYPT_MODE)) {
     printf("ERROR: FIPS CMAC failed to init AES\n");
     return EC_ERROR_UNKNOWN;
   }

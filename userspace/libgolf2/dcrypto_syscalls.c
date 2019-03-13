@@ -60,14 +60,14 @@ int tock_dcrypto_run(void* data, size_t datalen,
   int ret = -1;
   bool run_done = false;
 
-  ret = subscribe(HOTEL_DRIVER_DCRYPTO, TOCK_DCRYPTO_RUN_DONE,
+  ret = subscribe(H1B_DRIVER_DCRYPTO, TOCK_DCRYPTO_RUN_DONE,
                   tock_dcrypto_run_done, &run_done);
   if (ret < 0) {
     printf("Could not register dcrypto callback with kernel: %d\n", ret);
     return ret;
   }
 
-  ret = allow(HOTEL_DRIVER_DCRYPTO, TOCK_DCRYPTO_ALLOW_DATA,
+  ret = allow(H1B_DRIVER_DCRYPTO, TOCK_DCRYPTO_ALLOW_DATA,
               data, datalen);
   if (ret < 0) {
     // This should only occur if application state is not available,
@@ -76,7 +76,7 @@ int tock_dcrypto_run(void* data, size_t datalen,
     return TOCK_EBUSY;
   }
 
-  ret = allow(HOTEL_DRIVER_DCRYPTO, TOCK_DCRYPTO_ALLOW_PROG,
+  ret = allow(H1B_DRIVER_DCRYPTO, TOCK_DCRYPTO_ALLOW_PROG,
               program, programlen);
   if (ret < 0) {
     // This should only occur if application state is not available,
@@ -85,7 +85,7 @@ int tock_dcrypto_run(void* data, size_t datalen,
     return TOCK_EBUSY;
   }
 
-  ret = command(HOTEL_DRIVER_DCRYPTO, TOCK_DCRYPTO_CMD_RUN, start_instruction, 0);
+  ret = command(H1B_DRIVER_DCRYPTO, TOCK_DCRYPTO_CMD_RUN, start_instruction, 0);
 
   if (ret < 0) {
     printf("Could not invoke dcrypto program instruction %i rcode: %d\n", start_instruction, ret);
