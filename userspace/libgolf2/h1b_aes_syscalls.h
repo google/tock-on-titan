@@ -28,7 +28,7 @@ int tock_aes128_check(void);
 //
 // key - a buffer containing the key (must be 16 bytes)
 // len - length of the buffer (must be 16)
-int tock_aes128_set_key(unsigned char* key, unsigned char len);
+int tock_aes128_set_key(const unsigned char* key, unsigned char len);
 
 
 // Encrypts a payload according to aes-128 counter-mode. The counter

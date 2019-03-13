@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-APP ?= u2f_test
+APP ?= u2f_app
 TARGET=thumbv7m-none-eabi
 PLATFORM=golf2
 TOCK_ARCH=cortex-m3

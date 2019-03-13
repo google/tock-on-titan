@@ -73,7 +73,7 @@ int fips_aes_init(const uint8_t *key, uint32_t key_len, const uint8_t *iv,
   // convert here.
   key_len = key_len / 8;
   if (key_len == AES256_BLOCK_CIPHER_KEY_SIZE) {
-   tock_aes128_set_key(key, key_len);
+    tock_aes128_set_key(key, key_len);
   } else if (key_len == AES256_BLOCK_CIPHER_KEY_SIZE/2) {
     tock_aes128_set_key(key, key_len);
   } else {
