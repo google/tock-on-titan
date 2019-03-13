@@ -15,7 +15,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-//! Software interface to the dcrypto peripheral of the Hotel chip
+//! Software interface to the dcrypto peripheral of the H1B chip
 //! for the Tock operating system.
 //!
 //! dcrypto is a processor designed to offload the SC300 CPU and
@@ -84,7 +84,16 @@ const RAND_STALL_FREQ_6: u32 = (3 << 1);
 const RAND_STALL_FREQ_MASK: u32 = !(0x3 << 1);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum State {
+pub enum HwState { // Values of CRYPTO_STATUS_STATE bits
+    Halt = 0,
+    Run  = 1,
+    Break = 2,
+    Wipe = 3,
+    Unknown = 255,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum State {       // Software reflesction of hardware state
     Uninitialized,
     Halt,              // PGM_HALT
     Starting,          // Have sent command but no interrupt yet
@@ -100,10 +109,10 @@ pub enum ProgramFault {
     LoopOverflow,    // Loop nesting too deep
     LoopUnderflow,   // Popped when loop depth was 0
     ModOperandRange, // Mod operand out of range
-    StackOverflow,   // 
+    StackOverflow,   //
     Fault,           // ?
     Trap,            // Invalid instruction
-    Unknown, 
+    Unknown,
 }
 
 impl From<ProgramFault> for usize {
@@ -145,9 +154,9 @@ pub trait DcryptoClient<'a> {
     /// from the Running to the Halt state). If error is SUCCESS, the
     /// engine is now in the Halt state and the fault argument is meaningless.
     /// If error is not SUCCESS, fault contains the underlying dcrypto
-    /// error.  
+    /// error.
     fn execution_complete(&self, error: ReturnCode, fault: ProgramFault);
-    
+
     /// Called when a reset completes. If error is SUCCESS, the engine
     /// is now in the Halt state. If error is not SUCCESS, the state is
     /// undefined.
@@ -164,12 +173,12 @@ pub trait Dcrypto<'a> {
 
     /// Set the client to receive callbacks from the engine.
     fn set_client(&self, client: &'a DcryptoClient<'a>);
-    
+
     /// Read the Dcrypto dmem. length is the number of bytes: it must
     /// be <= data.len. Offset is the offset at which to
     /// read.
     fn read_data(&self, data: &mut [u8], offset: u32, length: u32) -> ReturnCode;
-    
+
     /// Write to the Dcrypto dmem. length is the number of bytes: it
     /// must be <= data.len. offset is the offset at which
     /// to perform the write.
@@ -177,21 +186,21 @@ pub trait Dcrypto<'a> {
 
     /// Read the Dcrypto imem. length is the number of bytes and must
     /// be <= data.len. offset is the offset at which to
-    /// read. 
+    /// read.
     fn read_instructions(&self, data: &mut [u8], offset: u32, length: u32) -> ReturnCode;
-    
+
     /// Write to the Dcrypto imem. length is the number of bytes and
     /// must be <= data.len. offset is the offset at which
     /// to perform the write.
     fn write_instructions(&self, instructions: &[u8], offset: u32, length: u32) -> ReturnCode;
-    
+
     /// Call to an instruction in instruction memory (IMEM).  Note
     /// that the address is an address, not an instruction index: it
     /// should be word aligned. Address should be a valid instruction
     /// address (inbetween 0 and IMEM_SIZE - 4). If this returns
     /// SUCCESS there will be a completion callback.
     fn call_imem(&self, address: u32) -> ReturnCode;
-    
+
     /// Low-level method to execute an instruction. If the
     /// instruction is a call instruction, the `is_call` parameter
     /// should be true; this tells the peripheral that it should wait
@@ -215,7 +224,7 @@ pub trait Dcrypto<'a> {
     fn reset(&self) -> ReturnCode;
 
     /// Wipe all secrets from the Dcrypto engine.
-    fn wipe_secrets(&self) -> ReturnCode;    
+    fn wipe_secrets(&self) -> ReturnCode;
 }
 
 #[repr(C)]
@@ -231,7 +240,7 @@ struct Registers {
     pub host_cmd: VolatileCell<u32>,     // 0x0020
     pub instr: VolatileCell<u32>,
     pub status: VolatileCell<u32>,
-    pub aux_cc: VolatileCell<u32>,     
+    pub aux_cc: VolatileCell<u32>,
     pub rand_stall: VolatileCell<u32>,   // 0x0030
     pub rand256: VolatileCell<u32>,
     pub imem_parity: VolatileCell<u32>,
@@ -263,16 +272,16 @@ impl<'a> DcryptoEngine<'a> {
             imem: TakeCell::empty(),
         }
     }
-    
+
     pub fn initialize(&mut self) -> ReturnCode {
         unsafe {
             self.drom = TakeCell::new(mem::transmute(DCRYPTO_BASE_ADDR + DROM_OFFSET));
             self.dmem = TakeCell::new(mem::transmute(DCRYPTO_BASE_ADDR + DMEM_OFFSET));
             self.imem = TakeCell::new(mem::transmute(DCRYPTO_BASE_ADDR + IMEM_OFFSET));
         }
-                
+
         let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
-        
+
         // Note: this is a re-implementation of the C code for
         // the Cr52 dcrypto runtime -pal
         if self.state.get() != State::Uninitialized {
@@ -329,12 +338,12 @@ impl<'a> DcryptoEngine<'a> {
                 InterruptFlag::PCStackOverflow as u32 |
                 InterruptFlag::ProgramFault as u32 |
                 InterruptFlag::Trap as u32;
-                
-                
+
+
             registers.int_enable.set(interrupts);
             //InterruptFlag::CommandDone as u32);
             //registers.int_enable.set(InterruptFlag::CommandDone as u32);
-            
+
             // Reset
             registers.control.set(1);
             registers.control.set(0);
@@ -357,7 +366,6 @@ impl<'a> DcryptoEngine<'a> {
             11 => ProgramFault::Trap,
             _ => ProgramFault::Unknown,
         };
-//        println!("DCRYPTO handling {:?} error interrupt.", cause);
 
         // Clear the corresponding interrupt flag
         let flag = match nvic {
@@ -373,20 +381,43 @@ impl<'a> DcryptoEngine<'a> {
                 panic!("DCRYPTO engine handled unknown interrupt, NVIC number is {}", nvic);
             },
         };
-        
+
         registers.int_state.set(flag as u32);
         let prior_state = self.state.get();
-        self.state.set(State::Break);
-        if prior_state == State::Running || prior_state == State::Break {
-            //println!("DCRYPTO engine had a {:?} error, now in Break state.", flag);
+        let status = match registers.status.get() & 0x3 {
+            0 => HwState::Halt,
+            1 => HwState::Run,
+            2 => HwState::Break,
+            3 => HwState::Wipe,
+            _ => HwState::Unknown
+        };
+        let new_state = match status {
+            HwState::Break => State::Break,
+            HwState::Halt  => State::Halt,
+            HwState::Run   => State::Running,
+            HwState::Wipe  => State::Wiping,
+            _              => State::Uninitialized
+        };
+
+        self.state.set(new_state);
+
+        // The U2F dcrypto code has several mod out of bounds errors
+        // but seems to work correctly. If we throw error interrupts
+        // back to userspace then the application fails. So ignore mod
+        // out of bounds errors for now (cr52 C implementation doesn't
+        // handle them). Pass other errors back to userspace. -pal
+        if new_state != State::Running &&
+           (cause == ProgramFault::DataAccess ||
+            cause == ProgramFault::DataAccess ||
+            cause == ProgramFault::LoopOverflow ||
+            cause == ProgramFault::LoopUnderflow ||
+            cause == ProgramFault::StackOverflow)
+        {
             self.client.get().map(|client| {
+                println!("DCRYPTO engine had a {:?} error but was in state {:?}, HW state is {:?}.", cause, prior_state, status);
                 client.execution_complete(ReturnCode::FAIL, cause);
             });
-        } else {
-            panic!("DCRYPTO engine had a {:?} error but was not running! State is fatally wrong.", cause);
         }
-
-        
     }
 
     pub fn handle_receive_interrupt(&self) {
@@ -401,22 +432,38 @@ impl<'a> DcryptoEngine<'a> {
     }
 
     pub fn handle_done_interrupt(&self) {
-        if self.state.get() != State::Running {
-            panic!("DCRYPTO state is fatally wrong; program complete interrupt but driver in state {:?}.", self.state.get());
-        } else {
-            let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
-            // Clear interrupt
-            registers.int_state.set(InterruptFlag::CommandDone as u32);
-
-            self.state.set(State::Halt);
-            self.client.get().map(|client| {
-                client.execution_complete(ReturnCode::SUCCESS, ProgramFault::Unknown);
-            });
+        let state = self.state.get();
+        match state {
+            State::Running |
+            State::Break |
+            State::Halt => {
+                //println!("DCRYPTO Completed program.");
+                let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
+                // Clear interrupt
+                registers.int_state.set(InterruptFlag::CommandDone as u32);
+                let fault = match state {
+                    State::Break => ProgramFault::Break,
+                    _            => ProgramFault::Unknown
+                };
+                self.state.set(State::Halt);
+                self.client.get().map(|client| {
+                        client.execution_complete(ReturnCode::SUCCESS, fault);
+                });
+            },
+            _ => {
+                panic!("DCRYPTO state is fatally wrong; program complete interrupt but driver in state {:?}.", state);
+            }
         }
     }
 
     pub fn handle_break_interrupt(&self) {
         panic!("DCRYPTO threw a break interrupt but no code should trigger this.");
+    }
+
+    pub fn handle_wipe_interrupt(&self) {
+        let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
+        registers.int_state.set(InterruptFlag::DoneWipeSecrets as u32);
+        // Do nothing; automatically transition back to halt state.
     }
 }
 
@@ -424,7 +471,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
     fn set_client(&self, client: &'a DcryptoClient<'a>) {
         self.client.set(Some(client));
     }
-   
+
     fn read_data(&self, data: &mut [u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > DMEM_SIZE as u32) ||
             (length > DMEM_SIZE as u32) ||
@@ -445,7 +492,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         });
         ReturnCode::SUCCESS
     }
-    
+
     fn write_data(&self, data: &[u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > DMEM_SIZE as u32) ||
             (length > DMEM_SIZE as u32) ||
@@ -457,7 +504,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         if self.state.get() != State::Halt {
             return ReturnCode::EBUSY;
         }
-        
+
         self.dmem.map(|mem| {
             for i in 0..length {
                 let index = (i * 4) as usize;
@@ -491,7 +538,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         });
         ReturnCode::SUCCESS
     }
-    
+
     fn write_instructions(&self, instructions: &[u8], offset: u32, length: u32) -> ReturnCode {
         if (offset > IMEM_SIZE as u32) ||
             (length > IMEM_SIZE as u32) ||
@@ -503,7 +550,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         if self.state.get() != State::Halt {
             return ReturnCode::EBUSY;
         }
-        
+
         self.imem.map(|mem| {
             //println!("Copying {} bytes.", length);
             for i in 0..length {
@@ -536,16 +583,17 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
         if address > (IMEM_SIZE - 4) as u32 {
             return ReturnCode::ESIZE;
         }
-        /* println!("Invoking program at {:x}.", address);
+        //println!("DCRYPTO Invoking program at {:x}.", address);
         self.imem.map(|mem| {
             for i in 0..4 {
-                println!(" [{}]: {:08x}", i, mem[i]);
+                let index = i + (address as usize);
+                //println!(" [{}]: {:08x}", index, mem[index]);
             }
-        });*/
+        });
 
         // 0x08000000 is an opcode of 6'h02, which is the call
         // instruction (DCRYPTO reference).
-        
+
         self.execute_instruction(0x08000000 + address, true)
     }
 
@@ -559,7 +607,7 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
             registers.int_state.set(0xffffffff);
             registers.int_state.get() & 0x3 != 0
         }{}
-        
+
         registers.host_cmd.set(instruction);
         if is_call {
             self.state.set(State::Running);
@@ -576,6 +624,9 @@ impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
     }
 
     fn wipe_secrets(&self) -> ReturnCode {
-        ReturnCode::FAIL
+        let registers: &mut Registers = unsafe {mem::transmute(self.registers)};
+        self.state.set(State::Wiping);
+        registers.wipe_secrets.set(0);
+        ReturnCode::SUCCESS
     }
 }

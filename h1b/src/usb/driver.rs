@@ -75,7 +75,6 @@ impl<'a> UsbHidU2fClient<'a> for U2fSyscallDriver<'a> {
                 if app.rx_buffer.is_some() {
                     let mut buf = app.rx_buffer.take().unwrap();
                     self.u2f_endpoints.get_slice(buf.as_mut());
-                    self.u2f_endpoints.enable_rx();
                     app.rx_buffer = Some(buf);
                 }
                 app.rx_callback.map(|mut cb| cb.schedule(0, 0, 0));
@@ -149,13 +148,13 @@ impl<'a> Driver for U2fSyscallDriver<'a> {
             U2F_CMD_CHECK => ReturnCode::SUCCESS, // Existence check
             U2F_CMD_TRANSMIT => self.apps.enter(appid, |app, _| { // Send packet
                 if app.tx_callback.is_some() && app.tx_buffer.is_some() {
-                    print!("U2F syscall: waiting for transmit ready.\n");
+                    //print!("U2F transmit: waiting for transmit ready.\n");
                     while !self.u2f_endpoints.transmit_ready() {}
                     if self.u2f_endpoints.transmit_ready() {
                         app.tx_buffer.take().map_or(ReturnCode::ERESERVE, |buf| {
                             let rcode = self.u2f_endpoints.put_slice(buf.as_ref());
                             app.tx_buffer = Some(buf);
-                            print!("U2F syscall: returning to userspace.\n");
+                            //print!("U2F transmit: returning to userspace.\n");
                             rcode
                         })
                     }
