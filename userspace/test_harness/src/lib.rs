@@ -77,25 +77,26 @@ pub struct TestDescAndFn {
 // The test harness's equivalent of main() (it is called by a compiler-generated
 // shim).
 pub fn test_main_static(tests: &[&TestDescAndFn]) {
-    use simple_print::console;
-    console!("Starting tests.\n");
+    use core::fmt::Write;
+    let mut console = libtock::console::Console::new();
+    console.write("Starting tests.\n");
     let mut overall_success = true;
     for test_case in tests {
         // Skip ignored test cases.
         let desc = &test_case.desc;
         let name = desc.name.0;
         if desc.ignore {
-            console!("Skipping ignored test ", name, "\n");
+            let _ = writeln!(console, "Skipping ignored test {}", name);
             continue;
         }
 
         // Run the test.
-        console!("Running test ", name, "\n");
+        let _ = writeln!(console, "Running test {}", name);
         let succeeded = test_case.testfn.0();
-        console!("Finished test ", name, ". Result: ",
-               if succeeded { "succeeded" } else { "failed" }, ".\n");
+        let _ = writeln!(console, "Finished test {}. Result: {}.", name,
+                         if succeeded { "succeeded" } else { "failed" });
         overall_success &= succeeded;
     }
-    console!("Testing complete. Result: ",
-           if overall_success { "succeeded" } else { "failed" }, "\n");
+    let _ = writeln!(console, "Testing complete. Result: {}",
+           if overall_success { "succeeded" } else { "failed" });
 }
