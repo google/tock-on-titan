@@ -18,6 +18,7 @@ use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
 use kernel::common::cells::TakeCell;
 use kernel::hil::symmetric_encryption;
 use kernel::hil::symmetric_encryption::{AES128_BLOCK_SIZE, AES128_KEY_SIZE};
+
 use kernel::hil::symmetric_encryption::{AES128, AES128CBC, AES128Ctr};
 
 pub const DRIVER_NUM: usize = 0x40000;
@@ -30,7 +31,7 @@ pub struct AppData {
     input_buffer: Option<AppSlice<Shared, u8>>,
     output_buffer: Option<AppSlice<Shared, u8>>,
     iv_buffer: Option<AppSlice<Shared, u8>>,
-    callback: Option<Callback>,
+    crypto_callback: Option<Callback>,
 }
 
 pub struct AesDriver<'a> {
@@ -69,22 +70,31 @@ impl<'a> AesDriver<'a> {
     fn run_aes(&self, caller_id: AppId) -> ReturnCode {
         self.apps.enter(caller_id, |app_data, _| {
             if app_data.input_buffer.is_none() {
-                debug!("Missing input buffer.\n");
+                debug!("AES: Missing input buffer.\n");
                 return ReturnCode::ENOMEM;
             } else if app_data.key.is_none() {
-                debug!("Missing application encryption key.\n");
+                debug!("AES: Missing application encryption key.\n");
                 return ReturnCode::ENOMEM;
             } else if self.buffer.is_none() {
-                debug!("Missing kernel buffer.\n");
+                debug!("AES: Missing kernel buffer.\n");
                 return ReturnCode::ENOMEM;
             }
+
             let key = app_data.key.take();
-            key.map(|key| {
+            let rcode = key.map_or(ReturnCode::EINVAL, |key| {
                 if key.len() == AES128_KEY_SIZE {
                     self.device.set_key(key.as_ref());
+                    app_data.key = Some(key);
+                    ReturnCode::SUCCESS
+                } else {
+                    debug!("AES: application encryption key is wrong size.\n");
+                    ReturnCode::EINVAL
                 }
-                app_data.key = Some(key);
             });
+
+            if rcode != ReturnCode::SUCCESS {
+                return rcode;
+            }
 
             // Copy application data into the kernel buffer
             self.buffer.map(|buf| {
@@ -122,7 +132,7 @@ impl<'a> symmetric_encryption::Client<'a> for AesDriver<'a> {
                     }
                 };
                 self.current_user.set(None);
-                app_data.callback.map(|mut cb| cb.schedule(val, 0, 0));
+                app_data.crypto_callback.map(|mut cb| cb.schedule(val, 0, 0));
             });
         });
         self.buffer.replace(output);
@@ -138,12 +148,12 @@ impl<'a> Driver for AesDriver<'a> {
                  app_id: AppId,
     ) -> ReturnCode {
         match subscribe_num {
-            0 => {
+            0 => { // Encrypt/decrypt done
                 self.apps.enter(app_id, |app_data, _| {
-                    app_data.callback = callback;
+                    app_data.crypto_callback = callback;
                     ReturnCode::SUCCESS
                 }).unwrap_or(ReturnCode::ENOMEM)
-            }
+            },
             _ => ReturnCode::ENOSUPPORT
         }
     }
@@ -181,6 +191,19 @@ impl<'a> Driver for AesDriver<'a> {
                 self.device.set_mode_aes128cbc(false);
                 self.run_aes(caller_id)
             },
+            7 /* install key */ => {
+                self.apps.enter(caller_id, |app_data, _| {
+                    let key = app_data.key.take();
+                    let rcode = key.map_or(ReturnCode::ENOMEM, |key| {
+                        if key.len() == AES128_KEY_SIZE {
+                            self.device.set_key(key.as_ref());
+                        }
+                        app_data.key = Some(key);
+                        ReturnCode::SUCCESS
+                    });
+                    rcode
+                }).unwrap_or(ReturnCode::ENOMEM)
+            }
             _ => {
                 self.current_user.set(None);
                 ReturnCode::ENOSUPPORT
@@ -260,7 +283,6 @@ impl<'a> Driver for AesDriver<'a> {
                         .unwrap_or(ReturnCode::FAIL)
                 }
             _ => ReturnCode::ENOSUPPORT,
-
         }
     }
 }

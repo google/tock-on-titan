@@ -43,6 +43,9 @@ use kernel::capabilities;
 use kernel::mpu::MPU;
 use kernel::hil;
 
+use kernel::hil::entropy::Entropy32;
+use kernel::hil::rng::Rng;
+
 use h1b::crypto::dcrypto::Dcrypto;
 use h1b::usb::{Descriptor, StringDescriptor};
 
@@ -53,7 +56,7 @@ const NUM_PROCS: usize = 1;
 const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultResponse::Panic;
 
 #[link_section = ".app_memory"]
-static mut APP_MEMORY: [u8; 32768] = [0; 32768];
+static mut APP_MEMORY: [u8; 0xc000] = [0; 0xc000];
 
 static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; NUM_PROCS] = [None];
 
@@ -69,10 +72,10 @@ pub struct Golf {
     ipc: kernel::ipc::IPC,
     digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
-    //rng: &'static capsules::rng::SimpleRng<'static, h1b::trng::Trng<'static>>,
+    rng: &'static capsules::rng::RngDriver<'static>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
-    uint_printer: debug_syscall::UintPrinter,
     u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
+    uint_printer: debug_syscall::UintPrinter,
 }
 
 static mut STRINGS: [StringDescriptor; 7] = [
@@ -243,7 +246,24 @@ pub unsafe fn reset_handler() {
     let u2f = static_init!(
         h1b::usb::driver::U2fSyscallDriver<'static>,
         h1b::usb::driver::U2fSyscallDriver::new(&mut h1b::usb::USB0, kernel.create_grant(&grant_cap)));
-    h1b::usb::UsbHidU2f::set_u2f_client(&h1b::usb::USB0, u2f);
+    h1b::usb::u2f::UsbHidU2f::set_u2f_client(&h1b::usb::USB0, u2f);
+
+
+    h1b::trng::TRNG0.init();
+    let entropy_to_random = static_init!(
+        capsules::rng::Entropy32ToRandom<'static>,
+        capsules::rng::Entropy32ToRandom::new(&h1b::trng::TRNG0)
+    );
+
+    let rng = static_init!(
+        capsules::rng::RngDriver<'static>,
+        capsules::rng::RngDriver::new(
+            entropy_to_random,
+            kernel.create_grant(&grant_cap)
+        )
+    );
+    h1b::trng::TRNG0.set_client(entropy_to_random);
+    entropy_to_random.set_client(rng);
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
@@ -269,25 +289,17 @@ pub unsafe fn reset_handler() {
     }
 
     let mut _ctr = 0;
-    let end = timerhs.now();
-
-    println!("Tock 1.0 booting. Initialization took {} tics.",
-             end.wrapping_sub(start));
-
     let chip = static_init!(h1b::chip::Hotel, h1b::chip::Hotel::new());
-
     chip.mpu().enable_mpu();
 
-    for _i in 0..1_000_000 {
-        _ctr += timerhs.now();
-    }
-
-    println!("Tock 1.0 booting. About to initialize USB.");
+    let end = timerhs.now();
+    println!("Tock: booted in {} tics; initializing USB and loading processes.",
+             end.wrapping_sub(start));
 
     h1b::usb::USB0.init(&mut h1b::usb::EP0_OUT_DESCRIPTORS,
                         &mut h1b::usb::EP0_OUT_BUFFERS,
                         &mut h1b::usb::EP0_IN_DESCRIPTORS,
-                        &mut h1b::usb::EP0_IN_BUFFERS,
+                        &mut h1b::usb::EP0_IN_BUFFER,
                         &mut h1b::usb::EP1_OUT_DESCRIPTOR,
                         &mut h1b::usb::EP1_OUT_BUFFER,
                         &mut h1b::usb::EP1_IN_DESCRIPTOR,
@@ -295,10 +307,9 @@ pub unsafe fn reset_handler() {
                         &mut h1b::usb::CONFIGURATION_BUFFER,
                         h1b::usb::PHY::A,
                         None,
-                        Some(0x18d1),
-                        Some(0x5026),
+                        Some(0x18d1),  // Google vendor ID
+                        Some(0x5026),  // proto2
                         &mut STRINGS);
-
     let golf2 = Golf {
         console: console,
         gpio: gpio,
@@ -307,12 +318,13 @@ pub unsafe fn reset_handler() {
         digest: digest,
         aes: aes,
         dcrypto: dcrypto,
-        //        rng: rng,
-        uint_printer: debug_syscall::UintPrinter::new(),
+        rng: rng,
         u2f_usb: u2f,
+        uint_printer: debug_syscall::UintPrinter::new(),
     };
-// dcrypto_test::run_dcrypto();
-//    rng_test::run_rng();
+
+    // dcrypto_test::run_dcrypto();
+    //    rng_test::run_rng();
 
     extern "C" {
         /// Beginning of the ROM region containing app images.
@@ -327,7 +339,7 @@ pub unsafe fn reset_handler() {
         FAULT_RESPONSE,
         &process_mgmt_cap,
     );
-    debug!("Start main loop.");
+    debug!("Tock: starting main loop.");
     debug!(" ");
 
     kernel.kernel_loop(&golf2, chip, Some(&golf2.ipc), &main_cap);
@@ -343,11 +355,11 @@ impl Platform for Golf {
             digest::DRIVER_NUM            => f(Some(self.digest)),
             capsules::alarm::DRIVER_NUM   => f(Some(self.timer)),
             aes::DRIVER_NUM               => f(Some(self.aes)),
-//            capsules::rng::DRIVER_NUM   => f(Some(self.rng)),
+            capsules::rng::DRIVER_NUM     => f(Some(self.rng)),
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
-            debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
             h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
+            debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
             _ =>  f(None),
         }
     }

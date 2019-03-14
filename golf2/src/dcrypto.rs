@@ -49,12 +49,12 @@ impl<'a> DcryptoDriver<'a> {
             busy: Cell::new(false),
        }
     }
-    
-    fn run_program(&self, app: &mut App) -> ReturnCode {
+
+    fn run_program(&self, app: &mut App, instruction: u32) -> ReturnCode {
         if app.data_buffer.is_none() || app.program.is_none() {
             return ReturnCode::ENOMEM;
         }
-        
+
         let mut rval: ReturnCode;
         let data_slice = app.data_buffer.take().unwrap();
         let program_slice = app.program.take().unwrap();
@@ -66,7 +66,7 @@ impl<'a> DcryptoDriver<'a> {
             let data_len = data.len() / 4;
             let program = program_slice.as_ref();
             let program_len = program.len() / 4;
-            
+
             rval = self.device.write_data(data, 0, data_len as u32);
 
             if rval == ReturnCode::SUCCESS {
@@ -79,7 +79,7 @@ impl<'a> DcryptoDriver<'a> {
         if rval != ReturnCode::SUCCESS {
             return rval;
         }
-        rval = self.device.call_imem(0);
+        rval = self.device.call_imem(instruction);
         if rval != ReturnCode::SUCCESS {
             return rval;
         }
@@ -104,23 +104,23 @@ impl<'a> Driver for DcryptoDriver<'a> {
         }
     }
 
-    fn command(&self, command_num: usize, _: usize, _: usize, _: AppId) -> ReturnCode {
+    fn command(&self, command_num: usize, instruction: usize, _: usize, _: AppId) -> ReturnCode {
         match command_num {
-            0 /* Check if present */ => ReturnCode::SUCCESS,            
+            0 /* Check if present */ => ReturnCode::SUCCESS,
             1 /* run program */ => {
-                if self.busy.get() { 
+                if self.busy.get() {
                     ReturnCode::EBUSY
                 } else {
                     self.app.map_or(ReturnCode::EBUSY, |app| {
                         self.busy.set(true);
-                        self.run_program(app)
+                        self.run_program(app, instruction as u32)
                     })
                 }
             }
             _ => ReturnCode::ENOSUPPORT,
         }
     }
-    
+
     fn allow(&self, _: AppId,
              minor_num: usize,
              slice: Option<AppSlice<Shared, u8>>

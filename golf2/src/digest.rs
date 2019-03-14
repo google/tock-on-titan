@@ -128,7 +128,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                                 return ReturnCode::EBUSY
                             }
                         }
-
+                        self.current_user.set(None);
                         let app_data: &mut App = app_data;
 
                         let output_buffer = match app_data.output_buffer {
@@ -142,6 +142,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                             Err(DigestError::NotConfigured) => ReturnCode::FAIL,
                             Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE
                         }
+
                     })
                     .unwrap_or(ReturnCode::ENOMEM)
             },
