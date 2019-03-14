@@ -95,7 +95,7 @@ static void increment_counter(unsigned char* buf) {
 // ***** Synchronous Calls *****
 
 
-int tock_aes128_set_key(unsigned char* data, unsigned char len) {
+int tock_aes128_set_key(const unsigned char* data, unsigned char len) {
   return allow(AES_DRIVER, TOCK_AES_ALLOW_KEY, (void*)data, len);
 }
 
