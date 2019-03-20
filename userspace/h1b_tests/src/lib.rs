@@ -14,9 +14,6 @@
 
 #![no_std]
 
-extern crate libtock;
-extern crate simple_print;
-
 #[test]
 fn basic_test() -> bool {
     use simple_print::{console,hex};
