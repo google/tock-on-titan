@@ -1,0 +1,47 @@
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Workspace for tock-on-titan userspace Rust code. Note that this directory
+# also contains C libraries and applications, which are not handled by Cargo.
+
+# Used by h1b_tests, as h1b_tests is built as a test binary.
+[profile.bench]
+codegen-units = 1
+lto = true
+opt-level = "z"
+panic = "abort"
+
+# Used by most Tock application binaries.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "z"
+panic = "abort"
+
+# Used by h1b_tests' dependencies, as h1b_tests is built as a test binary.
+[profile.test]
+codegen-units = 1
+debug = false
+debug-assertions = false
+incremental = false
+lto = true
+opt-level = "z"
+panic = "unwind"
+
+[workspace]
+members = [
+	"h1b_tests",
+	"simple_fmt",
+	"test_harness",
+]
