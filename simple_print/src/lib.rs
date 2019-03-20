@@ -13,26 +13,13 @@
 // limitations under the License.
 
 #![no_std]
-#![feature(alloc)]
 
 /// Tock userspace library for simple console printing/debugging. This avoids
 /// dynamic polymorphism and as a result is much lighter weight than core::fmt.
-/// Its interface is inspired by absl::StrCat.
+/// Its interface is inspired by absl::StrCat. It does not require dynamic
+/// memory allocation.
 
-// Although currently it is very malloc-happy, it is designed to be adapted to
-// minimize allocations. It should be possible to print numeric values using
-// only fixed-size stack-allocated buffers with no change to the public API.
-// Similarly, once we have some form of allow_const (i.e. an allow() syscall
-// that can point into RAM or flash), we can remove the allocation from the path
-// that prints a &str.
-//
-// The downside of this design is it produces a sequence of console writes
-// rather than allocating a buffer and doing the write in a single syscall,
-// which may hurt performance.
-
-extern crate alloc;
-
-use tock::console::Console;
+use libtock::console::Console;
 
 /// Prints a sequence of values to the console.
 ///
@@ -61,6 +48,8 @@ pub fn hex<T: HexPrintable>(value: T) -> Hex {
 // Implementation details below.
 // -----------------------------------------------------------------------------
 
+use simple_fmt::Base;
+
 pub trait Printable {
     fn print(self);
 }
@@ -69,31 +58,26 @@ impl Printable for &str {
     fn print(self) {
         use core::fmt::Write;
         // Tock's Console cannot fail.
-        let _ = Console.write_str(self);
-    }
-}
-
-impl Printable for alloc::string::String {
-    fn print(self) {
-        Console.write(self);
+        let _ = Console::new().write_str(self);
     }
 }
 
 impl Printable for i32 {
     fn print(self) {
-        Console.write(tock::fmt::i32_as_decimal(self));
+        let mut buffer = [0; 11];
+        Console::new().write(simple_fmt::i32_to_decimal(self, &mut buffer));
     }
 }
 
 impl Printable for u32 {
     fn print(self) {
-        Console.write(tock::fmt::u32_as_decimal(self));
+        let mut buffer = [0; 10];
+        Console::new().write(simple_fmt::fmt_u32(self, Base::Decimal, &mut buffer));
     }
 }
 
-// Types that may be printed in hex. Currently libtock-rs only supports
-// formatting u32's as hex; for simplicity, we simply convert anything we'd like
-// to print to u32's.
+// Types that may be printed in hex. Currently, all the types we'd like to print
+// as hex are equivalent to u32, so for simplicity we convert everything to u32.
 pub trait HexPrintable {
     fn to_u32(self) -> u32;
 }
@@ -102,7 +86,8 @@ pub struct Hex { value: u32 }
 
 impl Printable for Hex {
     fn print(self) {
-        Console.write(tock::fmt::u32_as_hex(self.value));
+        let mut buffer = [0; 8];
+        Console::new().write(simple_fmt::fmt_u32(self.value, Base::Hexadecimal, &mut buffer));
     }
 }
 

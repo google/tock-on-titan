@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![feature(alloc)]
 #![no_std]
 
-extern crate alloc;
+extern crate libtock;
 extern crate simple_print;
-extern crate tock;
 
 #[test]
 fn basic_test() -> bool {
     use simple_print::{console,hex};
     console!("Cat video count: ", 9001, "\nWhat we eat: ", hex(3405705229usize), "\n");
-    tock::timer::sleep(tock::timer::Duration::from_ms(1000));
+    libtock::timer::sleep(libtock::timer::Duration::from_ms(1000));
     true
 }
