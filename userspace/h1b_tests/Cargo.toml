@@ -24,7 +24,7 @@ libtock = { path = "../../third_party/libtock-rs" }
 simple_print = { path = "../../simple_print" }
 
 [dev-dependencies]
-test = { path = "../../test_harness" }
+test = { path = "../test_harness" }
 
 [profile.dev]
 panic = "abort"
