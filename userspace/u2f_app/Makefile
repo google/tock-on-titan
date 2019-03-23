@@ -12,32 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CURRENT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-
-TOCK_ARCH ?= cortex-m3
-
-THIRD_PARTY = ../../third_party
-TOCK_USERLAND_BASE_DIR = $(THIRD_PARTY)/libtock-c
-CHROMIUMOS_DIR         = $(THIRD_PARTY)/chromiumos-ec
-LIBGOLF2_DIR           = ../libgolf2
-
-BUILDDIR ?= $(CURRENT_DIR)/build/$(TOCK_ARCH)
-
+APP := u2f_app
 STACK_SIZE := 4096
-C_SRCS   := $(wildcard *.c)
 
-#OBJS += $(patsubst %.c,$(BUILDDIR)/%.o,$(C_SRCS))
-
-TOCK_APP_CONFIG = -Xlinker --defsym=STACK_SIZE=$$(STACK_SIZE)\
-		  -Xlinker --defsym=APP_HEAP_SIZE=$$(APP_HEAP_SIZE)\
-		  -Xlinker --defsym=KERNEL_HEAP_SIZE=$$(KERNEL_HEAP_SIZE)
-
+THIRD_PARTY    = ../../third_party
+CHROMIUMOS_DIR = $(THIRD_PARTY)/chromiumos-ec
+LIBGOLF2_DIR   = ../libgolf2
 
 EXTERN_LIBS += $(CHROMIUMOS_DIR) $(LIBGOLF2_DIR)
 
-include $(TOCK_USERLAND_BASE_DIR)/AppMakefile.mk
+include ../CAppMakefile.mk
 include $(CHROMIUMOS_DIR)/Makefile
 include $(LIBGOLF2_DIR)/Makefile
 
- override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
- override CPPFLAGS += -I./include
+override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
+override CPPFLAGS += -I./include
