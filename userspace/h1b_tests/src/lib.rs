@@ -16,8 +16,9 @@
 
 #[test]
 fn basic_test() -> bool {
-    use simple_print::{console,hex};
-    console!("Cat video count: ", 9001, "\nWhat we eat: ", hex(3405705229usize), "\n");
+    use core::fmt::Write;
+    let _ = writeln!(libtock::console::Console::new(),
+                     "Cat video count: {}\nWhat we eat: {:x}", 9001, 3405705229u32);
     libtock::timer::sleep(libtock::timer::Duration::from_ms(1000));
     true
 }

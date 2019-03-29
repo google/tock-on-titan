@@ -21,4 +21,3 @@ publish = false
 
 [dependencies]
 libtock = { path = "../../third_party/libtock-rs" }
-simple_print = { path = "../../simple_print" }

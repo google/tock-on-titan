@@ -42,6 +42,5 @@ panic = "unwind"
 [workspace]
 members = [
 	"h1b_tests",
-	"simple_fmt",
 	"test_harness",
 ]
