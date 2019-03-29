@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This is a userspace program for Tock that tests whether the U2F
+// (USB) data system call API can receive frames. It is a simple loop
+// that receives and prints out USB frames received using the U2F
+// driver.
+
 #include <tock.h>
 #include "u2f.h"
-
 
 int last_error = 0;
 int last_fault = 0;
