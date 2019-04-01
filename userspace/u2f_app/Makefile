@@ -12,18 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-APP := u2f_app
-STACK_SIZE := 4096
-
-THIRD_PARTY    = ../../third_party
-CHROMIUMOS_DIR = $(THIRD_PARTY)/chromiumos-ec
-LIBGOLF2_DIR   = ../libgolf2
-
-EXTERN_LIBS += $(CHROMIUMOS_DIR) $(LIBGOLF2_DIR)
-
-include ../CAppMakefile.mk
-include $(CHROMIUMOS_DIR)/Makefile
-include $(LIBGOLF2_DIR)/Makefile
-
-override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
-override CPPFLAGS += -I./include
+INVOKE_DIR    := userspace/u2f_app
+TOCK_ON_TITAN := ../..
+include $(TOCK_ON_TITAN)/DirShim.mk

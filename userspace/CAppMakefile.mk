@@ -12,32 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Common Makefile code for all C Tock-on-Titan apps. Included by Makefile in
-# each app directory.
-
-# libtock-c's AppMakefile does not define a `build` target, but it does define
-# `all`. Add an alias from `build` to `all` so that both targets work
-# consistently. This gives the behavior expected from tock-on-titan Makefiles.
-.PHONY: build
-build: all
-
-# Make targets that C apps do not support.
-.PHONY: check doc test
-check:
-doc:
-test:
-
-# TODO: Implement run
-.PHONY: run
-run:
+# Common Makefile code for all C Tock-on-Titan apps. Included by TockMakefile in
+# each app directory. Only implements the "all" target, which builds the
+# firmware image -- Build.mk should implement program and run.
 
 APP_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))$(APP)
 
-TOCK_ARCH ?= cortex-m3
+ELF2TAB := ../../build/cargo-host/release/elf2tab
+TOCK_ARCHS := cortex-m3
 TOCK_USERLAND_BASE_DIR = $(APP_DIR)/../../third_party/libtock-c
-# TODO: Should we be building everything in userspace/build/ rather than
-# userspace/$APP/build? That would match the Cargo workspace setup.
-BUILDDIR ?= $(APP_DIR)/build/$(TOCK_ARCH)
+BUILDDIR ?= $(APP_DIR)/../../build/userspace/$(APP)
 
 C_SRCS   := $(wildcard *.c)
 
