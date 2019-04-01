@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INVOKE_DIR    := golf2
-TOCK_ON_TITAN := ..
-include $(TOCK_ON_TITAN)/DirShim.mk
+# This Makefile builds the kernel image by using Tock's kernel build system.
+# Mapping from the common makefile targets to Tock's targets:
+#
+#   build: target/thumbv7m-none-eabi/release/golf2
+#   check: check
+#   clean: clean
+#   doc:   doc
+
+TARGET=thumbv7m-none-eabi
+PLATFORM=golf2
+TOCK_ARCH=cortex-m3
+include ../third_party/tock/boards/Makefile.common
