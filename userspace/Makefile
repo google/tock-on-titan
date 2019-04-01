@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-Cargo.lock
-
-# Specifically whitelist the .cargo/ directory, so that ripgrep will search it
-# (otherwise, ripgrep skips it because it is hidden).
-!.cargo/
+INVOKE_DIR    := userspace
+TOCK_ON_TITAN := ..
+include $(TOCK_ON_TITAN)/DirShim.mk
