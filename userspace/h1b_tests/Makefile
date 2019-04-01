@@ -12,60 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Supported targets (these correspond to cargo commands)
-#   all (default) -- alias for build
-#   build
-#   check
-#   clean
-#   doc
-
-.PHONY: all
-all: build
-
-.PHONY: build
-build: build/cortex-m3/cortex-m3/cortex-m3.tbf
-
-.PHONY: check
-check:
-	cargo check --release -Z offline
-
-.PHONY: clean
-clean:
-	cargo clean
-	rm -rf build/
-
-.PHONY: doc
-doc:
-	cargo doc --release -Z offline
-
-# Builds the Tock Binary Format (TBF) executable from the cargo-generated ELF
-# file. We use elf2tab -- it will create the tbf file as a side-effect. It
-# creates it in the same directory as the elf files, while the golf2 Makefile
-# expects it at build/cortex-m3/cortex-m3/cortex-m3.tbf, so we manually move the
-# file over afterwards.
-build/cortex-m3/cortex-m3/cortex-m3.tbf: ../target/thumbv7m-none-eabi/release/h1b_tests
-	mkdir -p build/cortex-m3/cortex-m3
-	cd ../../third_party/elf2tab && cargo run --release -Z offline -- \
-		-n "h1b_tests" \
-		-o ../../userspace/h1b_tests/build/cortex-m3/cortex-m3/cortex-m3.tab \
-		../../userspace/h1b_tests/$^ --stack=2048 --app-heap=1024 \
-		--kernel-heap=1024 --protected-region-size=64
-	mv ../target/thumbv7m-none-eabi/release/h1b_tests.tbf \
-		build/cortex-m3/cortex-m3/cortex-m3.tbf
-
-# Builds the h1b_tests Elf file using cargo. Marked as phony because we rely on
-# Cargo to determine when to rebuild. We build using `cargo test` so that rustc
-# builds the test code and tests list. We can't just pass --test to rustc
-# through rustflags because that causes cargo to fail to parse rustc's output
-# for some invocations. Cargo names the test h1b_test-<hex string>, and outputs
-# another file with the same name plus ".d", so we need to use find with a
-# regexp to locate the test executable. Note that we first clear out existing
-# test binaries because Cargo does not do so; the `find` call relies on there
-# only being a single test binary.
-.PHONY: ../target/thumbv7m-none-eabi/release/h1b_tests
-../target/thumbv7m-none-eabi/release/h1b_tests:
-	rm -f ../target/thumbv7m-none-eabi/release/h1b_tests-*
-	cargo test --no-run --release -Z offline
-	find ../target/thumbv7m-none-eabi/release/ -maxdepth 1 \
-		-regex '../target/thumbv7m-none-eabi/release/h1b_tests-[^.]+' \
-		-exec cp '{}' ../target/thumbv7m-none-eabi/release/h1b_tests ';'
+INVOKE_DIR    := userspace/h1b_tests
+TOCK_ON_TITAN := ../..
+include $(TOCK_ON_TITAN)/DirShim.mk
