@@ -161,7 +161,7 @@ void pop_falling_callback(int __attribute__((unused)) arg1,
                           int __attribute__((unused)) arg2,
                           int __attribute__((unused)) arg3,
                           void* __attribute__((unused)) data) {
-  printf("Pop callback\n");
+  printf("Button pressed (user contact)\n");
   tock_pop_set();
 }
 

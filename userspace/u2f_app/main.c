@@ -89,10 +89,10 @@ int main(void) {
   check_device_setup();
 
   while (1) {
-    printf("u2f_app: receiving frame into 0x%08x.\n", (unsigned int)u2f_buffer);
+    printf("U2F APP: receiving frame into 0x%08x.\n", (unsigned int)u2f_buffer);
     ret = tock_u2f_receive(u2f_buffer, U2F_FRAME_SIZE);
     if (ret != 0) {
-      printf("u2f_app: error %i in receive, retry.\n", ret);
+      printf("U2F APP: error %i in receive, retry.\n", ret);
       continue;
     }
     U2FHID_FRAME* frame = (U2FHID_FRAME*)u2f_buffer;
