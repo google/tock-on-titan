@@ -25,9 +25,11 @@
  */
 
 #include "kl.h"
+#include "hid_dfu.h"
+#include "trng.h"
 #include "u2f_corp.h"
 #include "u2f_hid_corp.h"
-#include "hid_dfu.h"
+
 
 #include "fips.h"
 #include "p256_ecdsa.h"
@@ -88,16 +90,16 @@ static void clear_pending(void) {
   pending.bcnt = 0;
 }
 
-/* Transaction timeout function */
+// Note: timeouts are not used; they are vestigial from original U2F code.
 /*
-static void u2fhid_timeout(void) {
+  static void u2fhid_timeout(void) {
   if (timeout_CID) {
     printf("%s: cid %04lx (pending %04lx)", __func__, timeout_CID, pending.cid);
     u2fhid_err(timeout_CID, ERR_MSG_TIMEOUT);
     timeout_CID = 0;
     clear_pending();
   }
-  }*/
+}*/
 //DECLARE_DEFERRED(u2fhid_timeout);
 
 static void cancel_timeout(void) {
