@@ -44,6 +44,12 @@ pub struct ShaEngine {
     current_mode: Cell<Option<DigestMode>>,
 }
 
+enum CertificateMask {
+    CertBits  = 0x3f,    // Bits 0:5
+    Enable    = 0x40,    // 1 << 6
+    CheckOnly = 0x80,    // 1 << 7
+}
+
 impl ShaEngine {
     const unsafe fn new(regs: *mut Registers) -> ShaEngine {
         ShaEngine {
@@ -87,7 +93,7 @@ impl DigestEngine for ShaEngine {
         Ok(())
     }
 
-    fn  initialize_hmac(&self, key: &[u8]) -> Result<(), DigestError> {
+    fn initialize_hmac(&self, key: &[u8]) -> Result<(), DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
 
         regs.itop.set(0); // clear status
@@ -115,9 +121,28 @@ impl DigestEngine for ShaEngine {
         return Ok(());
     }
 
+    fn initialize_certificate(&self, certificate_id: u32) -> Result<(), DigestError> {
+        let ref regs = unsafe { &*self.regs }.sha;
+        print!("sha::initialize_certificate called for cert {}\n", certificate_id);
+        regs.itop.set(0); // clear status
+
+
+        self.current_mode.set(Some(DigestMode::Sha256));
+
+        regs.use_cert.set(certificate_id & CertificateMask::CertBits as u32 |
+                          CertificateMask::Enable as u32);
+
+        regs.cfg_en.set(ShaCfgEnMask::IntEnDone as u32);
+
+        regs.trig.set(ShaTrigMask::Go as u32);
+        print!("sha::initialize_certificate complete\n");
+        Ok(())
+    }
+
+
     fn update(&self, data: &[u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-
+        print!("sha::update called\n");
         if self.current_mode.get().is_none() {
             print!("ERROR: SHA::update called but engine not initialized!\n");
             return Err(DigestError::NotConfigured);
@@ -134,7 +159,7 @@ impl DigestEngine for ShaEngine {
 
     fn finalize(&self, output: &mut [u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-
+        print!("sha::finalize called\n");
         let expected_output_size = match self.current_mode.get() {
             None => return Err(DigestError::NotConfigured),
             Some(mode) => mode.output_size(),
@@ -159,5 +184,18 @@ impl DigestEngine for ShaEngine {
         regs.itop.set(0);
 
         Ok(expected_output_size)
+    }
+
+    // Finalize withtout seeing the result; this is used for certificates
+    // (hidden secret generation)
+    fn finalize_hidden(&self) -> Result<(), DigestError> {
+        let ref regs = unsafe { &*self.regs }.sha;
+        print!("sha::finalize_hidden called\n");
+        regs.itop.set(0);
+        regs.trig.set(ShaTrigMask::Stop as u32);
+        while regs.itop.get() == 0 {}
+        regs.itop.set(0);
+
+        Ok(())
     }
 }

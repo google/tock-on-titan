@@ -26,7 +26,6 @@
 #include "gpio.h"
 
 #include "kl.h"
-#include "h1b_kl_syscalls.h"
 
 
 static uint32_t current_key[SHA256_DIGEST_WORDS];
@@ -221,16 +220,14 @@ static uint32_t KL_SEED_SSH[8] = {0x2baf15a8, 0xaa452083, 0x08de59eb,
 static int kl_step(uint32_t cert,
                    const uint32_t input[8],
                    uint32_t output[8]) {
-  int err;
 
-  err = tock_h1b_kl_set_input(input);
-  if (err < TOCK_SUCCESS) return err;
-
-  err = tock_h1b_kl_set_output(output);
-  if (err < TOCK_SUCCESS) return err;
-
-  return tock_h1b_kl_step(cert);
-
+  if (tock_digest_busy()) {
+    return TOCK_EBUSY;
+  } else {
+    return tock_digest_with_cert(cert,
+                                 (void*)input, 32,
+                                 (void*)output, 32);
+  }
 }
 
 

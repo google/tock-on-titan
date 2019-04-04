@@ -15,6 +15,20 @@
 #include "digest_syscalls.h"
 #include "tock.h"
 
+// TODO These need to be standardized
+#define H1B_DRIVER_DIGEST 0x40003
+
+// command() type ids
+#define TOCK_DIGEST_CMD_INITIALIZE 0
+#define TOCK_DIGEST_CMD_UPDATE     1
+#define TOCK_DIGEST_CMD_FINALIZE   2
+#define TOCK_DIGEST_CMD_BUSY       3
+#define TOCK_DIGEST_CMD_CERT_INIT  4
+
+// allow() type ids
+#define TOCK_DIGEST_ALLOW_INPUT    0
+#define TOCK_DIGEST_ALLOW_OUTPUT   1
+
 int tock_digest_set_input(void* buf, size_t len) {
   int rval = allow(H1B_DRIVER_DIGEST, TOCK_DIGEST_ALLOW_INPUT, buf, len);
   if (rval != TOCK_SUCCESS){
@@ -36,6 +50,12 @@ int tock_digest_hash_initialize(TockDigestMode mode) {
   return rval;
 }
 
+int tock_digest_cert_initialize(uint32_t cert) {
+  int rval = command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_CERT_INIT, cert, 0);
+  printf("Returned from cert_initialize\n");
+  return rval;
+}
+
 int tock_digest_hash_update(size_t n) {
   int rval = command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_UPDATE, n, 0);
   return rval;
@@ -45,28 +65,64 @@ int tock_digest_hash_finalize(void) {
   return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_FINALIZE, 0, 0);
 }
 
+int tock_digest_busy(void) {
+  return (command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_BUSY, 0, 0) == TOCK_EBUSY);
+}
+
 int tock_digest_hash_easy(void* input_buf, size_t input_len,
                           void* output_buf, size_t output_len, TockDigestMode mode) {
-  int ret = -1;
-  ret = tock_digest_set_input(input_buf, input_len);
-  if (ret < 0) {
-    printf("Digest: error %i on set_input\n", ret);
-    return ret;
+  int err = -1;
+  err = tock_digest_set_input(input_buf, input_len);
+  if (err < 0) {
+    printf("Digest: error %i on set_input\n", err);
+    return err;
   }
-  ret = tock_digest_set_output(output_buf, output_len);
-  if (ret < 0) {
-    printf("Digest: error %i on set_output\n", ret);
-    return ret;
+  err = tock_digest_set_output(output_buf, output_len);
+  if (err < 0) {
+    printf("Digest: error %i on set_output\n", err);
+    return err;
   }
-  ret = tock_digest_hash_initialize(mode);
-  if (ret < 0) {
-    printf("Digest: error %i on initialize\n", ret);
-    return ret;
+  err = tock_digest_hash_initialize(mode);
+  if (err < 0) {
+    printf("Digest: error %i on initialize\n", err);
+    return err;
   }
-  ret = tock_digest_hash_update(input_len);
-  if (ret < 0) {
-    printf("Digest: error %i on update\n", ret);
-    return ret;
+  err = tock_digest_hash_update(input_len);
+  if (err < 0) {
+    printf("Digest: error %i on update\n", err);
+    return err;
   }
+  return tock_digest_hash_finalize();
+}
+
+int tock_digest_with_cert(uint32_t cert,
+                          void* input_buf, size_t input_len,
+                          void* output_buf, size_t output_len) {
+  int err = -1;
+  err = tock_digest_set_input(input_buf, input_len);
+  if (err < 0) {
+    printf("Digest with cert: error %i on set_input\n", err);
+    return err;
+  }
+  err = tock_digest_set_output(output_buf, output_len);
+  if (err < 0) {
+    printf("Digest with cert: error %i on set_output\n", err);
+    return err;
+  }
+
+  err = tock_digest_cert_initialize(cert);
+  if (err < 0) {
+    printf("Digest with cert: error %i on initialize\n", err);
+    return err;
+  }
+  printf("libgolf2: Completed cert initialization\n");
+  if (input_buf != NULL) {
+    err = tock_digest_hash_update(input_len);
+    if (err < 0) {
+      printf("Digest: error %i on update\n", err);
+      return err;
+    }
+  }
+
   return tock_digest_hash_finalize();
 }

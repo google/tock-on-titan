@@ -53,6 +53,7 @@ impl<'a, E: DigestEngine + 'a> DigestDriver<'a, E> {
 
 impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
     fn command(&self, minor_num: usize, r2: usize, _r3: usize, caller_id: AppId) -> ReturnCode {
+        print!("DigestEngine: command({}, {}, {})\n", minor_num, r2, _r3);
         match minor_num {
             // Initialize hash engine (arg: digest mode)
             0 => {
@@ -145,6 +146,31 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
 
                     })
                     .unwrap_or(ReturnCode::ENOMEM)
+            },
+            3 => {
+                if self.current_user.get().is_some() {
+                    ReturnCode::EBUSY
+                } else {
+                    ReturnCode::SUCCESS
+                }
+            }
+            4 => { // Cert initialize
+                let rval = self.apps
+                    .enter(caller_id, |_app_data, _| {
+                        if self.current_user.get().is_some() {
+                            return ReturnCode::EBUSY;
+                        }
+                        self.current_user.set(Some(caller_id));
+                        let init_result = self.engine.initialize_certificate(r2 as u32);
+                        match init_result {
+                            Ok(_t) => return ReturnCode::SUCCESS,
+                            Err(DigestError::EngineNotSupported) => return ReturnCode::ENOSUPPORT,
+                            Err(DigestError::NotConfigured) => return ReturnCode::FAIL,
+                            Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE
+                        }
+                    }).unwrap_or(ReturnCode::ENOMEM);
+                print!("Completed command for cert initialization with {:?}.\n", rval);
+                rval
             },
             _ => ReturnCode::ENOSUPPORT
         }

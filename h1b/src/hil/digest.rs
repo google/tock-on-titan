@@ -60,6 +60,9 @@ pub trait DigestEngine {
     /// Initialize for HMAC operation with a key.
     fn initialize_hmac(&self, key: &[u8]) -> Result<(), DigestError>;
 
+    /// Initialize for generating a particular certificate (hidden secret)
+    fn initialize_certificate(&self, certificate_id: u32) -> Result<(), DigestError>;
+
     /// Feeds data into the digest. Returns the number of bytes that were actually consumed from
     /// the input.
     fn update(&self, data: &[u8]) -> Result<usize, DigestError>;
@@ -67,4 +70,9 @@ pub trait DigestEngine {
     /// Finalizes the digest, and stores it in the `output` buffer. Returns the number of bytes
     /// stored.
     fn finalize(&self, output: &mut [u8]) -> Result<usize, DigestError>;
+
+    /// Finalize withtout seeing the result; this is used for certificates
+    /// (hidden secret generation)
+    fn finalize_hidden(&self) -> Result<(), DigestError>;
+
 }
