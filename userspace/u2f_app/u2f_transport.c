@@ -431,7 +431,7 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
    */
 
   uint16_t bcnt = 0;
-  printf("U2F: processing frame at %p.\n", f_p);
+  printf("U2F: processing frame at 0x%08x.\n", (unsigned int)f_p);
   /* Channel error checking */
   /* TODO: Would be nice to check anything related to the channel here. */
   /* ERROR: Nothing should ever be on channel 0 */
