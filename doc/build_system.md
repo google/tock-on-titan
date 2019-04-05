@@ -76,17 +76,20 @@ directory structure of `build/`:
 
 ```
 build/
-    cargo-host/         # Cargo-managed artifacts for the host machine
+    cargo-host/         # Cargo-managed artifacts for the host machine. Uses
+                        # elf2tab's toolchain version.
     device_lock         # Lock file used with flock() to prevent concurrent uses
                         # of the device.
     userspace/
-        cargo/          # userspace/ Cargo workspace target tree
+        cargo/          # userspace/ Cargo workspace target tree. Uses
+                        # libtock-rs's toolchain version.
         h1b_tests/      # Non-cargo-managed files specific to h1b_tests
         u2f_app/
         libgolf2/
         ...
     golf2/
         cargo/          # Cargo-managed artifacts for the golf2 Tock kernel.
+                        # Uses tock's toolchain version.
         ...
     third_party/
         chromiumos-ec/  # chromiumos-ec library artifacts.
