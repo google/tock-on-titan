@@ -32,7 +32,8 @@ userspace/h1b_tests/localtests:
 
 .PHONY: userspace/h1b_tests/program
 userspace/h1b_tests/program: build/userspace/h1b_tests/full_image
-	$(TANGO_SPIFLASH) --verbose --input=build/userspace/h1b_tests/full_image
+	flock build/device_lock $(TANGO_SPIFLASH) --verbose \
+		--input=build/userspace/h1b_tests/full_image
 
 # TODO: Implement a runner.
 .PHONY: userspace/h1b_tests/run

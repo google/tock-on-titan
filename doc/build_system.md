@@ -77,6 +77,8 @@ directory structure of `build/`:
 ```
 build/
     cargo-host/         # Cargo-managed artifacts for the host machine
+    device_lock         # Lock file used with flock() to prevent concurrent uses
+                        # of the device.
     userspace/
         cargo/          # userspace/ Cargo workspace target tree
         h1b_tests/      # Non-cargo-managed files specific to h1b_tests
