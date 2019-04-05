@@ -19,9 +19,15 @@ userspace/h1b_tests/build: build/userspace/h1b_tests/full_image
 userspace/h1b_tests/check:
 	cd userspace/h1b_tests && cargo check --release -Z offline
 
-# TODO: Implement a test runner.
 .PHONY: userspace/h1b_tests/devicetests
-userspace/h1b_tests/devicetests:
+userspace/h1b_tests/devicetests: build/cargo-host/release/runner \
+                                 build/userspace/h1b_tests/full_image
+	flock build/device_lock -c ' \
+		$(TANGO_SPIFLASH) --verbose \
+		                  --input=build/userspace/h1b_tests/full_image ; \
+		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
+		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
+		build/cargo-host/release/runner --test'
 
 .PHONY: userspace/h1b_tests/doc
 userspace/h1b_tests/doc:
@@ -32,22 +38,24 @@ userspace/h1b_tests/localtests:
 
 .PHONY: userspace/h1b_tests/program
 userspace/h1b_tests/program: build/userspace/h1b_tests/full_image
-	flock build/device_lock $(TANGO_SPIFLASH) --verbose \
-		--input=build/userspace/h1b_tests/full_image
+	flock build/device_lock -c '$(TANGO_SPIFLASH) --verbose \
+		--input=build/userspace/h1b_tests/full_image'
 
-# TODO: Implement a runner.
 .PHONY: userspace/h1b_tests/run
-userspace/h1b_tests/run: #userspace/h1b_tests/program TODO
-	stty -F /dev/ttyUltraTarget2 115200 -icrnl
-	@echo '###################################################'
-	@echo '# Displaying output, press Enter to exit cleanly. #'
-	@echo '###################################################'
-	(cat /dev/ttyUltraTarget2 & cat_pid=$$! ; read ; kill $$cat_pid)
+userspace/h1b_tests/run: build/cargo-host/release/runner \
+                         build/userspace/h1b_tests/full_image
+	flock build/device_lock -c ' \
+		$(TANGO_SPIFLASH) --verbose \
+		                  --input=build/userspace/h1b_tests/full_image ; \
+		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
+		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
+		build/cargo-host/release/runner'
 
 .PHONY: build/userspace/h1b_tests/h1b_tests
 build/userspace/h1b_tests/h1b_tests:
-	rm -f build/userspace/cargo/release/h1b_tests-*
-	cd userspace/h1b_tests && cargo test --no-run --release -Z offline
+	rm -f build/userspace/cargo/thumbv7m-none-eabi/release/h1b_tests-*
+	cd userspace/h1b_tests && TOCK_KERNEL_VERSION=h1b_tests \
+		cargo test --no-run --release -Z offline
 	mkdir -p build/userspace/h1b_tests/
 	find build/userspace/cargo/thumbv7m-none-eabi/release/ -maxdepth 1 -regex \
 		'build/userspace/cargo/thumbv7m-none-eabi/release/h1b_tests-[^.]+' \

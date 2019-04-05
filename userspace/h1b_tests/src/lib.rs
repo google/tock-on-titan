@@ -19,6 +19,6 @@ fn basic_test() -> bool {
     use core::fmt::Write;
     let _ = writeln!(libtock::console::Console::new(),
                      "Cat video count: {}\nWhat we eat: {:x}", 9001, 3405705229u32);
-    libtock::timer::sleep(libtock::timer::Duration::from_ms(1000));
+    libtock::timer::sleep(libtock::timer::Duration::from_ms(100));
     true
 }
