@@ -12,5 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-APP := gpio_test
-include ../CAppMakefile.mk
+INVOKE_DIR    := userspace/gpio_test
+TOCK_ON_TITAN := ../..
+include $(TOCK_ON_TITAN)/DirShim.mk
