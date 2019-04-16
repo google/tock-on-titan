@@ -40,11 +40,17 @@ localtests: $(addsuffix /localtests,$(BUILD_SUBDIRS))
 
 .PHONY: prtest
 prtest: build devicetests localtests
-	@echo '--------------'
-	@echo 'PR test state:'
-	@echo '--------------'
+	@echo '------------------------------------------------------'
+	@echo 'prtest successful. When you open a PR, paste the below'
+	@echo 'block (not the output above) into the PR description:'
+	@echo '------------------------------------------------------'
+	@echo '```'
+	@echo '----------------------'
+	@echo '`make prtest` summary:'
+	@echo '----------------------'
 	git rev-parse HEAD
 	git status
+	@echo '```'
 
 
 include $(addsuffix /Build.mk,$(BUILD_SUBDIRS))
