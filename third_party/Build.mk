@@ -26,7 +26,7 @@ third_party/build: build/cargo-host/release/elf2tab
 .PHONY: third_party/check
 third_party/check:
 	cd third_party/elf2tab && \
-		CARGO_BUILD_TARGET_DIR="../../build/cargo-host" cargo check
+		CARGO_BUILD_TARGET_DIR="../../build/cargo-host" cargo check --frozen
 
 .PHONY: third_party/devicetests
 third_party/devicetests:
@@ -34,16 +34,16 @@ third_party/devicetests:
 .PHONY: third_party/doc
 third_party/doc:
 	cd third_party/elf2tab && \
-		CARGO_BUILD_TARGET_DIR="../../build/cargo-host" cargo doc
+		CARGO_BUILD_TARGET_DIR="../../build/cargo-host" cargo doc --frozen
 
 .PHONY: third_party/localtests
 third_party/localtests:
 	cd third_party/elf2tab && \
-		CARGO_BUILD_TARGET_DIR="../../build/cargo-host" cargo test
+		CARGO_BUILD_TARGET_DIR="../../build/cargo-host" cargo test --frozen
 
 
 .PHONY: build/cargo-host/release/elf2tab
 build/cargo-host/release/elf2tab:
 	cd third_party/elf2tab && \
 		CARGO_BUILD_TARGET_DIR="../../build/cargo-host" \
-		cargo build --release
+		cargo build --frozen --release
