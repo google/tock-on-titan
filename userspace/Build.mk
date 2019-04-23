@@ -72,7 +72,8 @@ $(foreach APP,$(C_APPS),userspace/$(APP)/localtests):
 .PHONY: $(foreach APP,$(C_APPS),userspace/$(APP)/program)
 $(foreach APP,$(C_APPS),userspace/$(APP)/program): userspace/%/program: \
 		build/userspace/%/full_image
-	$(TANGO_SPIFLASH) --verbose --input=build/userspace/$*/full_image
+	flock build/device_lock $(TANGO_SPIFLASH) --verbose \
+		--input=build/userspace/$*/full_image
 
 # TODO: Write a program to display the console output and call it here.
 .PHONY: $(foreach APP,$(C_APPS),userspace/$(APP)/program)
