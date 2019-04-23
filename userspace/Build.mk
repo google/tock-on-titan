@@ -75,10 +75,15 @@ $(foreach APP,$(C_APPS),userspace/$(APP)/program): userspace/%/program: \
 	flock build/device_lock $(TANGO_SPIFLASH) --verbose \
 		--input=build/userspace/$*/full_image
 
-# TODO: Write a program to display the console output and call it here.
-.PHONY: $(foreach APP,$(C_APPS),userspace/$(APP)/program)
+.PHONY: $(foreach APP,$(C_APPS),userspace/$(APP)/run)
 $(foreach APP,$(C_APPS),userspace/$(APP)/run): userspace/%/run: \
-		userspace/%/program
+		build/cargo-host/release/runner build/userspace/%/full_image
+	flock build/device_lock -c ' \
+		$(TANGO_SPIFLASH) --verbose \
+			--input=build/userspace/$*/full_image ; \
+		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
+		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
+		build/cargo-host/release/runner'
 
 .PHONY: $(foreach APP,$(C_APPS),build/userspace/$(APP)/cortex-m3/cortex-m3.tbf)
 $(foreach APP,$(C_APPS),build/userspace/$(APP)/cortex-m3/cortex-m3.tbf): \
