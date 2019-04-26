@@ -14,9 +14,11 @@
 
 use core::cell::Cell;
 use core::mem;
+use cortexm3;
 use hil::digest::{DigestEngine, DigestMode, DigestError};
 use kernel::common::cells::VolatileCell;
 use super::keymgr::{KEYMGR0_REGS, Registers};
+
 
 #[allow(unused)]
 enum ShaTrigMask {
@@ -39,6 +41,11 @@ enum ShaCfgEnMask {
     IntMaskDone = 0x2_0000,
 }
 
+enum HKey {
+    KeyBits = 0x3ff, // Bits 0:9
+    Enable  = 0x400, // 1 << 10
+}
+
 pub struct ShaEngine {
     regs: *mut Registers,
     current_mode: Cell<Option<DigestMode>>,
@@ -56,6 +63,11 @@ impl ShaEngine {
             regs: regs,
             current_mode: Cell::new(None),
         }
+    }
+
+    pub fn handle_interrupt(&self, nvic: u32) {
+        let ref regs = unsafe { &*self.regs }.sha;
+        regs.itop.set(0);
     }
 }
 
@@ -80,7 +92,8 @@ impl DigestEngine for ShaEngine {
 
         regs.trig.set(ShaTrigMask::Stop as u32);
 
-        let mut flags = ShaCfgEnMask::Livestream as u32 | ShaCfgEnMask::IntEnDone as u32;
+        let mut flags = ShaCfgEnMask::Livestream as u32 |
+                        ShaCfgEnMask::IntEnDone as u32;
         match mode {
             DigestMode::Sha1 => flags |= ShaCfgEnMask::Sha1 as u32,
             DigestMode::Sha256 => (),
@@ -123,26 +136,28 @@ impl DigestEngine for ShaEngine {
 
     fn initialize_certificate(&self, certificate_id: u32) -> Result<(), DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
+        let ref hregs = unsafe { &*self.regs }.hkey;
         print!("sha::initialize_certificate called for cert {}\n", certificate_id);
         regs.itop.set(0); // clear status
 
 
-        self.current_mode.set(Some(DigestMode::Sha256));
-
+        //self.current_mode.set(Some(DigestMode::Sha256));
+        //regs.user_hidden_key.set(key_index & HKey::KeyBits as u32 |
+        //HKey::Enable as u32);
         regs.use_cert.set(certificate_id & CertificateMask::CertBits as u32 |
                           CertificateMask::Enable as u32);
 
         regs.cfg_en.set(ShaCfgEnMask::IntEnDone as u32);
 
         regs.trig.set(ShaTrigMask::Go as u32);
-        print!("sha::initialize_certificate complete\n");
+//        print!("sha::initialize_certificate complete\n");
         Ok(())
     }
 
 
     fn update(&self, data: &[u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-        print!("sha::update called\n");
+        //print!("sha::update called\n");
         if self.current_mode.get().is_none() {
             print!("ERROR: SHA::update called but engine not initialized!\n");
             return Err(DigestError::NotConfigured);
@@ -159,7 +174,7 @@ impl DigestEngine for ShaEngine {
 
     fn finalize(&self, output: &mut [u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-        print!("sha::finalize called\n");
+        //print!("sha::finalize called\n");
         let expected_output_size = match self.current_mode.get() {
             None => return Err(DigestError::NotConfigured),
             Some(mode) => mode.output_size(),
@@ -171,7 +186,10 @@ impl DigestEngine for ShaEngine {
         // Tell hardware we're done streaming and then wait for the hash calculation to finish.
         regs.itop.set(0);
         regs.trig.set(ShaTrigMask::Stop as u32);
-        while regs.itop.get() == 0 {}
+        let mut counter = 0;
+        while regs.itop.get() == 0 && counter < 10000 {
+            counter = counter + 1;
+        }
 
         for i in 0..(expected_output_size / 4) {
             let word = regs.sts_h[i].get();
@@ -188,14 +206,14 @@ impl DigestEngine for ShaEngine {
 
     // Finalize withtout seeing the result; this is used for certificates
     // (hidden secret generation)
-    fn finalize_hidden(&self) -> Result<(), DigestError> {
+    fn finalize_hidden(&self) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-        print!("sha::finalize_hidden called\n");
+        //print!("sha::finalize_hidden called\n");
         regs.itop.set(0);
         regs.trig.set(ShaTrigMask::Stop as u32);
-        while regs.itop.get() == 0 {}
+        //while regs.itop.get() == 0 {}
         regs.itop.set(0);
 
-        Ok(())
+        Ok(0)
     }
 }

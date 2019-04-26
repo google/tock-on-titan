@@ -57,6 +57,8 @@ const uint8_t* fips_hwSHA256_final(uint32_t* output) {
 
 static enum AES_encrypt_mode encrypt_mode = AES_ENCRYPT_MODE;
 static enum AES_cipher_mode cipher_mode = AES_CIPHER_MODE_CTR;
+static uint8_t block_len = AES128_BLOCK_CIPHER_KEY_SIZE;
+
 static const uint8_t* initialization_vector = NULL;
 
 int fips_aes_init(const uint8_t *key, uint32_t key_len, const uint8_t *iv,
@@ -75,10 +77,10 @@ int fips_aes_init(const uint8_t *key, uint32_t key_len, const uint8_t *iv,
   // fips_aes_init takes the key_len in bits, but Tock expects it in bytes;
   // convert here.
   key_len = key_len / 8;
-  if (key_len == AES256_BLOCK_CIPHER_KEY_SIZE) {
-    tock_aes128_set_key(key, key_len);
-  } else if (key_len == AES256_BLOCK_CIPHER_KEY_SIZE/2) {
-    tock_aes128_set_key(key, key_len);
+  if (key_len == AES256_BLOCK_CIPHER_KEY_SIZE ||
+      key_len == AES128_BLOCK_CIPHER_KEY_SIZE) {
+    tock_aes_set_key(key, key_len);
+    block_len = key_len;
   } else {
     printf("FAIL: aes_init passed a non-standard key length: %lu\n", key_len);
     return 0;
@@ -86,34 +88,40 @@ int fips_aes_init(const uint8_t *key, uint32_t key_len, const uint8_t *iv,
   return 1;
 }
 
+#pragma GCC diagnostic ignored "-Wstack-usage="
 int fips_aes_block(const uint8_t *in, uint8_t *out) {
+  if (block_len != AES128_BLOCK_CIPHER_KEY_SIZE &&
+      block_len != AES256_BLOCK_CIPHER_KEY_SIZE) {
+    printf("fips_aes_block: invalid block length: %i\n", block_len);
+    return 0;
+  }
   if (cipher_mode == AES_CIPHER_MODE_CTR) {
-    uint8_t iv[16];
-    memcpy(iv, initialization_vector, 16);
-    memcpy(out, in, 16);
+    uint8_t iv[block_len];
+    memcpy(iv, initialization_vector, block_len);
+    memcpy(out, in, block_len);
     if (encrypt_mode == AES_ENCRYPT_MODE) {
-      tock_aes128_encrypt_ctr_sync(out, 16, iv, 16);
+      tock_aes_encrypt_ctr_sync(out, block_len, iv, block_len);
       increment_counter();
     } else {
-      memcpy(out, in, 16);
-      tock_aes128_decrypt_ctr_sync(out, 16, iv, 16);
+      memcpy(out, in, block_len);
+      tock_aes_decrypt_ctr_sync(out, block_len, iv, block_len);
       increment_counter();
     }
   } else if (cipher_mode == AES_CIPHER_MODE_CBC) {
-    uint8_t iv[16];
-    memcpy(iv, initialization_vector, 16);
-    memcpy(out, in, 16);
+    uint8_t iv[block_len];
+    memcpy(iv, initialization_vector, block_len);
+    memcpy(out, in, block_len);
     if (encrypt_mode == AES_ENCRYPT_MODE) {
-      tock_aes128_encrypt_cbc_sync(out, 16, iv, 16);
+      tock_aes_encrypt_cbc_sync(out, block_len, iv, block_len);
     } else {
-      tock_aes128_decrypt_cbc_sync(out, 16, iv, 16);
+      tock_aes_decrypt_cbc_sync(out, block_len, iv, block_len);
     }
   } else if (cipher_mode == AES_CIPHER_MODE_ECB) {
-    memcpy(out, in, 16);
+    memcpy(out, in, block_len);
     if (encrypt_mode == AES_ENCRYPT_MODE) {
-      tock_aes128_encrypt_ecb_sync(out, 16);
+      tock_aes_encrypt_ecb_sync(block_len, out, block_len);
     } else {
-      tock_aes128_decrypt_ecb_sync(out, 16);
+      tock_aes_decrypt_ecb_sync(block_len, out, block_len);
     }
   } else {
     printf("fips_aes_block: unsupported cipher mode: %i\n", cipher_mode);
@@ -224,9 +232,11 @@ static int kl_step(uint32_t cert,
   if (tock_digest_busy()) {
     return TOCK_EBUSY;
   } else {
-    return tock_digest_with_cert(cert,
-                                 (void*)input, 32,
-                                 (void*)output, 32);
+    int rval = tock_digest_with_cert(cert,
+                                     (void*)input, 32,
+                                     (void*)output, 32);
+    //printf("kl_step(%lu, %p, %p) = %i\n", cert, input, output, rval);
+    return rval;
   }
 }
 
@@ -235,8 +245,11 @@ int kl_init(void) {
   uint32_t salt[8];
   int error = 0;
   size_t i;
-
+  printf("tock_shims.c: kl_init()\n");
   // salt rsr some
+  printf("kl_init(): generating salt\n");
+  rand_bytes(salt, sizeof(salt));
+  //error = error || kl_step(40, salt, NULL);
   rand_bytes(salt, sizeof(salt));
   error = error || kl_step(28, salt, NULL);
 
@@ -281,20 +294,24 @@ int kl_derive(const uint32_t salt[8] ,
 
 int kl_derive_attest(const uint32_t input[8],
                      uint32_t output[8]) {
+  printf("kl_derive_attest(%p, %p)\n", input, output);
   return kl_derive(KL_SEED_ATTEST, input, output);
 }
 
 int kl_derive_obfs(const uint32_t input[8],
                    uint32_t output[8]) {
+  printf("kl_derive_obfs(%p, %p)\n", input, output);
   return kl_derive(KL_SEED_OBFS, input, output);
 }
 
 int kl_derive_origin(const uint32_t input[8],
                      uint32_t output[8]) {
+  printf("kl_derive_origin(%p, %p)\n", input, output);
   return kl_derive(KL_SEED_ORIGIN, input, output);
 }
 
 int kl_derive_ssh(const uint32_t input[8] ,
                   uint32_t output[8]) {
+  printf("kl_derive_ssh(%p, %p)\n", input, output);
   return kl_derive(KL_SEED_SSH, input, output);
 }

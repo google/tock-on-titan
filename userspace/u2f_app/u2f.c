@@ -61,7 +61,11 @@ static int equal_arrays(const void *va, const void *vb, size_t n) {
   const uint8_t *b = (const uint8_t *)vb;
   uint8_t accu = 0;
 
-  while (n--) accu |= (*a++) ^ (*b++);
+  while (n--) {
+    printf("%i [%02x] =? [%02x]\n", n, *a, *b);
+    accu |= (*a++) ^ (*b++);
+
+  }
   return accu == 0;
 }
 
@@ -349,14 +353,16 @@ static uint16_t u2f_authenticate(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   if (obfuscate_kh(req->appId, req->keyHandle, kh, AES_DECRYPT_MODE) !=
       EC_SUCCESS)
     return U2F_SW_WTF + 1;
+
   deinterleave64(kh, origin, od_seed);
 
+  printf("u2f_authenticate: Checking whether appId (i.e. origin) matches.\n");
   /* Check whether appId (i.e. origin) matches. Constant time. */
   if (!equal_arrays(origin, req->appId, 24)) return U2F_SW_WRONG_DATA;
 
   /* Origin check only? */
   if (apdu.p1 & G2F_CHECK) return U2F_SW_CONDITIONS_NOT_SATISFIED;
-
+  printf("u2f_authenticate: Checking for user presence.\n");
   /* Sense user presence, with optional consume */
   resp->flags = pop_check_presence(apdu.p1 & G2F_CONSUME, 500) == POP_TOUCH_YES;
 
@@ -417,18 +423,18 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
     apdu.data += 2;
   }
 
-  printf("\n\n");
-  printf("APDU rcv'd: %p\n", ibuf);
-  printf("  APDU.len: 0x%x\n", apdu.len);
+  //printf("\n\n");
+  //printf("APDU rcv'd: %p\n", ibuf);
+  //printf("  APDU.len: 0x%x\n", apdu.len);
 
   if (CLA == 0x00) { /* Always 0x00 */
     sw = U2F_SW_INS_NOT_SUPPORTED;
 
     switch (INS) {
       case (U2F_INS_REGISTER):
-        printf("U2F REGISTER cmd received\n");
+        //printf("U2F REGISTER cmd received\n");
         sw = u2f_register(apdu, obuf, &obuf_len);
-        printf("  - result 0x%x\n", sw);
+        //printf("  - result 0x%x\n", sw);
         if (fips_fatal != FIPS_INITIALIZED) {
           obuf_len = 0;
           sw = U2F_SW_WTF + 6;
@@ -437,9 +443,9 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
         break;
 
     case (U2F_INS_AUTHENTICATE):
-        printf("U2F AUTHENTICATE cmd received\n");
+      //printf("U2F AUTHENTICATE cmd received\n");
         sw = u2f_authenticate(apdu, obuf, &obuf_len);
-        printf("  -setting SW to 0x%x\n", sw);
+        // printf("  -setting SW to 0x%x\n", sw);
         if (fips_fatal != FIPS_INITIALIZED) {
           obuf_len = 0;
           sw = U2F_SW_WTF + 6;
@@ -447,7 +453,7 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
         break;
 
       case (U2F_INS_VERSION):
-        printf("U2F VERSION\n");
+        //printf("U2F VERSION\n");
         sw = u2f_version(apdu, obuf, &obuf_len);
         break;
     }
@@ -465,14 +471,14 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
   obuf[obuf_len - 2] = sw >> 8;
   obuf[obuf_len - 1] = sw;
 
-  printf(" SW status: %04x\n", sw);
+  //printf(" SW status: %04x\n", sw);
 
   {
-    int i = 0;
+    //int i = 0;
 
-    printf("\nAPDU response buffer: %d\n", obuf_len);
-    for (i = 0; i < obuf_len; i++) printf("%02X", obuf[i]);
-    printf("\n");
+    //printf("\nAPDU response buffer: %d\n", obuf_len);
+    //for (i = 0; i < obuf_len; i++) printf("%02X", obuf[i]);
+    //printf("\n");
   }
 
   return obuf_len;

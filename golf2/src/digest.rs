@@ -53,7 +53,7 @@ impl<'a, E: DigestEngine + 'a> DigestDriver<'a, E> {
 
 impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
     fn command(&self, minor_num: usize, r2: usize, _r3: usize, caller_id: AppId) -> ReturnCode {
-        print!("DigestEngine: command({}, {}, {})\n", minor_num, r2, _r3);
+        //print!("DigestEngine: command({}, {}, {})\n", minor_num, r2, _r3);
         match minor_num {
             // Initialize hash engine (arg: digest mode)
             0 => {
@@ -85,7 +85,8 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                             Ok(_t) => return ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => return ReturnCode::ENOSUPPORT,
                             Err(DigestError::NotConfigured) => return ReturnCode::FAIL,
-                            Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE
+                            Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE,
+                            Err(DigestError::Timeout) => return ReturnCode::FAIL,
                         }
                     }).unwrap_or(ReturnCode::ENOMEM)
             },
@@ -114,7 +115,8 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                             Ok(_t) => ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => ReturnCode::ENOSUPPORT,
                             Err(DigestError::NotConfigured) => ReturnCode::ERESERVE,
-                            Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE
+                            Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE,
+                            Err(DigestError::Timeout) => ReturnCode::FAIL
                         }
                     })
                     .unwrap_or(ReturnCode::ENOMEM)
@@ -132,16 +134,17 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                         self.current_user.set(None);
                         let app_data: &mut App = app_data;
 
-                        let output_buffer = match app_data.output_buffer {
-                            Some(ref mut slice) => slice,
-                            None => return ReturnCode::ENOMEM
+                        let rval = match app_data.output_buffer {
+                            Some(ref mut slice) => self.engine.finalize(slice.as_mut()),
+                            None => self.engine.finalize_hidden()
                         };
 
-                        match self.engine.finalize(output_buffer.as_mut()) {
+                        match rval {
                             Ok(_t) => ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => ReturnCode::ENOSUPPORT,
                             Err(DigestError::NotConfigured) => ReturnCode::FAIL,
-                            Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE
+                            Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE,
+                            Err(DigestError::Timeout) => ReturnCode::FAIL,
                         }
 
                     })
@@ -161,12 +164,14 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                             return ReturnCode::EBUSY;
                         }
                         self.current_user.set(Some(caller_id));
+                        print!("Initializing cert {}\n", r2);
                         let init_result = self.engine.initialize_certificate(r2 as u32);
                         match init_result {
                             Ok(_t) => return ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => return ReturnCode::ENOSUPPORT,
                             Err(DigestError::NotConfigured) => return ReturnCode::FAIL,
-                            Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE
+                            Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE,
+                            Err(DigestError::Timeout) => return ReturnCode::FAIL,
                         }
                     }).unwrap_or(ReturnCode::ENOMEM);
                 print!("Completed command for cert initialization with {:?}.\n", rval);

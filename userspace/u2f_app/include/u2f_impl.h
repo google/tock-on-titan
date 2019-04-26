@@ -18,7 +18,10 @@
 #define __CROS_EC_U2F_IMPL_H
 
 #include "common.h"
-#include "cryptoc/p256.h"
+#include "crypto/p256.h"
+
+// Call to initialize keyladder and other U2F state.
+void u2f_init(void);
 
 /* APDU fields to pass around */
 struct apdu {

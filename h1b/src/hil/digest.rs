@@ -41,6 +41,7 @@ pub enum DigestError {
     NotConfigured,
     /// The supplied output buffer is too small. Parameter is the required buffer size.
     BufferTooSmall(usize),
+    Timeout,
 }
 
 impl From<DigestError> for SyscallError {
@@ -49,6 +50,7 @@ impl From<DigestError> for SyscallError {
             DigestError::EngineNotSupported => SyscallError::NotImplemented,
             DigestError::NotConfigured => SyscallError::InvalidState,
             DigestError::BufferTooSmall(_) => SyscallError::OutOfRange,
+            DigestError::Timeout => SyscallError::ResourceBusy,
         }
     }
 }
@@ -72,7 +74,8 @@ pub trait DigestEngine {
     fn finalize(&self, output: &mut [u8]) -> Result<usize, DigestError>;
 
     /// Finalize withtout seeing the result; this is used for certificates
-    /// (hidden secret generation)
-    fn finalize_hidden(&self) -> Result<(), DigestError>;
+    /// (hidden secret generation). Ok is always Ok(0); passes a usize
+    /// to match the finalize() signature.
+    fn finalize_hidden(&self) -> Result<usize, DigestError>;
 
 }

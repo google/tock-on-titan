@@ -341,7 +341,6 @@ pub unsafe fn reset_handler() {
     );
     debug!("Tock: starting main loop.");
     debug!(" ");
-
     kernel.kernel_loop(&golf2, chip, Some(&golf2.ipc), &main_cap);
 }
 

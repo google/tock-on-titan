@@ -104,7 +104,7 @@ static void clear_pending(void) {
 
 static void cancel_timeout(void) {
   if (timeout_CID) {
-    printf("%s: cancel timer %04lx\n", __func__, timeout_CID);
+    //printf("%s: cancel timer %04lx\n", __func__, timeout_CID);
     timeout_CID = 0;
   }
   //hook_call_deferred(&u2fhid_timeout_data, -1);
@@ -112,7 +112,7 @@ static void cancel_timeout(void) {
 
 /* Start/restart timeout for a given channel */
 static void start_timeout(uint32_t cid) {
-  printf("%s: start timer %04lx\n", __func__, cid);
+  //  printf("%s: start timer %04lx\n", __func__, cid);
   timeout_CID = cid;
   //  hook_call_deferred(&u2fhid_timeout_data, MSG_TIMEOUT);
 }
@@ -279,28 +279,28 @@ static void u2fhid_response_msg(PENDING_MSG *req) {
   /* Command dispatch */
   switch (req->cmd | TYPE_MASK) {
     case U2FHID_MSG:
-      printf("Responding to cmd MSG on CID: %02lx\n", req->cid);
+      //printf("Responding to cmd MSG on CID: %02lx\n", req->cid);
       u2fhid_cmd_msg(req->data, req->bcnt, tx_buffer, &rsp_len);
       break;
 
     case U2FHID_PING:
-      printf("Responding to cmd PING on CID: %02lx\n", req->cid);
+      //printf("Responding to cmd PING on CID: %02lx\n", req->cid);
       rsp_len = req->bcnt; /* bytes in = bytes out */
       u2fhid_cmd_ping(req->data, req->bcnt, tx_buffer);
       break;
 
     case U2FHID_LOCK:
-      printf("Responding to cmd LOCK on CID: %02lx\n", req->cid);
+      //printf("Responding to cmd LOCK on CID: %02lx\n", req->cid);
       u2fhid_cmd_lock(req->cid, req->data[0]);
       break;
 
     case U2FHID_WINK:
-      printf("Responding to cmd WINK on CID: %02lx\n", req->cid);
+      //printf("Responding to cmd WINK on CID: %02lx\n", req->cid);
       u2fhid_cmd_wink();
       break;
 
     case U2FHID_PROMPT:
-      printf("Responding to cmd PROMPT on CID: %02lx\n", req->cid);
+      //printf("Responding to cmd PROMPT on CID: %02lx\n", req->cid);
       u2fhid_cmd_prompt();
       break;
 
@@ -315,20 +315,20 @@ static void u2fhid_response_msg(PENDING_MSG *req) {
 
 #if defined(CONFIG_FIPS_TEST)
     case U2FHID_FIPS:
-      printf("Responding to U2F command FIPS on CID: %02lx\n", req->cid);
+      //printf("Responding to U2F command FIPS on CID: %02lx\n", req->cid);
       rsp_len = sizeof(tx_buffer);
       u2fhid_cmd_fips(req->data, req->bcnt, tx_buffer, &rsp_len);
       break;
 #endif
 
     case U2FHID_SYSINFO:
-      printf("Responding to cmd SYSINFO on CID: %02lx\n", req->cid);
+      //printf("Responding to cmd SYSINFO on CID: %02lx\n", req->cid);
       u2fhid_cmd_sysinfo(tx_buffer, &rsp_len);
       break;
 
     /* TODO: Make this state not-special if possible */
     default:
-      printf("Command %02x on CID %02lx does not exist.\n", req->cmd, req->cid);
+      //printf("Command %02x on CID %02lx does not exist.\n", req->cmd, req->cid);
       u2fhid_err(req->cid, ERR_INVALID_CMD);
       clear_pending();
       return;
@@ -433,7 +433,7 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
    */
 
   uint16_t bcnt = 0;
-  printf("U2F: processing frame at 0x%08x.\n", (unsigned int)f_p);
+  //printf("U2F: processing frame at 0x%08x.\n", (unsigned int)f_p);
   /* Channel error checking */
   /* TODO: Would be nice to check anything related to the channel here. */
   /* ERROR: Nothing should ever be on channel 0 */
@@ -485,7 +485,7 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
 
     /* INIT frame */
     if (FRAME_TYPE(*f_p) == TYPE_INIT) {
-      printf("U2F: Received init frame.\n");
+      //printf("U2F: Received init frame.\n");
       /* ERROR: Device in use by another channel */
       if ((f_p->cid != pending.cid) && (pending.cid != 0)) {
         printf("U2F: Fob in use by other channel.\n");
@@ -541,7 +541,7 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
     }
     /* CONTinuation frame */
     else if (FRAME_TYPE(*f_p) == TYPE_CONT) {
-      printf("U2F: Received CONT frame.\n");
+      //printf("U2F: Received CONT frame.\n");
       /* ERRORish: No pending transaction, ignore. */
       if (pending.cid == 0 || pending.cid != f_p->cid) {
         printf("U2F: Random CONT packet; ignoring\n");
@@ -576,6 +576,12 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
 /* Wake up the u2f task to handle a frame */
 void u2f_wakeup(void) {
   //  if (task_start_called()) task_set_event(TASK_ID_U2F, TASK_EVENT_FRAME, 0);
+}
+
+void u2f_init(void) {
+  if (kl_init()) {
+    printf("ERROR: kl_init() FAIL!\n");
+  }
 }
 
 /* N.B. HOOK_INIT happens *before* the initial task scheduling, so you

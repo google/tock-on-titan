@@ -55,10 +55,10 @@ impl Chip for Hotel {
                     4 => crypto::dcrypto::DCRYPTO.handle_done_interrupt(),
                     5 => crypto::dcrypto::DCRYPTO.handle_receive_interrupt(),
 
-                    54 => (), // KEYMGR HKEY ALERT, ignored
+//                    54 => (), // KEYMGR HKEY ALERT, ignored
                     104...109 => crypto::aes::KEYMGR0_AES.handle_interrupt(nvic_num),
 
-                    110 => (), // KEYMGR0_DSHA_INT, currently polled
+                    110 => crypto::sha::KEYMGR0_SHA.handle_interrupt(nvic_num),
                     111 => (), // KEYMGR0_SHA_WFIFO_FULL
 
                     159 => timels::TIMELS0.handle_interrupt(),
