@@ -173,14 +173,14 @@ static int u2fhid_cmd_lock(const uint32_t cid, const uint8_t duration) {
 /* U2F HID command WINK */
 static int u2fhid_cmd_wink(void) {
   /* TODO: Frob the LED */
-  printf("\nWINK WINK\n");
+  //printf("\nWINK WINK\n");
   return EC_SUCCESS;
 }
 
 /* U2F HID command PROMPT */
 static int u2fhid_cmd_prompt(void) {
   /* TODO: Frob the LED */
-  printf("\nPROMPT PROMPT\n");
+  //printf("\nPROMPT PROMPT\n");
   return EC_SUCCESS;
 }
 
@@ -278,31 +278,31 @@ static void u2fhid_response_msg(PENDING_MSG *req) {
 
   /* Command dispatch */
   switch (req->cmd | TYPE_MASK) {
-    case U2FHID_MSG:
-      //printf("Responding to cmd MSG on CID: %02lx\n", req->cid);
+  case U2FHID_MSG:
+    //printf("Responding to cmd MSG on CID: %02lx\n", req->cid);
       u2fhid_cmd_msg(req->data, req->bcnt, tx_buffer, &rsp_len);
       break;
 
-    case U2FHID_PING:
-      //printf("Responding to cmd PING on CID: %02lx\n", req->cid);
-      rsp_len = req->bcnt; /* bytes in = bytes out */
-      u2fhid_cmd_ping(req->data, req->bcnt, tx_buffer);
-      break;
+  case U2FHID_PING:
+    //printf("Responding to cmd PING on CID: %02lx\n", req->cid);
+    rsp_len = req->bcnt; /* bytes in = bytes out */
+    u2fhid_cmd_ping(req->data, req->bcnt, tx_buffer);
+    break;
 
-    case U2FHID_LOCK:
-      //printf("Responding to cmd LOCK on CID: %02lx\n", req->cid);
-      u2fhid_cmd_lock(req->cid, req->data[0]);
-      break;
+  case U2FHID_LOCK:
+    //printf("Responding to cmd LOCK on CID: %02lx\n", req->cid);
+    u2fhid_cmd_lock(req->cid, req->data[0]);
+    break;
 
-    case U2FHID_WINK:
-      //printf("Responding to cmd WINK on CID: %02lx\n", req->cid);
-      u2fhid_cmd_wink();
-      break;
+  case U2FHID_WINK:
+    //printf("Responding to cmd WINK on CID: %02lx\n", req->cid);
+    u2fhid_cmd_wink();
+    break;
 
-    case U2FHID_PROMPT:
-      //printf("Responding to cmd PROMPT on CID: %02lx\n", req->cid);
-      u2fhid_cmd_prompt();
-      break;
+  case U2FHID_PROMPT:
+    //printf("Responding to cmd PROMPT on CID: %02lx\n", req->cid);
+    u2fhid_cmd_prompt();
+    break;
 
 #if defined(CONFIG_HID_DFU)
     case U2FHID_DFU:
@@ -321,17 +321,17 @@ static void u2fhid_response_msg(PENDING_MSG *req) {
       break;
 #endif
 
-    case U2FHID_SYSINFO:
-      //printf("Responding to cmd SYSINFO on CID: %02lx\n", req->cid);
-      u2fhid_cmd_sysinfo(tx_buffer, &rsp_len);
-      break;
+  case U2FHID_SYSINFO:
+    //printf("Responding to cmd SYSINFO on CID: %02lx\n", req->cid);
+    u2fhid_cmd_sysinfo(tx_buffer, &rsp_len);
+    break;
 
     /* TODO: Make this state not-special if possible */
-    default:
-      //printf("Command %02x on CID %02lx does not exist.\n", req->cmd, req->cid);
-      u2fhid_err(req->cid, ERR_INVALID_CMD);
-      clear_pending();
-      return;
+  default:
+    //printf("Command %02x on CID %02lx does not exist.\n", req->cmd, req->cid);
+    u2fhid_err(req->cid, ERR_INVALID_CMD);
+    clear_pending();
+    return;
   }
 
   /* Number of continuation frames needed for response message */
@@ -409,13 +409,13 @@ static void u2fhid_cmd_init(U2FHID_FRAME *f_p) {
   /* DATA + 16 = Capabilities flags */
   /* TODO: Yes/no? */
   response.init.data[16] = CAPFLAG_WINK | CAPFLAG_LOCK;
-  printf("Response Frame -> cid:%08lx cmd:%02x ", response.cid,
-          response.init.cmd);
-  printf("bcnth:%02x bcntl:%02x ", response.init.bcnth, response.init.bcntl);
-  printf("data:%0X%0X%0X%0X%0X%0X%0X%0X\n\n", response.init.data[0],
-          response.init.data[1], response.init.data[2], response.init.data[3],
-          response.init.data[4], response.init.data[5], response.init.data[6],
-          response.init.data[7]);
+  //printf("Response Frame -> cid:%08lx cmd:%02x ", response.cid,
+  //        response.init.cmd);
+  //printf("bcnth:%02x bcntl:%02x ", response.init.bcnth, response.init.bcntl);
+  //printf("data:%0X%0X%0X%0X%0X%0X%0X%0X\n\n", response.init.data[0],
+  //        response.init.data[1], response.init.data[2], response.init.data[3],
+  //        response.init.data[4], response.init.data[5], response.init.data[6],
+  //        response.init.data[7]);
 
   usbu2f_put_frame(&response);
 }
@@ -464,8 +464,9 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
     }
 
     /* Cope w/ the "special" U2FHID_INIT command */
-    printf("U2F HID Init cmd received\n");
+    //printf("U2F HID Init cmd received\n");
     u2fhid_cmd_init(f_p);
+    //printf("U2F HID Init cmd completed\n");
     return;
   }
 
@@ -560,7 +561,10 @@ void u2fhid_process_frame(U2FHID_FRAME *f_p) {
       /* Restart timeout */
       start_timeout(pending.cid);
       /* Consume frame, process full request msg if last frame */
-      if (consume_frame(f_p)) u2fhid_response_msg(&pending);
+      if (consume_frame(f_p)) {
+        //printf("U2F: Message completed, process.\n");
+        u2fhid_response_msg(&pending);
+      }
     }
     /* Invalid frame type; shouldn't happen */
     else {

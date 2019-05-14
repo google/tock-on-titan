@@ -62,12 +62,11 @@ static int equal_arrays(const void *va, const void *vb, size_t n) {
   uint8_t accu = 0;
 
   while (n--) {
-    printf("%i [%02x] =? [%02x]\n", n, *a, *b);
     accu |= (*a++) ^ (*b++);
-
   }
   return accu == 0;
 }
+
 
 /**
  * (re)generate origin-specific ECDSA keypair via a DRBG seeded w/
@@ -80,11 +79,11 @@ static int equal_arrays(const void *va, const void *vb, size_t n) {
  *
  * @return EC_SUCCESS
  */
+
 static int origin_keypair(uint8_t *seed, p256_int *d, p256_int *pk_x,
                           p256_int *pk_y) {
   uint32_t tmp[8];
   DRBG ctx;
-
   if (pk_x != NULL && pk_y != NULL) {
     /* Initial generation: pick origin additional data */
     if (kl_random(seed)) return EC_ERROR_UNKNOWN;
@@ -98,7 +97,6 @@ static int origin_keypair(uint8_t *seed, p256_int *d, p256_int *pk_x,
   make_drbg1(&ctx);
   fips_keygen(&ctx, d, pk_x, pk_y, tmp, sizeof(tmp));
   DRBG_exit(&ctx);
-
   return EC_SUCCESS;
 }
 
@@ -210,11 +208,11 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   LITE_SHA256_CTX ctx;  // SHA256 output container
   DRBG drbg_ctx;
 
-  printf("REGISTER CMD\n");
+  //printf("REGISTER CMD\n");
 
   if (apdu.len != sizeof(U2F_REGISTER_REQ)) {
     printf(
-        "ERR: U2F REGISTER INS error wrong "
+        "ERR: u2f_register "
         "length (%i should be %i), return 0x%x\n", apdu.len, sizeof(U2F_REGISTER_REQ), U2F_SW_WRONG_LENGTH);
     return U2F_SW_WRONG_LENGTH;
   }
@@ -222,17 +220,19 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   /* Check user presence, w/ optional consume */
   if (pop_check_presence(apdu.p1 & G2F_CONSUME, 250) != POP_TOUCH_YES &&
       (apdu.p1 & G2F_TUP) != 0) {
+    printf("ERR: u2f_register: did not satisfy conditions.\n");
     return U2F_SW_CONDITIONS_NOT_SATISFIED;
   }
 
   /* Check crypto state */
   if (fips_fatal != FIPS_INITIALIZED) {
+    printf("ERR: u2f_register: fips not initialized.\n");
     return U2F_SW_WTF + 6;
   }
 
   /* Generate origin-specific keypair */
   if (origin_keypair(od_seed, &od, &opk_x, &opk_y) != EC_SUCCESS) {
-    printf("ERR: Origin-specific keypair generation failed!");
+    printf("ERR: u2f_register: origin-specific keypair generation failed!");
     return U2F_SW_WTF + 1;
   }
 
@@ -248,8 +248,10 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
     rand_bytes(buf + 48, 16);
   }
 
-  if (obfuscate_kh(req->appId, buf, kh, AES_ENCRYPT_MODE) != EC_SUCCESS)
+  if (obfuscate_kh(req->appId, buf, kh, AES_ENCRYPT_MODE) != EC_SUCCESS) {
+    printf("ERR: u2f_register: could not obfuscate key handle.\n");
     return U2F_SW_WTF + 2;
+  }
 
   /* Response message hash for signing */
   SHA256_INIT(&ctx);
@@ -290,7 +292,7 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
         individual_cert(resp->keyHandleCertSig + m_off, MAX_CERT_SIZE);
   } else {
     /* Anon attestation keypair; use origin key to self-sign */
-    printf("anon attest\n");
+    printf("anonymous attestion\n");
     cert_len =
       anonymous_cert(&od, &opk_x, &opk_y, resp->keyHandleCertSig + m_off,
                        MAX_CERT_SIZE);
@@ -298,7 +300,6 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   }
   if (cert_len == 0) return U2F_SW_WTF + 4;
 
-  printf("copied n = %lu byte cert into response\n", cert_len);
   l += cert_len;
   m_off += cert_len;
 
@@ -314,7 +315,7 @@ static uint16_t u2f_register(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   /* Signature -> ASN.1 DER encoded bytes */
   l += asn1_sigp(resp->keyHandleCertSig + m_off, &r, &s);
 
-  printf("cmd REGISTER completed\n");
+  //printf("cmd REGISTER completed\n");
   *obuf_len = l;
 
   return U2F_SW_NO_ERROR; /* APDU success */
@@ -346,29 +347,40 @@ static uint16_t u2f_authenticate(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
 
   /* Check crypto state */
   if (fips_fatal != FIPS_INITIALIZED) {
+    printf("u2f_authenticate: fips not initialized!\n");
     return U2F_SW_WTF + 6;
   }
 
   /* Disentangle key handle */
   if (obfuscate_kh(req->appId, req->keyHandle, kh, AES_DECRYPT_MODE) !=
-      EC_SUCCESS)
+      EC_SUCCESS) {
+    printf("u2f_authenticate: obfuscate_kh failed\n");
     return U2F_SW_WTF + 1;
+  }
 
   deinterleave64(kh, origin, od_seed);
 
-  printf("u2f_authenticate: Checking whether appId (i.e. origin) matches.\n");
   /* Check whether appId (i.e. origin) matches. Constant time. */
-  if (!equal_arrays(origin, req->appId, 24)) return U2F_SW_WRONG_DATA;
+  if (!equal_arrays(origin, req->appId, 24)) {
+    printf("u2f_authenticate: wrong_data on appId\n");
+    return U2F_SW_WRONG_DATA;
+  }
 
   /* Origin check only? */
-  if (apdu.p1 & G2F_CHECK) return U2F_SW_CONDITIONS_NOT_SATISFIED;
-  printf("u2f_authenticate: Checking for user presence.\n");
+  if (apdu.p1 & G2F_CHECK) {
+    printf("u2f_authenticate: origin check only, return early.\n");
+    return U2F_SW_CONDITIONS_NOT_SATISFIED;
+  }
+  printf("u2f_authenticate: origin passes checks. Wait for user presence.\n");
+
   /* Sense user presence, with optional consume */
   resp->flags = pop_check_presence(apdu.p1 & G2F_CONSUME, 500) == POP_TOUCH_YES;
 
   /* Mandatory user presence? */
-  if ((apdu.p1 & G2F_TUP) != 0 && resp->flags == 0)
+  if ((apdu.p1 & G2F_TUP) != 0 && resp->flags == 0) {
+    printf("u2f_authenticate: TUP and flags conditions not satisfied\n");
     return U2F_SW_CONDITIONS_NOT_SATISFIED;
+  }
 
   /* Increment-only counter in flash. OK to share between origins. */
   count = flash_ctr_incr();
@@ -376,6 +388,7 @@ static uint16_t u2f_authenticate(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   resp->ctr[1] = (count >> 16) & 0xFF;
   resp->ctr[2] = (count >> 8) & 0xFF;
   resp->ctr[3] = count & 0xFF;
+  printf("u2f_authenticate: incremented counter to %li\n", count);
 
   /* Message signature */
   SHA256_INIT(&ctx);
@@ -385,18 +398,30 @@ static uint16_t u2f_authenticate(APDU apdu, uint8_t *obuf, uint16_t *obuf_len) {
   SHA256_UPDATE(&ctx, req->nonce, U2F_NONCE_SIZE);
   PT_FROM_BIN(SHA256_FINAL(&ctx), &h);
 
-  if (origin_keypair(od_seed, &origin_d, NULL, NULL)) return U2F_SW_WTF + 2;
+  printf("u2f_authenticate: generated hash of message.\n");
+  printf("u2f_authenticate: generating signature.\n");
+
+  if (origin_keypair(od_seed, &origin_d, NULL, NULL)) {
+    printf("u2f_authenticate: failed to origin_keypair\n");
+    return U2F_SW_WTF + 2;
+  }
 
   make_drbg2(&drbg_ctx);
+
   if (!ECDSA_SIGN(&drbg_ctx, &origin_d, &h, &r, &s)) {
     PT_CLEAR(&origin_d);
+    printf("u2f_authenticate: failed to ECDSA_SIGN\n");
     return U2F_SW_WTF + 3;
   }
   PT_CLEAR(&origin_d);
 
+  printf("u2f_authenticate: ECDSA signed.\n");
+
   sig_len = asn1_sigp(resp->sig, &r, &s);
+  printf("u2f_authenticate: asn1 signature generated of len %i.\n", sig_len);
 
   *obuf_len = sizeof(resp->flags) + U2F_CTR_SIZE + sig_len;
+  printf("U2F: u2f_authenticate completes.\n");
   return U2F_SW_NO_ERROR;
 }
 
@@ -431,31 +456,31 @@ uint16_t apdu_rcv(const uint8_t *ibuf, uint16_t in_len, uint8_t *obuf) {
     sw = U2F_SW_INS_NOT_SUPPORTED;
 
     switch (INS) {
-      case (U2F_INS_REGISTER):
-        //printf("U2F REGISTER cmd received\n");
-        sw = u2f_register(apdu, obuf, &obuf_len);
-        //printf("  - result 0x%x\n", sw);
-        if (fips_fatal != FIPS_INITIALIZED) {
-          obuf_len = 0;
-          sw = U2F_SW_WTF + 6;
-          printf("  fips uninitialized (0x%x) change SW to 0x%x\n", fips_fatal, sw);
-        }
-        break;
+    case (U2F_INS_REGISTER):
+      printf("U2F REGISTER cmd received\n");
+      sw = u2f_register(apdu, obuf, &obuf_len);
+      //printf("  - result 0x%x\n", sw);
+      if (fips_fatal != FIPS_INITIALIZED) {
+        obuf_len = 0;
+        sw = U2F_SW_WTF + 6;
+        printf("  fips uninitialized (0x%x) change SW to 0x%x\n", fips_fatal, sw);
+      }
+      break;
 
     case (U2F_INS_AUTHENTICATE):
-      //printf("U2F AUTHENTICATE cmd received\n");
-        sw = u2f_authenticate(apdu, obuf, &obuf_len);
-        // printf("  -setting SW to 0x%x\n", sw);
-        if (fips_fatal != FIPS_INITIALIZED) {
-          obuf_len = 0;
-          sw = U2F_SW_WTF + 6;
-        }
-        break;
+      printf("U2F AUTHENTICATE cmd received\n");
+      sw = u2f_authenticate(apdu, obuf, &obuf_len);
+      //printf("  -setting SW to 0x%x\n", sw);
+      if (fips_fatal != FIPS_INITIALIZED) {
+        obuf_len = 0;
+        sw = U2F_SW_WTF + 6;
+      }
+      break;
 
-      case (U2F_INS_VERSION):
-        //printf("U2F VERSION\n");
-        sw = u2f_version(apdu, obuf, &obuf_len);
-        break;
+    case (U2F_INS_VERSION):
+      //printf("U2F VERSION\n");
+      sw = u2f_version(apdu, obuf, &obuf_len);
+      break;
     }
 
 #if defined(CONFIG_G2F)

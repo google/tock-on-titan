@@ -14,7 +14,6 @@
 
 use core::cell::Cell;
 use core::mem;
-use cortexm3;
 use hil::digest::{DigestEngine, DigestMode, DigestError};
 use kernel::common::cells::VolatileCell;
 use super::keymgr::{KEYMGR0_REGS, Registers};
@@ -41,11 +40,6 @@ enum ShaCfgEnMask {
     IntMaskDone = 0x2_0000,
 }
 
-enum HKey {
-    KeyBits = 0x3ff, // Bits 0:9
-    Enable  = 0x400, // 1 << 10
-}
-
 pub struct ShaEngine {
     regs: *mut Registers,
     current_mode: Cell<Option<DigestMode>>,
@@ -54,7 +48,7 @@ pub struct ShaEngine {
 enum CertificateMask {
     CertBits  = 0x3f,    // Bits 0:5
     Enable    = 0x40,    // 1 << 6
-    CheckOnly = 0x80,    // 1 << 7
+    //CheckOnly = 0x80,    // 1 << 7
 }
 
 impl ShaEngine {
@@ -65,7 +59,7 @@ impl ShaEngine {
         }
     }
 
-    pub fn handle_interrupt(&self, nvic: u32) {
+    pub fn handle_interrupt(&self, _nvic: u32) {
         let ref regs = unsafe { &*self.regs }.sha;
         regs.itop.set(0);
     }
@@ -79,7 +73,6 @@ const HMAC_KEY_SIZE_WORDS: usize = HMAC_KEY_SIZE_BYTES / 4;
 impl DigestEngine for ShaEngine {
     fn initialize(&self, mode: DigestMode) -> Result<(), DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-
         regs.itop.set(0); // clear status
 
         // Compile-time check for DigestMode exhaustiveness
@@ -108,7 +101,6 @@ impl DigestEngine for ShaEngine {
 
     fn initialize_hmac(&self, key: &[u8]) -> Result<(), DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-
         regs.itop.set(0); // clear status
         self.current_mode.set(Some(DigestMode::Sha256Hmac));
 
@@ -136,28 +128,21 @@ impl DigestEngine for ShaEngine {
 
     fn initialize_certificate(&self, certificate_id: u32) -> Result<(), DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-        let ref hregs = unsafe { &*self.regs }.hkey;
-        print!("sha::initialize_certificate called for cert {}\n", certificate_id);
         regs.itop.set(0); // clear status
 
 
-        //self.current_mode.set(Some(DigestMode::Sha256));
-        //regs.user_hidden_key.set(key_index & HKey::KeyBits as u32 |
-        //HKey::Enable as u32);
         regs.use_cert.set(certificate_id & CertificateMask::CertBits as u32 |
                           CertificateMask::Enable as u32);
 
         regs.cfg_en.set(ShaCfgEnMask::IntEnDone as u32);
 
         regs.trig.set(ShaTrigMask::Go as u32);
-//        print!("sha::initialize_certificate complete\n");
         Ok(())
     }
 
 
     fn update(&self, data: &[u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-        //print!("sha::update called\n");
         if self.current_mode.get().is_none() {
             print!("ERROR: SHA::update called but engine not initialized!\n");
             return Err(DigestError::NotConfigured);
@@ -174,7 +159,6 @@ impl DigestEngine for ShaEngine {
 
     fn finalize(&self, output: &mut [u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-        //print!("sha::finalize called\n");
         let expected_output_size = match self.current_mode.get() {
             None => return Err(DigestError::NotConfigured),
             Some(mode) => mode.output_size(),
@@ -183,13 +167,11 @@ impl DigestEngine for ShaEngine {
             return Err(DigestError::BufferTooSmall(expected_output_size));
         }
 
-        // Tell hardware we're done streaming and then wait for the hash calculation to finish.
+        // Tell hardware we're done streaming and then wait for the
+        // hash calculation to finish.
         regs.itop.set(0);
         regs.trig.set(ShaTrigMask::Stop as u32);
-        let mut counter = 0;
-        while regs.itop.get() == 0 && counter < 10000 {
-            counter = counter + 1;
-        }
+        while regs.itop.get() == 0 {}
 
         for i in 0..(expected_output_size / 4) {
             let word = regs.sts_h[i].get();
@@ -198,7 +180,6 @@ impl DigestEngine for ShaEngine {
             output[i * 4 + 2] = (word >> 16) as u8;
             output[i * 4 + 3] = (word >> 24) as u8;
         }
-
         regs.itop.set(0);
 
         Ok(expected_output_size)
@@ -208,10 +189,9 @@ impl DigestEngine for ShaEngine {
     // (hidden secret generation)
     fn finalize_hidden(&self) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-        //print!("sha::finalize_hidden called\n");
         regs.itop.set(0);
         regs.trig.set(ShaTrigMask::Stop as u32);
-        //while regs.itop.get() == 0 {}
+        while regs.itop.get() == 0 {}
         regs.itop.set(0);
 
         Ok(0)

@@ -52,7 +52,6 @@ int tock_digest_hash_initialize(TockDigestMode mode) {
 
 int tock_digest_cert_initialize(uint32_t cert) {
   int rval = command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_CERT_INIT, cert, 0);
-  printf("Returned from cert_initialize\n");
   return rval;
 }
 
@@ -99,38 +98,33 @@ int tock_digest_with_cert(uint32_t cert,
                           void* input_buf, size_t input_len,
                           void* output_buf, size_t output_len) {
   int err = -1;
-  printf("libgolf2: tock_digest_with_cert(%lu, %p, %u, %p, %u)\n", cert, input_buf, input_len, output_buf, output_len);
   err = tock_digest_set_input(input_buf, input_len);
-  //printf("  - input set to %p\n", input_buf);
   if (err < 0) {
     printf("Digest with cert: error %i on set_input\n", err);
     return err;
   }
   err = tock_digest_set_output(output_buf, output_len);
-  //printf("  - output set to %p\n", output_buf);
   if (err < 0) {
     printf("Digest with cert: error %i on set_output\n", err);
     return err;
   }
 
   err = tock_digest_cert_initialize(cert);
-  //printf("  - cert initialized\n");
   if (err < 0) {
     printf("Digest with cert: error %i on initialize\n", err);
     return err;
   }
   if (input_buf != NULL) {
     err = tock_digest_hash_update(input_len);
-    //printf("  - hash updated\n");
     if (err < 0) {
       printf("Digest with cert: error %i on update\n", err);
       return err;
     }
+    err = tock_digest_hash_finalize();
+    if (err < 0) {
+      printf("Digest with cert: error %i on finalize\n", err);
+    }
   }
 
-  err = tock_digest_hash_finalize();
-  if (err < 0) {
-    printf("Digest with cert: error %i on finalize\n", err);
-  }
   return err;
 }

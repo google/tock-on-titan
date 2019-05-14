@@ -65,6 +65,7 @@ int fips_p256_pick(DRBG* drbg, p256_int* output, const void* data,
   } while (result == 0 && fips_p256_cmp(&tmp, &FIPS_SECP256r1_nMin2) > 0);
 
   fips_p256_add_d(&tmp, 1, output);
+
   fips_p256_clear(&tmp);
 
   return result;

@@ -128,6 +128,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                         match self.current_user.get() {
                             Some(cur) if cur.idx() == caller_id.idx() => {}
                             _ => {
+                                //debug!("Finalize busy, {}\n", caller_id.idx());
                                 return ReturnCode::EBUSY
                             }
                         }
@@ -151,30 +152,35 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                     .unwrap_or(ReturnCode::ENOMEM)
             },
             3 => {
-                if self.current_user.get().is_some() {
+                ReturnCode::SUCCESS
+                    /*if self.current_user.get().is_some() {
                     ReturnCode::EBUSY
                 } else {
                     ReturnCode::SUCCESS
-                }
+                }*/
             }
             4 => { // Cert initialize
                 let rval = self.apps
-                    .enter(caller_id, |_app_data, _| {
+                    .enter(caller_id, |app_data, _| {
                         if self.current_user.get().is_some() {
                             return ReturnCode::EBUSY;
                         }
                         self.current_user.set(Some(caller_id));
-                        print!("Initializing cert {}\n", r2);
+                        //print!("Initializing cert {}\n", r2);
                         let init_result = self.engine.initialize_certificate(r2 as u32);
-                        match init_result {
-                            Ok(_t) => return ReturnCode::SUCCESS,
+                        let err = match init_result {
+                            Ok(_t) => ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => return ReturnCode::ENOSUPPORT,
                             Err(DigestError::NotConfigured) => return ReturnCode::FAIL,
                             Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE,
                             Err(DigestError::Timeout) => return ReturnCode::FAIL,
+                        };
+                        if app_data.input_buffer.is_none() {
+                            self.current_user.set(None);
                         }
+                        err
                     }).unwrap_or(ReturnCode::ENOMEM);
-                print!("Completed command for cert initialization with {:?}.\n", rval);
+                //print!("Completed command for cert initialization with {:?}.\n", rval);
                 rval
             },
             _ => ReturnCode::ENOSUPPORT

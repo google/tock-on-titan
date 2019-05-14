@@ -27,7 +27,6 @@
 
 #include "kl.h"
 
-
 static uint32_t current_key[SHA256_DIGEST_WORDS];
 static uint32_t current_digest[SHA256_DIGEST_WORDS];
 
@@ -172,7 +171,7 @@ void pop_falling_callback(int __attribute__((unused)) arg1,
                           int __attribute__((unused)) arg2,
                           int __attribute__((unused)) arg3,
                           void* __attribute__((unused)) data) {
-  printf("Button pressed (user contact)\n");
+  printf("Button pressed (user contact)\n\n");
   tock_pop_set();
 }
 
@@ -195,7 +194,6 @@ void tock_pop_clear(void) {
 
 enum touch_state tock_pop_check_presence(int consume) {
   enum touch_state old = touch_latch;
-  printf("pop_check_presence consume=%i, returning %i\n", consume, old);
   if (consume) {
     tock_pop_clear();
   }
@@ -228,14 +226,13 @@ static uint32_t KL_SEED_SSH[8] = {0x2baf15a8, 0xaa452083, 0x08de59eb,
 static int kl_step(uint32_t cert,
                    const uint32_t input[8],
                    uint32_t output[8]) {
-
   if (tock_digest_busy()) {
+    printf("kl_step: DIGEST BUSY\n");
     return TOCK_EBUSY;
   } else {
     int rval = tock_digest_with_cert(cert,
                                      (void*)input, 32,
                                      (void*)output, 32);
-    //printf("kl_step(%lu, %p, %p) = %i\n", cert, input, output, rval);
     return rval;
   }
 }
@@ -263,7 +260,7 @@ int kl_init(void) {
   error = error || kl_step(20, NULL, NULL);
   for (i = 0; i < 254 + 1; ++i) error = error || kl_step(25, NULL, NULL);
   error = error || kl_step(34, ISR2_SEED, NULL);
-
+  printf("kl_init(): salted!\n");
   return error;
 
 }
@@ -294,24 +291,20 @@ int kl_derive(const uint32_t salt[8] ,
 
 int kl_derive_attest(const uint32_t input[8],
                      uint32_t output[8]) {
-  printf("kl_derive_attest(%p, %p)\n", input, output);
   return kl_derive(KL_SEED_ATTEST, input, output);
 }
 
 int kl_derive_obfs(const uint32_t input[8],
                    uint32_t output[8]) {
-  printf("kl_derive_obfs(%p, %p)\n", input, output);
   return kl_derive(KL_SEED_OBFS, input, output);
 }
 
 int kl_derive_origin(const uint32_t input[8],
                      uint32_t output[8]) {
-  printf("kl_derive_origin(%p, %p)\n", input, output);
   return kl_derive(KL_SEED_ORIGIN, input, output);
 }
 
 int kl_derive_ssh(const uint32_t input[8] ,
                   uint32_t output[8]) {
-  printf("kl_derive_ssh(%p, %p)\n", input, output);
   return kl_derive(KL_SEED_SSH, input, output);
 }
