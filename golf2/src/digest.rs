@@ -55,8 +55,9 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
     fn command(&self, minor_num: usize, r2: usize, _r3: usize, caller_id: AppId) -> ReturnCode {
         //print!("DigestEngine: command({}, {}, {})\n", minor_num, r2, _r3);
         match minor_num {
+            0 => ReturnCode::SUCCESS,
             // Initialize hash engine (arg: digest mode)
-            0 => {
+            1 => {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         if self.current_user.get().is_some() {
@@ -91,7 +92,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                     }).unwrap_or(ReturnCode::ENOMEM)
             },
             // Feed data from input buffer (arg: number of bytes)
-            1 => {
+            2 => {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         match self.current_user.get() {
@@ -122,7 +123,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                     .unwrap_or(ReturnCode::ENOMEM)
             },
             // Finalize hash and output to output buffer (arg: unused)
-            2 => {
+            3 => {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         match self.current_user.get() {
@@ -151,7 +152,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                     })
                     .unwrap_or(ReturnCode::ENOMEM)
             },
-            3 => {
+            4 => {
                 ReturnCode::SUCCESS
                     /*if self.current_user.get().is_some() {
                     ReturnCode::EBUSY
@@ -159,7 +160,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                     ReturnCode::SUCCESS
                 }*/
             }
-            4 => { // Cert initialize
+            5 => { // Cert initialize
                 let rval = self.apps
                     .enter(caller_id, |app_data, _| {
                         if self.current_user.get().is_some() {
