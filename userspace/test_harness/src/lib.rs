@@ -97,6 +97,6 @@ pub fn test_main_static(tests: &[&TestDescAndFn]) {
                          if succeeded { "succeeded" } else { "failed" });
         overall_success &= succeeded;
     }
-    let _ = writeln!(console, "Testing complete. Result: {}",
-           if overall_success { "succeeded" } else { "failed" });
+    let _ = writeln!(console, "TEST_FINISHED: {}",
+           if overall_success { "SUCCESS" } else { "FAIL" });
 }

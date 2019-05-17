@@ -1,4 +1,4 @@
-# Copyright 2018 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,5 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-Cargo.lock
-build/
+[package]
+name = "runner"
+version = "0.1.0"
+authors = ["jrvanwhy <jrvanwhy@google.com>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+clap = { path = "../third_party/clap" }
+libc = { path = "../third_party/libc" }

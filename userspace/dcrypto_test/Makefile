@@ -12,5 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-APP := dcrypto_test
-include ../CAppMakefile.mk
+INVOKE_DIR    := userspace/dcrypto_test
+TOCK_ON_TITAN := ../..
+include $(TOCK_ON_TITAN)/DirShim.mk

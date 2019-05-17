@@ -12,5 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-APP := sha_test
-include ../CAppMakefile.mk
+INVOKE_DIR    := userspace/sha_test
+TOCK_ON_TITAN := ../..
+include $(TOCK_ON_TITAN)/DirShim.mk
