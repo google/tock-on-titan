@@ -128,6 +128,4 @@ pub unsafe fn init() {
     cortexm3::nvic::disable_all();
     cortexm3::nvic::clear_all_pending();
     cortexm3::nvic::enable_all();
-
-    //cortexm3::nvic::Nvic::new(110).disable(); // SHA spins
 }

@@ -104,7 +104,6 @@ static void clear_pending(void) {
 
 static void cancel_timeout(void) {
   if (timeout_CID) {
-    //printf("%s: cancel timer %04lx\n", __func__, timeout_CID);
     timeout_CID = 0;
   }
   //hook_call_deferred(&u2fhid_timeout_data, -1);
@@ -112,7 +111,6 @@ static void cancel_timeout(void) {
 
 /* Start/restart timeout for a given channel */
 static void start_timeout(uint32_t cid) {
-  //  printf("%s: start timer %04lx\n", __func__, cid);
   timeout_CID = cid;
   //  hook_call_deferred(&u2fhid_timeout_data, MSG_TIMEOUT);
 }
@@ -412,11 +410,6 @@ static void u2fhid_cmd_init(U2FHID_FRAME *f_p) {
   //printf("Response Frame -> cid:%08lx cmd:%02x ", response.cid,
   //        response.init.cmd);
   //printf("bcnth:%02x bcntl:%02x ", response.init.bcnth, response.init.bcntl);
-  //printf("data:%0X%0X%0X%0X%0X%0X%0X%0X\n\n", response.init.data[0],
-  //        response.init.data[1], response.init.data[2], response.init.data[3],
-  //        response.init.data[4], response.init.data[5], response.init.data[6],
-  //        response.init.data[7]);
-
   usbu2f_put_frame(&response);
 }
 

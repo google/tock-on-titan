@@ -46,19 +46,20 @@ int tock_digest_set_output(void* buf, size_t len) {
   return rval;
 }
 
+int tock_digest_check(void) {
+  return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_CHECK, 0, 0);
+}
+
 int tock_digest_hash_initialize(TockDigestMode mode) {
-  int rval = command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_INITIALIZE, mode, 0);
-  return rval;
+  return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_INITIALIZE, mode, 0);
 }
 
 int tock_digest_cert_initialize(uint32_t cert) {
-  int rval = command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_CERT_INIT, cert, 0);
-  return rval;
+  return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_CERT_INIT, cert, 0);
 }
 
 int tock_digest_hash_update(size_t n) {
-  int rval = command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_UPDATE, n, 0);
-  return rval;
+  return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_UPDATE, n, 0);
 }
 
 int tock_digest_hash_finalize(void) {

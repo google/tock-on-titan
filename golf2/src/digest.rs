@@ -51,13 +51,19 @@ impl<'a, E: DigestEngine + 'a> DigestDriver<'a, E> {
     }
 }
 
+const COMMAND_CHECK: usize            = 0;
+const COMMAND_INITIALIZE: usize       = 1;
+const COMMAND_UPDATE: usize           = 2;
+const COMMAND_FINALIZE: usize         = 3;
+const COMMAND_BUSY: usize             = 4;
+const COMMAND_CERTIFICATE_INIT: usize = 5;
+
 impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
     fn command(&self, minor_num: usize, r2: usize, _r3: usize, caller_id: AppId) -> ReturnCode {
-        //print!("DigestEngine: command({}, {}, {})\n", minor_num, r2, _r3);
         match minor_num {
-            0 => ReturnCode::SUCCESS,
+            COMMAND_CHECK => ReturnCode::SUCCESS,
             // Initialize hash engine (arg: digest mode)
-            1 => {
+            COMMAND_INITIALIZE => {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         if self.current_user.get().is_some() {
@@ -92,7 +98,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                     }).unwrap_or(ReturnCode::ENOMEM)
             },
             // Feed data from input buffer (arg: number of bytes)
-            2 => {
+            COMMAND_UPDATE => {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         match self.current_user.get() {
@@ -123,13 +129,12 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                     .unwrap_or(ReturnCode::ENOMEM)
             },
             // Finalize hash and output to output buffer (arg: unused)
-            3 => {
+            COMMAND_FINALIZE => {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         match self.current_user.get() {
                             Some(cur) if cur.idx() == caller_id.idx() => {}
                             _ => {
-                                //debug!("Finalize busy, {}\n", caller_id.idx());
                                 return ReturnCode::EBUSY
                             }
                         }
@@ -152,22 +157,20 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                     })
                     .unwrap_or(ReturnCode::ENOMEM)
             },
-            4 => {
-                ReturnCode::SUCCESS
-                    /*if self.current_user.get().is_some() {
+            COMMAND_BUSY => {
+                if self.current_user.get().is_some() {
                     ReturnCode::EBUSY
                 } else {
                     ReturnCode::SUCCESS
-                }*/
+                }
             }
-            5 => { // Cert initialize
+            COMMAND_CERTIFICATE_INIT => { // Cert initialize
                 let rval = self.apps
                     .enter(caller_id, |app_data, _| {
                         if self.current_user.get().is_some() {
                             return ReturnCode::EBUSY;
                         }
                         self.current_user.set(Some(caller_id));
-                        //print!("Initializing cert {}\n", r2);
                         let init_result = self.engine.initialize_certificate(r2 as u32);
                         let err = match init_result {
                             Ok(_t) => ReturnCode::SUCCESS,
@@ -181,7 +184,6 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                         }
                         err
                     }).unwrap_or(ReturnCode::ENOMEM);
-                //print!("Completed command for cert initialization with {:?}.\n", rval);
                 rval
             },
             _ => ReturnCode::ENOSUPPORT

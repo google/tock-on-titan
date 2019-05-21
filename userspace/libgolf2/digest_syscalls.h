@@ -28,6 +28,8 @@ typedef enum TockDigestMode {
 int tock_digest_set_input(void* buf, size_t len);
 int tock_digest_set_output(void* buf, size_t len);
 
+int tock_digest_check(void);
+
 int tock_digest_hash_initialize(TockDigestMode mode);
 int tock_digest_cert_initialize(uint32_t cert);
 
