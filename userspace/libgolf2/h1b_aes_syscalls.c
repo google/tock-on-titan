@@ -15,7 +15,7 @@
 
 #include "h1b_aes_syscalls.h"
 
-#define AES_DRIVER 0x40000
+#define H1B_AES_DRIVER 0x40010
 
 #define TOCK_AES_CMD_CHECK 0
 #define TOCK_AES_CMD_ECB_ENC 1
@@ -62,21 +62,21 @@ static void aes_cb(int callback_type,
 // ***** System Call Interface *****
 
 int tock_aes_check(void) {
-  return command(AES_DRIVER, TOCK_AES_CMD_CHECK, 0, 0);
+  return command(H1B_AES_DRIVER, TOCK_AES_CMD_CHECK, 0, 0);
 }
 
 // Internal callback for encryption and decryption
 static int tock_aes_set_callback(subscribe_cb callback, void *ud) {
-  return subscribe(AES_DRIVER, TOCK_AES_SUBSCRIBE_CRYPT, callback, ud);
+  return subscribe(H1B_AES_DRIVER, TOCK_AES_SUBSCRIBE_CRYPT, callback, ud);
 }
 
 static int tock_aes_set_input(unsigned char *data, unsigned char len) {
-  return allow(AES_DRIVER, TOCK_AES_ALLOW_INPUT, (void*)data, len);
+  return allow(H1B_AES_DRIVER, TOCK_AES_ALLOW_INPUT, (void*)data, len);
 }
 
 // Internal function to configure a initial counter to be used on counter-mode
 static int tock_aes_set_ctr(unsigned char* ctr, unsigned char len) {
-  return allow(AES_DRIVER, TOCK_AES_ALLOW_IVCTR, (void*)ctr, len);
+  return allow(H1B_AES_DRIVER, TOCK_AES_ALLOW_IVCTR, (void*)ctr, len);
 }
 
 static void increment_counter(unsigned char* buf, unsigned char len) {
@@ -96,7 +96,7 @@ static void increment_counter(unsigned char* buf, unsigned char len) {
 
 
 int tock_aes_set_key(const unsigned char* data, unsigned char len) {
-  return allow(AES_DRIVER, TOCK_AES_ALLOW_KEY, (void*)data, len);
+  return allow(H1B_AES_DRIVER, TOCK_AES_ALLOW_KEY, (void*)data, len);
 }
 
 // Operates on a single 16-byte block.
@@ -116,7 +116,7 @@ static int aes_encrypt_ctr_block(unsigned char* buf,
   err = tock_aes_set_ctr(ctr, len);
   if (err < TOCK_SUCCESS) return err;
 
-  err = command(AES_DRIVER, TOCK_AES_CMD_CTR_ENC, 0, 0);
+  err = command(H1B_AES_DRIVER, TOCK_AES_CMD_CTR_ENC, 0, 0);
   if (err < TOCK_SUCCESS) return err;
 
   yield_for(&result.fired);
@@ -145,7 +145,7 @@ static int aes_decrypt_ctr_block(unsigned char* buf,
   err = tock_aes_set_ctr(ctr, len);
   if (err < TOCK_SUCCESS) return err;
 
-  err = command(AES_DRIVER, TOCK_AES_CMD_CTR_DEC, 0, 0);
+  err = command(H1B_AES_DRIVER, TOCK_AES_CMD_CTR_DEC, 0, 0);
   if (err < TOCK_SUCCESS) return err;
 
   yield_for(&result.fired);
@@ -212,7 +212,7 @@ static int aes_encrypt_ecb_block(unsigned char* buf, unsigned char len) {
   err = tock_aes_set_input(buf, len);
   if (err < TOCK_SUCCESS) return err;
 
-  err = command(AES_DRIVER, TOCK_AES_CMD_ECB_ENC, 0, 0);
+  err = command(H1B_AES_DRIVER, TOCK_AES_CMD_ECB_ENC, 0, 0);
   if (err < TOCK_SUCCESS) return err;
 
   yield_for(&result.fired);
@@ -236,7 +236,7 @@ static int aes_decrypt_ecb_block(unsigned char* buf, unsigned char len) {
   err = tock_aes_set_input(buf, len);
   if (err < TOCK_SUCCESS) return err;
 
-  err = command(AES_DRIVER, TOCK_AES_CMD_ECB_DEC, 0, 0);
+  err = command(H1B_AES_DRIVER, TOCK_AES_CMD_ECB_DEC, 0, 0);
   if (err < TOCK_SUCCESS) return err;
 
   yield_for(&result.fired);
@@ -302,7 +302,7 @@ static int aes_encrypt_cbc_block(unsigned char block_len,
   err = tock_aes_set_ctr(iv, block_len);
   if (err < TOCK_SUCCESS) return err;
 
-  err = command(AES_DRIVER, TOCK_AES_CMD_CBC_ENC, 0, 0);
+  err = command(H1B_AES_DRIVER, TOCK_AES_CMD_CBC_ENC, 0, 0);
   if (err < TOCK_SUCCESS) return err;
 
   yield_for(&result.fired);
@@ -344,7 +344,7 @@ static int aes_decrypt_cbc_block(unsigned char block_len,
   err = tock_aes_set_ctr(iv, block_len);
   if (err < TOCK_SUCCESS) return err;
 
-  err = command(AES_DRIVER, TOCK_AES_CMD_CBC_DEC, 0, 0);
+  err = command(H1B_AES_DRIVER, TOCK_AES_CMD_CBC_DEC, 0, 0);
   if (err < TOCK_SUCCESS) return err;
 
   yield_for(&result.fired);

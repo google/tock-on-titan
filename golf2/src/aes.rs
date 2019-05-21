@@ -21,7 +21,7 @@ use kernel::hil::symmetric_encryption::{AES128_BLOCK_SIZE, AES128_KEY_SIZE};
 
 use kernel::hil::symmetric_encryption::{AES128, AES128CBC, AES128Ctr};
 
-pub const DRIVER_NUM: usize = 0x40000;
+pub const DRIVER_NUM: usize = 0x40010;
 
 pub static mut AES_BUF: [u8; AES128_BLOCK_SIZE] = [0; AES128_BLOCK_SIZE];
 
