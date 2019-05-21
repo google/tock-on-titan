@@ -15,6 +15,25 @@
 #include <tock.h>
 #include "dcrypto_syscalls.h"
 
+#define H1B_DRIVER_DCRYPTO 0x40004
+
+#define TOCK_DCRYPTO_CMD_CHECK 0
+#define TOCK_DCRYPTO_CMD_RUN   1
+
+#define TOCK_DCRYPTO_ALLOW_DATA 0
+#define TOCK_DCRYPTO_ALLOW_PROG 1
+
+#define TOCK_DCRYPTO_RUN_DONE 0
+
+//#define TOCK_DCRYPTO_FAULT_STACK_OVERFLOW  2
+//#define TOCK_DCRYPTO_FAULT_LOOP_OVERFLOW   3
+//#define TOCK_DCRYPTO_FAULT_LOOP_UNDERFLOW  4
+//#define TOCK_DCRYPTO_FAULT_DATA_ACCESS     5
+//#define TOCK_DCRYPTO_FAULT_BREAK           7
+//#define TOCK_DCRYPTO_FAULT_TRAP            8
+//#define TOCK_DCRYPTO_FAULT_FAULT          10
+//#define TOCK_DCRYPTO_FAULT_LOOP_MODRANGE  11
+#define TOCK_DCRYPTO_FAULT_UNKNOWN        12
 
 int last_error = 0;
 int last_fault = 0;
@@ -51,7 +70,9 @@ static void tock_dcrypto_run_done(int error,
   *(bool*)callback_args = true;
 }
 
-
+int tock_dcrypto_check(void) {
+  return command(H1B_DRIVER_DCRYPTO, TOCK_DCRYPTO_CMD_CHECK, 0, 0);
+}
 
 int tock_dcrypto_run(void* data, size_t datalen,
                      void* program, size_t programlen,

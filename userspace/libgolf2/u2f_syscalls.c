@@ -15,6 +15,23 @@
 #include <tock.h>
 #include "u2f_syscalls.h"
 
+#define H1B_DRIVER_U2F 0x20008
+
+#define TOCK_U2F_CMD_CHECK    0
+
+#define TOCK_U2F_CMD_TRANSMIT 1
+#define TOCK_U2F_CMD_RECEIVE  2
+
+#define TOCK_U2F_ALLOW_TRANSMIT 1
+#define TOCK_U2F_ALLOW_RECEIVE  2
+
+#define TOCK_U2F_SUBSCRIBE_TRANSMIT_DONE 1
+#define TOCK_U2F_SUBSCRIBE_RECEIVE_DONE  2
+//#define TOCK_U2F_SUBSCRIBE_RECONNECT     3
+
+int tock_u2f_check(void) {
+  return command(H1B_DRIVER_U2F, TOCK_U2F_CMD_CHECK, 0, 0);
+}
 
 static void tock_u2f_transmit_done(int error __attribute__((unused)),
                                    int fault  __attribute__((unused)),

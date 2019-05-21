@@ -17,17 +17,6 @@
 
 #include <stdlib.h>
 
-// TODO These need to be standardized
-#define H1B_DRIVER_DIGEST 0x40003
-
-// command() type ids
-#define TOCK_DIGEST_CMD_INITIALIZE 0
-#define TOCK_DIGEST_CMD_UPDATE 1
-#define TOCK_DIGEST_CMD_FINALIZE 2
-
-// allow() type ids
-#define TOCK_DIGEST_ALLOW_INPUT 0
-#define TOCK_DIGEST_ALLOW_OUTPUT 1
 
 typedef enum TockDigestMode {
   DIGEST_MODE_SHA1 = 0,
@@ -39,11 +28,32 @@ typedef enum TockDigestMode {
 int tock_digest_set_input(void* buf, size_t len);
 int tock_digest_set_output(void* buf, size_t len);
 
+int tock_digest_check(void);
+
 int tock_digest_hash_initialize(TockDigestMode mode);
+int tock_digest_cert_initialize(uint32_t cert);
+
 int tock_digest_hash_update(size_t n);
 int tock_digest_hash_finalize(void);
 
+// Return if the hash engine is busy
+int tock_digest_busy(void);
+
 int tock_digest_hash_easy(void* input_buf, size_t input_len,
-                          void* output_buf, size_t output_len, TockDigestMode mode);
+                          void* output_buf, size_t output_len,
+                          TockDigestMode mode);
+
+// Rather than a normal digest, compute one using one of the keyladder
+// "certificates", i.e. hidden secrets. These digests are always
+// SHA256. Input and output are often NULL since this operation can
+// generate hidden keys from hidden data.
+//
+// In the Cr52 code, this operation is kl_step; it's refactored to a
+// digest driver call because it uses the SHA engine, so should go
+// through the arbitration/busy checks that the SHA driver performs
+// to prevent concurrent operations on the engine.
+int tock_digest_with_cert(uint32_t cert,
+                          void* input_buf, size_t input_len,
+                          void* output_buf, size_t output_len);
 
 #endif // TOCK_DIGEST_H

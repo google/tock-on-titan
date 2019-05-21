@@ -17,20 +17,8 @@
 
 #include <stdlib.h>
 
-#define H1B_DRIVER_U2F 0x20008
-
-#define TOCK_U2F_CMD_CHECK    0
-
-#define TOCK_U2F_CMD_TRANSMIT 1
-#define TOCK_U2F_CMD_RECEIVE  2
-
-#define TOCK_U2F_ALLOW_TRANSMIT 1
-#define TOCK_U2F_ALLOW_RECEIVE  2
-
-#define TOCK_U2F_SUBSCRIBE_TRANSMIT_DONE 1
-#define TOCK_U2F_SUBSCRIBE_RECEIVE_DONE  2
-#define TOCK_U2F_SUBSCRIBE_RECONNECT     3
-
+// Check whether driver present (0 is success, means present)
+int tock_u2f_check(void);
 // Transmit as a frame from U2F endpoint. datalen must be <= 64.
 int tock_u2f_transmit(void* data, size_t datalen);
 // Receive a frame from U2F endopint. datalen must be <= 64.

@@ -12,7 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This code is a rewrite/port of the u2f_transport.c code
+// This code is a rewrite/port of the u2f_transport.c code from
+// Cr52. It implements a U2F (2 factor authentication token)
+// application as a process in the Tock operating system. It is
+// intended to run on an H1B tock-on-titan Tock kernel. It depends on
+// the following system call drivers:
+//   - GPIO (for user button presses)
+//   - H1B_DRIVER_DCRYPTO (for ECC crypto acceleration)
+//   - H1B_DRIVER_DIGEST (for SHA256 hash acceleration)
+//   - AES_DRIVER (the H1B variant in libgolf2, for AES acceleration)
+//   - H1B_DRIVER_U2F (for USB transport to the token over EP1)
+//   - CONSOLE (for printing out messages)
+//   - RNG (for entropy generation)
 
 #include <stdio.h>
 #include <string.h>
@@ -26,14 +37,21 @@
 #include "u2f_syscalls.h"
 #include "u2f_hid.h"
 
+static perso_st me;
+
 
 static void check_device_setup(void);
 static void process_frame(U2FHID_FRAME* frame);
-
 static void setup_personality(void);
 
-const perso_st* get_personality(void) {return NULL;}
-int check_personality(const perso_st* id) {return id != NULL;}
+const perso_st* get_personality(void) {
+  return &me;
+}
+
+int check_personality(const perso_st* id) {
+  return id != NULL;
+}
+
 int new_personality(perso_st* id) {
   if (id == NULL) {
     return 0;
@@ -50,7 +68,6 @@ int set_personality(const perso_st* id) {
   }
 }
 
-static perso_st me;
 
 static void setup_personality(void) {
   if (check_personality(get_personality()) == 1) return;
@@ -65,17 +82,15 @@ static void check_device_setup(void) {
   ensure_factory_entropy();
   printf("  - Setting up personality.\n");
   setup_personality();
+  printf("  - Setup complete.\n");
 }
 
 void u2fhid_process_frame(U2FHID_FRAME *f_p);
 
 void process_frame(U2FHID_FRAME* frame) {
-  printf("U2F APP: processing frame\n");
+  //printf("U2F APP: processing frame\n");
   u2fhid_process_frame(frame);
-  //u2fhid_process_frame(frame);
-  //u2fhid_process_frame(frame);
-  //u2fhid_process_frame(frame);
-  printf("U2F APP: completed processing frame\n");
+  //printf("U2F APP: completed processing frame\n");
 }
 
 char u2f_buffer[U2F_FRAME_SIZE];
@@ -87,9 +102,10 @@ int main(void) {
   tock_pop_enable_detection();
   printf("= Running U2F Transport Application =\n");
   check_device_setup();
+  u2f_init();
 
   while (1) {
-    printf("U2F APP: receiving frame into 0x%08x.\n", (unsigned int)u2f_buffer);
+    //printf("U2F APP: receiving frame into 0x%08x.\n", (unsigned int)u2f_buffer);
     ret = tock_u2f_receive(u2f_buffer, U2F_FRAME_SIZE);
     if (ret != 0) {
       printf("U2F APP: error %i in receive, retry.\n", ret);

@@ -23,6 +23,8 @@
 extern "C" {
 #endif
 
+void u2f_init(void);
+
 /* N.B. Should be <= to USB_MAX_PACKET_SIZE */
 #define U2F_REPORT_SIZE 64
 

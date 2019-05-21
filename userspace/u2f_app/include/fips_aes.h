@@ -46,6 +46,7 @@ enum AES_encrypt_mode { AES_DECRYPT_MODE = 0, AES_ENCRYPT_MODE = 1 };
  * AES implementation, based on a hardware AES block.
  */
 #define AES256_BLOCK_CIPHER_KEY_SIZE 32
+#define AES128_BLOCK_CIPHER_KEY_SIZE 16
 
 int fips_aes_init(const uint8_t *key, uint32_t key_len, const uint8_t *iv,
                   enum AES_cipher_mode c_mode, enum AES_encrypt_mode e_mode);

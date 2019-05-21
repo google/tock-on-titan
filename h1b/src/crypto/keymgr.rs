@@ -30,7 +30,7 @@ pub struct Registers {
 
     _padding_2124: [u8; 0x3000 - 0x2124], // 0x2124
 
-    hkey: HkeyRegisters, // 0x3000 - 0x3330
+    pub hkey: HkeyRegisters, // 0x3000 - 0x3330
 }
 
 #[repr(C)]
@@ -108,9 +108,9 @@ struct TmPwRegisters {
 }
 
 #[repr(C)]
-struct HkeyRegisters {
-    rwr: [VolatileCell<u32>; 8], // 0x3000
-    rwr_vld: VolatileCell<u32>, // 0x3020
+pub struct HkeyRegisters {
+    pub rwr: [VolatileCell<u32>; 8], // 0x3000
+    pub rwr_vld: VolatileCell<u32>, // 0x3020
     rwr_lock: VolatileCell<u32>, // 0x3024
 
     _padding_3028: [u8; 0x3100 - 0x3028], // 0x3028
@@ -132,8 +132,8 @@ struct HkeyRegisters {
 
     flash_rcv_wipe: VolatileCell<u32>, // 0x3320
 
-    err_flags: VolatileCell<u32>, // 0x3324
-    err_ctr: VolatileCell<u32>, // 0x3328
+    pub err_flags: VolatileCell<u32>, // 0x3324
+    pub err_ctr: VolatileCell<u32>, // 0x3328
 
     flash_rcv_status: VolatileCell<u32>, // 0x332c
     testmode_unlocked_status: VolatileCell<u32>, // 0x3330

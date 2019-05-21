@@ -86,6 +86,7 @@ static int fill_pool(void *out, size_t n, int rct) {
     if (flash_physical_info_read_word(
             FACTORY_ENTROPY_OFFSET + i * sizeof(uint32_t), buf + i) !=
         EC_SUCCESS) {
+      printf("FAILED to read INFO1.\n");
       return EC_ERROR_INVAL; /* Flash read INFO1 failed. */
     }
   }
@@ -95,6 +96,7 @@ static int fill_pool(void *out, size_t n, int rct) {
   /* Stuck-bit test */
   if (rct) {
     if (repetition_count_test_n(buf, words_n) != EC_SUCCESS) {
+      printf("FAILED repetition count test.\n");
       return EC_ERROR_UNKNOWN;
     }
   }
@@ -143,13 +145,16 @@ void make_drbg2(DRBG *ctx) {
   memset(rng_buf, 0x0, sizeof(rng_buf));
 }
 
+
 // Returns 0 on success
 int fips_keygen(DRBG *drbg, p256_int *d, p256_int *x, p256_int *y,
                 const void *addl_data, int addl_len) {
   // Index into the entropy of the primed drbg
   int rv = fips_p256_pick(drbg, d, addl_data, addl_len);
-  if (rv) return rv;
-
+  if (rv) {
+    printf("failed to generate key\n");
+    return rv;
+  }
   if (x == NULL || y == NULL) {
     return 0;
   } else {
@@ -162,7 +167,6 @@ int fips_keygen(DRBG *drbg, p256_int *d, p256_int *x, p256_int *y,
 
     // Compute public key
     rv = (fips_p256_base_point_mul(d, x, y) == 0);
-
     // FIPS consistency check for new keypairs
     if (fips_ecdsa_consistency_test(x, y, d)) {
       throw_fips_err(FIPS_FATAL_ECDSA);

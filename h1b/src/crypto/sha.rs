@@ -18,6 +18,7 @@ use hil::digest::{DigestEngine, DigestMode, DigestError};
 use kernel::common::cells::VolatileCell;
 use super::keymgr::{KEYMGR0_REGS, Registers};
 
+
 #[allow(unused)]
 enum ShaTrigMask {
     Go = 0x1,
@@ -44,12 +45,23 @@ pub struct ShaEngine {
     current_mode: Cell<Option<DigestMode>>,
 }
 
+enum CertificateMask {
+    CertBits  = 0x3f,    // Bits 0:5
+    Enable    = 0x40,    // 1 << 6
+    //CheckOnly = 0x80,    // 1 << 7
+}
+
 impl ShaEngine {
     const unsafe fn new(regs: *mut Registers) -> ShaEngine {
         ShaEngine {
             regs: regs,
             current_mode: Cell::new(None),
         }
+    }
+
+    pub fn handle_interrupt(&self, _nvic: u32) {
+        let ref regs = unsafe { &*self.regs }.sha;
+        regs.itop.set(0);
     }
 }
 
@@ -61,7 +73,6 @@ const HMAC_KEY_SIZE_WORDS: usize = HMAC_KEY_SIZE_BYTES / 4;
 impl DigestEngine for ShaEngine {
     fn initialize(&self, mode: DigestMode) -> Result<(), DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-
         regs.itop.set(0); // clear status
 
         // Compile-time check for DigestMode exhaustiveness
@@ -74,7 +85,8 @@ impl DigestEngine for ShaEngine {
 
         regs.trig.set(ShaTrigMask::Stop as u32);
 
-        let mut flags = ShaCfgEnMask::Livestream as u32 | ShaCfgEnMask::IntEnDone as u32;
+        let mut flags = ShaCfgEnMask::Livestream as u32 |
+                        ShaCfgEnMask::IntEnDone as u32;
         match mode {
             DigestMode::Sha1 => flags |= ShaCfgEnMask::Sha1 as u32,
             DigestMode::Sha256 => (),
@@ -87,9 +99,8 @@ impl DigestEngine for ShaEngine {
         Ok(())
     }
 
-    fn  initialize_hmac(&self, key: &[u8]) -> Result<(), DigestError> {
+    fn initialize_hmac(&self, key: &[u8]) -> Result<(), DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-
         regs.itop.set(0); // clear status
         self.current_mode.set(Some(DigestMode::Sha256Hmac));
 
@@ -115,9 +126,23 @@ impl DigestEngine for ShaEngine {
         return Ok(());
     }
 
+    fn initialize_certificate(&self, certificate_id: u32) -> Result<(), DigestError> {
+        let ref regs = unsafe { &*self.regs }.sha;
+        regs.itop.set(0); // clear status
+
+
+        regs.use_cert.set(certificate_id & CertificateMask::CertBits as u32 |
+                          CertificateMask::Enable as u32);
+
+        regs.cfg_en.set(ShaCfgEnMask::IntEnDone as u32);
+
+        regs.trig.set(ShaTrigMask::Go as u32);
+        Ok(())
+    }
+
+
     fn update(&self, data: &[u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-
         if self.current_mode.get().is_none() {
             print!("ERROR: SHA::update called but engine not initialized!\n");
             return Err(DigestError::NotConfigured);
@@ -134,7 +159,6 @@ impl DigestEngine for ShaEngine {
 
     fn finalize(&self, output: &mut [u8]) -> Result<usize, DigestError> {
         let ref regs = unsafe { &*self.regs }.sha;
-
         let expected_output_size = match self.current_mode.get() {
             None => return Err(DigestError::NotConfigured),
             Some(mode) => mode.output_size(),
@@ -143,7 +167,8 @@ impl DigestEngine for ShaEngine {
             return Err(DigestError::BufferTooSmall(expected_output_size));
         }
 
-        // Tell hardware we're done streaming and then wait for the hash calculation to finish.
+        // Tell hardware we're done streaming and then wait for the
+        // hash calculation to finish.
         regs.itop.set(0);
         regs.trig.set(ShaTrigMask::Stop as u32);
         while regs.itop.get() == 0 {}
@@ -155,9 +180,20 @@ impl DigestEngine for ShaEngine {
             output[i * 4 + 2] = (word >> 16) as u8;
             output[i * 4 + 3] = (word >> 24) as u8;
         }
-
         regs.itop.set(0);
 
         Ok(expected_output_size)
+    }
+
+    // Finalize withtout seeing the result; this is used for certificates
+    // (hidden secret generation)
+    fn finalize_hidden(&self) -> Result<usize, DigestError> {
+        let ref regs = unsafe { &*self.regs }.sha;
+        regs.itop.set(0);
+        regs.trig.set(ShaTrigMask::Stop as u32);
+        while regs.itop.get() == 0 {}
+        regs.itop.set(0);
+
+        Ok(0)
     }
 }

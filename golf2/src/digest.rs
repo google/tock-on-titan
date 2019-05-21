@@ -51,11 +51,19 @@ impl<'a, E: DigestEngine + 'a> DigestDriver<'a, E> {
     }
 }
 
+const COMMAND_CHECK: usize            = 0;
+const COMMAND_INITIALIZE: usize       = 1;
+const COMMAND_UPDATE: usize           = 2;
+const COMMAND_FINALIZE: usize         = 3;
+const COMMAND_BUSY: usize             = 4;
+const COMMAND_CERTIFICATE_INIT: usize = 5;
+
 impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
     fn command(&self, minor_num: usize, r2: usize, _r3: usize, caller_id: AppId) -> ReturnCode {
         match minor_num {
+            COMMAND_CHECK => ReturnCode::SUCCESS,
             // Initialize hash engine (arg: digest mode)
-            0 => {
+            COMMAND_INITIALIZE => {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         if self.current_user.get().is_some() {
@@ -84,12 +92,13 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                             Ok(_t) => return ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => return ReturnCode::ENOSUPPORT,
                             Err(DigestError::NotConfigured) => return ReturnCode::FAIL,
-                            Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE
+                            Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE,
+                            Err(DigestError::Timeout) => return ReturnCode::FAIL,
                         }
                     }).unwrap_or(ReturnCode::ENOMEM)
             },
             // Feed data from input buffer (arg: number of bytes)
-            1 => {
+            COMMAND_UPDATE => {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         match self.current_user.get() {
@@ -113,13 +122,14 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                             Ok(_t) => ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => ReturnCode::ENOSUPPORT,
                             Err(DigestError::NotConfigured) => ReturnCode::ERESERVE,
-                            Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE
+                            Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE,
+                            Err(DigestError::Timeout) => ReturnCode::FAIL
                         }
                     })
                     .unwrap_or(ReturnCode::ENOMEM)
             },
             // Finalize hash and output to output buffer (arg: unused)
-            2 => {
+            COMMAND_FINALIZE => {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         match self.current_user.get() {
@@ -131,20 +141,50 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                         self.current_user.set(None);
                         let app_data: &mut App = app_data;
 
-                        let output_buffer = match app_data.output_buffer {
-                            Some(ref mut slice) => slice,
-                            None => return ReturnCode::ENOMEM
+                        let rval = match app_data.output_buffer {
+                            Some(ref mut slice) => self.engine.finalize(slice.as_mut()),
+                            None => self.engine.finalize_hidden()
                         };
 
-                        match self.engine.finalize(output_buffer.as_mut()) {
+                        match rval {
                             Ok(_t) => ReturnCode::SUCCESS,
                             Err(DigestError::EngineNotSupported) => ReturnCode::ENOSUPPORT,
                             Err(DigestError::NotConfigured) => ReturnCode::FAIL,
-                            Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE
+                            Err(DigestError::BufferTooSmall(_s)) => ReturnCode::ESIZE,
+                            Err(DigestError::Timeout) => ReturnCode::FAIL,
                         }
 
                     })
                     .unwrap_or(ReturnCode::ENOMEM)
+            },
+            COMMAND_BUSY => {
+                if self.current_user.get().is_some() {
+                    ReturnCode::EBUSY
+                } else {
+                    ReturnCode::SUCCESS
+                }
+            }
+            COMMAND_CERTIFICATE_INIT => { // Cert initialize
+                let rval = self.apps
+                    .enter(caller_id, |app_data, _| {
+                        if self.current_user.get().is_some() {
+                            return ReturnCode::EBUSY;
+                        }
+                        self.current_user.set(Some(caller_id));
+                        let init_result = self.engine.initialize_certificate(r2 as u32);
+                        let err = match init_result {
+                            Ok(_t) => ReturnCode::SUCCESS,
+                            Err(DigestError::EngineNotSupported) => return ReturnCode::ENOSUPPORT,
+                            Err(DigestError::NotConfigured) => return ReturnCode::FAIL,
+                            Err(DigestError::BufferTooSmall(_s)) => return ReturnCode::ESIZE,
+                            Err(DigestError::Timeout) => return ReturnCode::FAIL,
+                        };
+                        if app_data.input_buffer.is_none() {
+                            self.current_user.set(None);
+                        }
+                        err
+                    }).unwrap_or(ReturnCode::ENOMEM);
+                rval
             },
             _ => ReturnCode::ENOSUPPORT
         }
