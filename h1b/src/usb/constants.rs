@@ -14,7 +14,6 @@
 
 #![allow(dead_code)]
 
-
 // The USB stack currently expects 7 strings, at these indices.
 pub const STRING_LANG: u8       = 0;
 pub const STRING_VENDOR: u8     = 1;
@@ -23,17 +22,6 @@ pub const STRING_PLATFORM: u8   = 3;
 pub const STRING_INTERFACE1: u8 = 4;  // Shell
 pub const STRING_BLAH: u8       = 5;  // Garbage?
 pub const STRING_INTERFACE2: u8 = 6;  // Hotel_U2F
-
-
-pub const SOF: u32           = 1 << 3;
-pub const EARLY_SUSPEND: u32 = 1 << 10;
-pub const USB_SUSPEND: u32   = 1 << 11;
-pub const USB_RESET: u32     = 1 << 12;
-pub const ENUM_DONE: u32     = 1 << 13;
-pub const IEPINT: u32        = 1 << 18;
-pub const OEPINT: u32        = 1 << 19;
-pub const GOUTNAKEFF: u32    = 1 << 7;
-pub const GINNAKEFF: u32     = 1 << 6;
 
 const MAX_CONTROL_ENDPOINTS: u16 =  3;
 const MAX_NORMAL_ENDPOINTS:  u16 = 16;
@@ -50,7 +38,25 @@ pub const RX_FIFO_SIZE: u16 = (4 * MAX_CONTROL_ENDPOINTS + 6) +
                               (2 * MAX_NORMAL_ENDPOINTS) + 1;
 pub const TX_FIFO_SIZE: u16 = 2 * MAX_PACKET_SIZE / 4;
 
+
+#[repr(u32)]
+pub enum Configuration {
+    // Timing values copied from Cr50 C reference code
+    TimeoutCalibration7 = 7  <<  0,
+    Unidirectional6Pin  = 0  <<  5,
+    FullSpeed1_1        = 1  <<  6,
+    TurnaroundTime14    = 14 << 10,
+}
+
+#[repr(u32)]
+pub enum Gpio {
+    PhyA       = 0b100 << 4,
+    PhyB       = 0b101 << 4,
+    WriteMode  = 1 << 15,
+}
+
 #[derive(PartialEq)]
+#[repr(u32)]
 pub enum Interrupt {
     HostMode           = 1 <<  0,
     Mismatch           = 1 <<  1,
@@ -58,7 +64,7 @@ pub enum Interrupt {
     SOF                = 1 <<  3,
     RxFIFO             = 1 <<  4,
     GlobalInNak        = 1 <<  6,
-    OutNak             = 1 <<  7,
+    GlobalOutNak       = 1 <<  7,
     EarlySuspend       = 1 << 10,
     Suspend            = 1 << 11,
     Reset              = 1 << 12,

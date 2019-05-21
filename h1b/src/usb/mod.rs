@@ -342,29 +342,29 @@ impl<'a> USB<'a> {
         let status = self.registers.interrupt_status.get();
         print_usb_interrupt_status(status);
 
-        if status & ENUM_DONE != 0 {
+        if status & Interrupt::EnumDone as u32 != 0 {
             // MPS default set to 0 == 64 bytes
             // "Application must read the DSTS register to obtain the
             //  enumerated speed."
         }
 
-        if status & EARLY_SUSPEND != 0  || status & USB_SUSPEND != 0 {
+        if status & Interrupt::EarlySuspend as u32 != 0  ||
+           status & Interrupt::Suspend as u32 != 0 {
             // Currently do not support suspend
         }
 
-        if self.registers.interrupt_mask.get() & status & SOF != 0 { // Clear SOF
-            self.registers.interrupt_mask.set(self.registers.interrupt_mask.get() & !SOF);
+        if (self.registers.interrupt_mask.get() & status & Interrupt::SOF as u32) != 0 { // Clear SOF
+            let newval = self.registers.interrupt_mask.get() & !(Interrupt::SOF as u32);
+            self.registers.interrupt_mask.set(newval);
         }
 
-        if status & GOUTNAKEFF != 0 { // Clear Global OUT NAK
-            self.registers.device_control.set(self.registers.device_control.get() | 1 << 10);
+        if status & Interrupt::Reset as u32 != 0 ||
+           status & Interrupt::ResetDetected as u32 != 0 {
+            self.usb_reset();
         }
 
-        if status & GINNAKEFF != 0 { // Clear Global Non-periodic IN NAK
-            self.registers.device_control.set(self.registers.device_control.get() | 1 << 8);
-        }
-
-        if status & (OEPINT | IEPINT) != 0 { // Interrupt pending
+        if status & Interrupt::InEndpoints as u32 != 0 ||
+           status & Interrupt::OutEndpoints as u32 != 0 { // Interrupt pending
             let pending_interrupts = self.registers.device_all_ep_interrupt.get();
             let inter_ep0_out = (pending_interrupts & AllEndpointInterruptMask::OUT0 as u32) != 0;
             let inter_ep0_in =  (pending_interrupts & AllEndpointInterruptMask::IN0 as u32)  != 0;
@@ -384,8 +384,14 @@ impl<'a> USB<'a> {
             }
         }
 
-        if status & USB_RESET != 0 {
-            self.usb_reset();
+        // Clear Global OUT NAK
+        if status & Interrupt::GlobalOutNak as u32 != 0 {
+            self.registers.device_control.set(self.registers.device_control.get() | 1 << 10);
+        }
+
+        // Clear Global Non-periodic IN NAK
+        if status & Interrupt::GlobalInNak as u32 != 0 {
+            self.registers.device_control.set(self.registers.device_control.get() | 1 << 8);
         }
 
         self.registers.interrupt_status.set(status);
@@ -472,15 +478,16 @@ impl<'a> USB<'a> {
         }
 
         let transfer_type = TableCase::decode_interrupt(ep_out_interrupts);
-        control_debug!("USB: handle endpoint 0, transfer type: {:?}\n", transfer_type);
         let flags = self.ep0_out_descriptors
             .map(|descs| descs[self.last_ep0_out_idx.get()].flags)
             .unwrap();
+
         let setup_ready = flags & DescFlag::SETUP_READY == DescFlag::SETUP_READY;
+        control_debug!("USB: handle endpoint 0, transfer type: {:?}, setup_ready: {}\n", transfer_type, setup_ready);
 
         match self.state.get() {
             USBState::WaitingForSetupPacket => {
-                control_debug!("USB: waiting for setup in\n");
+                control_debug!("USB: waiting for setup\n");
                 if transfer_type == TableCase::A || transfer_type == TableCase::C {
                     if setup_ready {
                         self.handle_setup(transfer_type);
@@ -1183,29 +1190,26 @@ impl<'a> USB<'a> {
 
         // This code below still needs significant cleanup -pal
         let sel_phy = match phy {
-            PHY::A => 0b100, // USB PHY0
-            PHY::B => 0b101, // USB PHY1
+            PHY::A => Gpio::PhyA, // USB PHY0
+            PHY::B => Gpio::PhyB, // USB PHY1
         };
         // Select PHY A
-        self.registers.gpio.set((1 << 15 | // WRITE mode
-                                sel_phy << 4 | // Select PHY A & Set PHY active
-                                0) << 16); // CUSTOM_CFG Register
+        self.registers.gpio.set((Gpio::WriteMode as u32 |
+                                 sel_phy as u32) << 16);
 
         // Configure the chip
-        self.registers.configuration.set(1 << 6 | // USB 1.1 Full Speed
-            0 << 5 | // 6-pin unidirectional
-            14 << 10 | // USB Turnaround time to 14 -- what does this mean though??
-            7); // Timeout calibration to 7 -- what does this mean though??
-
-
+        self.registers.configuration.set(Configuration::FullSpeed1_1 as u32 |
+                                         Configuration::Unidirectional6Pin as u32 |
+                                         Configuration::TurnaroundTime14 as u32 |
+                                         Configuration::TimeoutCalibration7 as u32);
         // Soft reset
         self.soft_reset();
 
         // Configure the chip
-        self.registers.configuration.set(1 << 6 | // USB 1.1 Full Speed
-            0 << 5 | // 6-pin unidirectional
-            14 << 10 | // USB Turnaround time to 14 -- what does this mean though??
-            7); // Timeout calibration to 7 -- what does this mean though??
+        self.registers.configuration.set(Configuration::FullSpeed1_1 as u32 |
+                                         Configuration::Unidirectional6Pin as u32 |
+                                         Configuration::TurnaroundTime14 as u32 |
+                                         Configuration::TimeoutCalibration7 as u32);
 
         // === Begin Core Initialization ==//
 
@@ -1280,8 +1284,15 @@ impl<'a> USB<'a> {
         //
         self.registers
             .interrupt_mask
-            .set(GOUTNAKEFF | GINNAKEFF | USB_RESET | ENUM_DONE | OEPINT | IEPINT |
-                 EARLY_SUSPEND | USB_SUSPEND | SOF);
+            .set(Interrupt::GlobalOutNak as u32 |
+                 Interrupt::GlobalInNak as u32 |
+                 Interrupt::Reset as u32 |
+                 Interrupt::EnumDone as u32 |
+                 Interrupt::InEndpoints as u32 |
+                 Interrupt::OutEndpoints as u32 |
+                 Interrupt::EarlySuspend as u32 |
+                 Interrupt::Suspend as u32 |
+                 Interrupt::SOF as u32);
 
         // Power on programming done
         self.registers.device_control.set(self.registers.device_control.get() | 1 << 11);
@@ -1541,7 +1552,7 @@ fn print_usb_interrupt_status(status: u32) {
     if (status & Interrupt::SOF as u32) != 0                {int_debug!("  +SOF\n");}
     if (status & Interrupt::RxFIFO as u32) != 0             {int_debug!("  +RxFIFO\n");}
     if (status & Interrupt::GlobalInNak as u32) != 0        {int_debug!("  +GlobalInNak\n");}
-    if (status & Interrupt::OutNak as u32) != 0             {int_debug!("  +OutNak\n");}
+    if (status & Interrupt::GlobalOutNak as u32) != 0       {int_debug!("  +GlobalOutNak\n");}
     if (status & Interrupt::EarlySuspend as u32) != 0       {int_debug!("  +EarlySuspend\n");}
     if (status & Interrupt::Suspend as u32) != 0            {int_debug!("  +Suspend\n");}
     if (status & Interrupt::Reset as u32) != 0              {int_debug!("  +USB reset\n");}
