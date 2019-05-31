@@ -185,6 +185,94 @@ pub enum InInterrupt {
     SetupRecvd   =         1 << 15,
 }
 
+// OTG Databook, Table 5-9
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
+pub enum AhbConfig {
+    GlobalInterruptMask         = 1 <<  0,
+    BurstLen1Word               = 0b0000 << 1,
+    BurstLen4Words              = 0b0001 << 1,
+    BurstLen8Words              = 0b0010 << 1,
+    BurstLen16Words             = 0b0011 << 1,
+    BurstLen32Words             = 0b0100 << 1,
+    BurstLen64Words             = 0b0101 << 1,
+    BurstLen128Words            = 0b0110 << 1,
+    BurstLen256Words            = 0b0111 << 1,
+    DmaEnable                   = 1 <<  5,
+    NonPeriodicTxFifoEmptyLevel = 1 <<  7,
+    PeriodicTxFifoEmptyLevel    = 1 <<  8,
+    RemoteMemorySupport         = 1 << 21,
+    NotifyAllDmaWrite           = 1 << 22,
+    AhbSingleSupport            = 1 << 23,
+    InverseDescEndianness       = 1 << 24,
+}
+// OTG Databook, Table 5-53
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
+pub enum DeviceConfig {
+//    DeviceSpeedHigh                    = 0b00 << 0,
+    DeviceSpeedFull2                   = 0b01 << 0, // 2.0 clock 30 or 60 MHz
+    DeviceSpeedLow                     = 0b10 << 0,
+    DeviceSpeedFull1                   = 0b11 << 0, // 1.1 clock 48Mhz
+//    NonZeroLengthStatusOutHandshake    = 1 <<  2,
+    Enable32KHzSuspendMode             = 1 <<  3,
+
+    DeviceAddressShift            =  4,
+    DeviceAddressWidth            =  7,
+
+//    PeriodicFrameInterval80            = 0b00 << 11,
+    PeriodicFrameInterval85            = 0b01 << 11,
+    PeriodicFrameInterval90            = 0b10 << 11,
+    PeriodicFrameInterval95            = 0b11 << 11,
+    EnableDeviceOutNak                 = 1 << 13,
+    XcvrDelay                          = 1 << 14,
+    ErraticErrorInterruptMask          = 1 << 15,
+
+    InEndpointMismatchCountShift  = 18,
+    InEndpointMismatchCountWidth  =  5,
+
+    EnableScatterGatherDMAInDeviceMode = 1 << 23,
+//    PeriodicSchedulingInterval25       = 0b00 << 24,
+    PeriodicSchedulingInterval50       = 0b01 << 24,
+    PeriodicSchedulingInterval75       = 0b10 << 24,
+
+    ResValidShift                 = 26,
+    ResValidWidth                 =  6,
+
+}
+
+// OTG Databook, Table 5-54
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
+pub enum DeviceControl {
+    RemoteWakeupSignaling        = 1 <<  0,
+    SoftDisconnect               = 1 <<  1,
+    GlobalNonPeriodicInNakStatus = 1 <<  2,
+    GlobalOutNakStatus           = 1 <<  3,
+    TestControlDisabled          = 0b000 <<  4,
+    TestControlModeJ             = 0b001 <<  4,
+    TestControlModeK             = 0b010 <<  4,
+    TestControlModeSE0Nak        = 0b011 <<  4,
+    TestControlModePacket        = 0b100 <<  4,
+    TestControlModeForceEnable   = 0b101 <<  4,
+    SetGlobalNonPeriodicInNak    = 1 <<  7,
+    ClearGlobalNonPeriodicInNak  = 1 <<  8,
+    SetGlobalOutNak              = 1 <<  9,
+    ClearGlobalOutNak            = 1 << 10,
+    PowerOnProgrammingDone       = 1 << 11,
+//    GlobalMultiCountInvalid      = 0b00 << 13,
+    GlobalMultiCount1Packet      = 0b01 << 13,
+    GlobalMultiCount2Packets     = 0b10 << 13,
+    GlobalMultiCount3Packets     = 0b11 << 13,
+    IgnoreFrameNumber            = 1 << 15,
+    NakOnBabbleError             = 1 << 16,
+    EnableContinueOnBna          = 1 << 17,
+    DeepSleepBESLReject          = 1 << 18,
+}
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(dead_code)]

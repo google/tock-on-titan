@@ -386,12 +386,14 @@ impl<'a> USB<'a> {
 
         // Clear Global OUT NAK
         if status & Interrupt::GlobalOutNak as u32 != 0 {
-            self.registers.device_control.set(self.registers.device_control.get() | 1 << 10);
+            self.registers.device_control.set(self.registers.device_control.get() |
+                                              DeviceControl::ClearGlobalOutNak as u32);
         }
 
         // Clear Global Non-periodic IN NAK
         if status & Interrupt::GlobalInNak as u32 != 0 {
-            self.registers.device_control.set(self.registers.device_control.get() | 1 << 8);
+            self.registers.device_control.set(self.registers.device_control.get() |
+                                              DeviceControl::ClearGlobalNonPeriodicInNak as u32);
         }
 
         self.registers.interrupt_status.set(status);
@@ -829,8 +831,12 @@ impl<'a> USB<'a> {
                 // IN packet handshake, the hardware knows to wait, so
                 // we should just set it now.
                 let mut dcfg = self.registers.device_config.get();
-                dcfg &= !(0x7f << 4); // Strip address from config
-                dcfg |= ((request.w_value & 0x7f) as u32) << 4; // Put in addr
+
+                // Strip address from config and put in new address
+                dcfg &= !(0x7f << DeviceConfig::DeviceAddressShift as u32);
+                let new_addr = (request.w_value & 0x7f) as u32;
+                dcfg |= new_addr << DeviceConfig::DeviceAddressShift as u32;
+
                 self.registers
                     .device_config
                     .set(dcfg);
@@ -1225,12 +1231,13 @@ impl<'a> USB<'a> {
         // _Don't_ set:
         //   * Periodic TxFIFO interrupt on empty (only valid in slave mode)
         //   * AHB Burst length (defaults to 1 word)
-        self.registers.ahb_config.set(1 |      // Global Interrupt unmask
-                                      1 << 5 | // DMA Enable
-                                      1 << 7); // Non_periodic TxFIFO
+        self.registers.ahb_config.set(AhbConfig::GlobalInterruptMask as u32 |
+                                      AhbConfig::DmaEnable as u32 |
+                                      AhbConfig::NonPeriodicTxFifoEmptyLevel as u32);
 
         // Set Soft Disconnect bit to make sure we're in disconnected state
-        self.registers.device_control.set(self.registers.device_control.get() | (1 << 1));
+        self.registers.device_control.set(self.registers.device_control.get() |
+                                          DeviceControl::SoftDisconnect as u32);
 
         // The datasheet says to unmask OTG and Mode Mismatch interrupts, but
         // we don't support anything but device mode for now, so let's skip
@@ -1245,10 +1252,10 @@ impl<'a> USB<'a> {
         // ===  Begin Device Initialization  ==//
 
         self.registers.device_config.set(self.registers.device_config.get() |
-            0b11       | // Device Speed: USB 1.1 Full speed (48Mhz)
-            0 << 2     | // Non-zero-length Status: send packet to application
-            0b00 << 11 | // Periodic frame interval: 80%
-            1 << 23);   // Enable Scatter/gather
+                                         DeviceConfig::DeviceSpeedFull1 as u32|
+                                         DeviceConfig::EnableScatterGatherDMAInDeviceMode as u32);
+        // 0 << 2     | // Non-zero-length Status: send packet to application
+        // 0b00 << 11 | // Periodic frame interval: 80%
 
         // We would set the device threshold control register here, but I don't
         // think we enable thresholding.
@@ -1295,20 +1302,24 @@ impl<'a> USB<'a> {
                  Interrupt::SOF as u32);
 
         // Power on programming done
-        self.registers.device_control.set(self.registers.device_control.get() | 1 << 11);
+        self.registers.device_control.set(self.registers.device_control.get() |
+                                          DeviceControl::PowerOnProgrammingDone as u32);
+
         for _ in 0..10000 {
             support::nop();
         }
-        self.registers.device_control.set(self.registers.device_control.get() & !(1 << 11));
+        self.registers.device_control.set(self.registers.device_control.get() &
+                                          !(DeviceControl::PowerOnProgrammingDone as u32));
 
         // Clear global NAKs
         self.registers.device_control.set(self.registers.device_control.get() |
-            1 << 10 | // Clear global OUT NAK
-            1 << 8);  // Clear Global Non-periodic IN NAK
+                                          DeviceControl::ClearGlobalOutNak as u32 |
+                                          DeviceControl::ClearGlobalNonPeriodicInNak as u32);
 
         // Reconnect:
         //  Clear the Soft Disconnect bit to allow the core to issue a connect.
-        self.registers.device_control.set(self.registers.device_control.get() & !(1 << 1));
+        self.registers.device_control.set(self.registers.device_control.get() &
+                                          !(DeviceControl::SoftDisconnect as u32));
 
     }
 

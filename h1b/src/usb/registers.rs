@@ -14,6 +14,7 @@
 
 use core::ops::{BitAnd, BitOr};
 use kernel::common::cells::VolatileCell;
+use kernel::common::registers::{self, ReadOnly, ReadWrite, WriteOnly};
 
 #[repr(C)]
 pub struct Registers {
