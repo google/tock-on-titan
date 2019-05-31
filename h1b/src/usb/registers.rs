@@ -16,11 +16,93 @@ use core::ops::{BitAnd, BitOr};
 use kernel::common::cells::VolatileCell;
 use kernel::common::registers::{self, ReadOnly, ReadWrite, WriteOnly};
 
+register_bitfields![u32,
+    AhbConfig [  // OTG Databook, Table 5-9
+        GlobalInterruptMask                OFFSET(0)  NUMBITS(1) [],
+        BurstLength                        OFFSET(1)  NUMBITS(4) [
+            Len1Word    = 0b0000,
+            Len4Words   = 0b0001,
+            Len8Words   = 0b0010,
+            Len16Words  = 0b0011,
+            Len32Words  = 0b0100,
+            Len64Words  = 0b0101,
+            Len128Words = 0b0110,
+            Len256Words = 0b0111
+        ],
+        DmaEnable                          OFFSET(5)  NUMBITS(1) [],
+        NonPeriodicTxFifoEmptyLevel        OFFSET(7)  NUMBITS(1) [],
+        PeriodicTxFifoEmptyLevel           OFFSET(8)  NUMBITS(1) [],
+        RemoteMemorySupport                OFFSET(21) NUMBITS(1) [],
+        NotifyAllDmaWrite                  OFFSET(22) NUMBITS(1) [],
+        AhbSingleSupport                   OFFSET(23) NUMBITS(1) [],
+        InverseDescEndianness              OFFSET(24) NUMBITS(1) []
+    ],
+
+    DeviceConfig [  // OTG Databook, Table 5-53
+        DeviceSpeed                        OFFSET(0) NUMBITS(2) [
+            High  = 0b00,
+            Full2 = 0b01,
+            Low   = 0b10,
+            Full1 = 0b11
+        ],
+        DeviceAddress                      OFFSET(4)  NUMBITS(7) [],
+        PeriodicFrameInterval              OFFSET(11) NUMBITS(2) [
+            Interval80 = 0b00,
+            Interval85 = 0b01,
+            Interval90 = 0b10,
+            Interval95 = 0b11
+        ],
+        EnableDeviceOutNak                 OFFSET(13) NUMBITS(1) [],
+        XcvrDelay                          OFFSET(14) NUMBITS(1) [],
+        ErraticErrorInterruptMask          OFFSET(15) NUMBITS(1) [],
+        InEndpointMismatchCount            OFFSET(18) NUMBITS(5) [],
+        EnableScatterGatherDMAInDeviceMode OFFSET(23) NUMBITS(1) [],
+        PeriodicScheduling                 OFFSET(24) NUMBITS(2) [
+            Interval25 = 0b00,
+            Interval50 = 0b01,
+            Interval75 = 0b10
+        ],
+        ResuneValidationPeriod             OFFSET(26) NUMBITS(6) []
+
+    ],
+
+    DeviceControl [  // OTG Databook, Table 5-54
+        RemoteWakeupSignaling              OFFSET(0)  NUMBITS(1) [],
+        SoftDisconnect                     OFFSET(1)  NUMBITS(1) [],
+        GlobalNonPeriodicInNakStatus       OFFSET(2)  NUMBITS(1) [],
+        GlobalOutNakStatus                 OFFSET(3)  NUMBITS(1) [],
+        TestControl                        OFFSET(4)  NUMBITS(3) [
+            Disabled        = 0b000,
+            ModeJ           = 0b001,
+            ModeK           = 0b010,
+            ModeSE0Nak      = 0b011,
+            ModePacket      = 0b100,
+            ModeForceEnable = 0b101
+        ],
+        SetGlobalNonPeriodicInNak          OFFSET(7)  NUMBITS(1) [],
+        ClearGlobalNonPeriodicInNak        OFFSET(8)  NUMBITS(1) [],
+        SetGlobalOutNak                    OFFSET(9)  NUMBITS(1) [],
+        ClearGlobalOutNak                  OFFSET(10) NUMBITS(1) [],
+        PowerOnProgrammingDone             OFFSET(11) NUMBITS(1) [],
+        GlobalMultiCount                   OFFSET(13) NUMBITS(2) [
+            CountInvalid   = 0b00,
+            Count1Packet   = 0b01,
+            Count2Packets  = 0b10,
+            Count3Packets  = 0b11
+        ],
+        IgnoreFrameNumber                  OFFSET(15) NUMBITS(1) [],
+        NakOnBabbleError                   OFFSET(16) NUMBITS(1) [],
+        EnableContinueOnBna                OFFSET(17) NUMBITS(1) [],
+        DeepSleepBESLReject                OFFSET(18) NUMBITS(1) []
+    ]
+];
+
+
 #[repr(C)]
 pub struct Registers {
     pub otg_control: VolatileCell<u32>,
     pub otg_interrupt: VolatileCell<u32>,
-    pub ahb_config: VolatileCell<u32>,
+    pub ahb_config: ReadWrite<u32, AhbConfig::Register>,
     pub configuration: VolatileCell<u32>,
     pub reset: VolatileCell<u32>,
     pub interrupt_status: VolatileCell<u32>,
@@ -59,8 +141,8 @@ pub struct Registers {
 
     _reserved2: [u32; 432],
 
-    pub device_config: VolatileCell<u32>,
-    pub device_control: VolatileCell<u32>,
+    pub device_config: ReadWrite<u32, DeviceConfig::Register>,
+    pub device_control: ReadWrite<u32, DeviceControl::Register>,
     pub device_status: VolatileCell<u32>,
 
     _reserved_3: u32,
@@ -183,6 +265,9 @@ impl BitAnd for EpCtl {
         EpCtl(self.0 & rhs.0)
     }
 }
+
+
+
 
 #[repr(C)]
 #[repr(align(4))]
