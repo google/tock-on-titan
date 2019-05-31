@@ -55,34 +55,6 @@ pub enum Gpio {
     WriteMode  = 1 << 15,
 }
 
-#[derive(PartialEq)]
-#[repr(u32)]
-pub enum Interrupt {
-    HostMode           = 1 <<  0,
-    Mismatch           = 1 <<  1,
-    OTG                = 1 <<  2,
-    SOF                = 1 <<  3,
-    RxFIFO             = 1 <<  4,
-    GlobalInNak        = 1 <<  6,
-    GlobalOutNak       = 1 <<  7,
-    EarlySuspend       = 1 << 10,
-    Suspend            = 1 << 11,
-    Reset              = 1 << 12,
-    EnumDone           = 1 << 13,
-    OutISOCDrop        = 1 << 14,
-    EOPF               = 1 << 15,
-    EndpointMismatch   = 1 << 17,
-    InEndpoints        = 1 << 18,
-    OutEndpoints       = 1 << 19,
-    InISOCIncomplete   = 1 << 20,
-    IncompletePeriodic = 1 << 21,
-    FetchSuspend       = 1 << 22,
-    ResetDetected      = 1 << 23,
-    ConnectIDChange    = 1 << 28,
-    SessionRequest     = 1 << 30,
-    ResumeWakeup       = 1 << 31,
-}
-
 #[allow(dead_code)]
 pub enum AllEndpointInterruptMask {
     IN0   = 1 <<  0,

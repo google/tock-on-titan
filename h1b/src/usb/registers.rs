@@ -122,6 +122,39 @@ register_bitfields![u32,
         NakOnBabbleError                   OFFSET(16) NUMBITS(1) [],
         EnableContinueOnBna                OFFSET(17) NUMBITS(1) [],
         DeepSleepBESLReject                OFFSET(18) NUMBITS(1) []
+    ],
+
+    Interrupt [  // OTG Databook, Table 5-13
+        // Note this field is not valid on the Mask register
+        CurrentMode                        OFFSET(0)  NUMBITS(1) [
+            Host   = 0b0,
+            Device = 0b1
+        ],
+        ModeMismatch                       OFFSET(1)  NUMBITS(1) [],
+        OTG                                OFFSET(2)  NUMBITS(1) [],
+        StartOfFrame                       OFFSET(3)  NUMBITS(1) [],
+        RxFifoNotEmpty                     OFFSET(4)  NUMBITS(1) [],
+        NonPeriodicTxFifoEmpty             OFFSET(5)  NUMBITS(1) [],
+        GlobalInNak                        OFFSET(6)  NUMBITS(1) [],
+        GlobalOutNak                       OFFSET(7)  NUMBITS(1) [],
+        EarlySuspend                       OFFSET(10) NUMBITS(1) [],
+        Suspend                            OFFSET(11) NUMBITS(1) [],
+        Reset                              OFFSET(12) NUMBITS(1) [],
+        EnumerationDone                    OFFSET(13) NUMBITS(1) [],
+        OutIsochronousPacketDropped        OFFSET(14) NUMBITS(1) [],
+        EndOfPeriodicFrame                 OFFSET(15) NUMBITS(1) [],
+        RestoreDone                        OFFSET(16) NUMBITS(1) [],
+        EndpointMismatch                   OFFSET(17) NUMBITS(1) [],
+        InEndpoints                        OFFSET(18) NUMBITS(1) [],
+        OutEndpoints                       OFFSET(19) NUMBITS(1) [],
+        IncompleteIsochronousInTransfer    OFFSET(20) NUMBITS(1) [],
+        IncompletePeriodicTransfer         OFFSET(21) NUMBITS(1) [],
+        DataFetchSuspended                 OFFSET(22) NUMBITS(1) [],
+        ResetDetected                      OFFSET(23) NUMBITS(1) [],
+        ConnectIDChange                    OFFSET(28) NUMBITS(1) [],
+        DisconnectDetected                 OFFSET(29) NUMBITS(1) [],
+        SessionRequest                     OFFSET(30) NUMBITS(1) [],
+        ResumeWakeup                       OFFSET(31) NUMBITS(1) []
     ]
 ];
 
@@ -133,8 +166,8 @@ pub struct Registers {
     pub ahb_config: ReadWrite<u32, AhbConfig::Register>,
     pub configuration: VolatileCell<u32>,
     pub reset: ReadWrite<u32, Reset::Register>,
-    pub interrupt_status: VolatileCell<u32>,
-    pub interrupt_mask: VolatileCell<u32>,
+    pub interrupt_status: ReadWrite<u32, Interrupt::Register>,
+    pub interrupt_mask: ReadWrite<u32, Interrupt::Register>,
     pub _grxstsr: VolatileCell<u32>,
     pub _grxstsp: VolatileCell<u32>,
     pub receive_fifo_size: VolatileCell<u32>,

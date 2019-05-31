@@ -23,12 +23,14 @@ pub mod u2f;
 
 use cortexm3::support;
 use kernel::ReturnCode;
+use kernel::common::registers::LocalRegisterCopy;
 
 pub use self::constants::Descriptor;
 pub use self::registers::AhbConfig;
 pub use self::registers::DeviceConfig;
 pub use self::registers::DeviceControl;
 pub use self::registers::DMADescriptor;
+pub use self::registers::Interrupt;
 pub use self::registers::Reset;
 pub use self::types::StringDescriptor;
 
@@ -339,62 +341,64 @@ impl<'a> USB<'a> {
     /// are passed to clients delegated for particular endpoints or interfaces.
     pub fn handle_interrupt(&self) {
         // Save current interrupt status snapshot to correctly clear at end
-        let status = self.registers.interrupt_status.get();
+        let status = self.registers.interrupt_status.extract();
+        let mask = self.registers.interrupt_mask.extract();
+
         print_usb_interrupt_status(status);
 
-        if status & Interrupt::EnumDone as u32 != 0 {
+        if status.is_set(Interrupt::EnumerationDone) {
             // MPS default set to 0 == 64 bytes
             // "Application must read the DSTS register to obtain the
             //  enumerated speed."
         }
 
-        if status & Interrupt::EarlySuspend as u32 != 0  ||
-           status & Interrupt::Suspend as u32 != 0 {
-            // Currently do not support suspend
-        }
-
-        if (self.registers.interrupt_mask.get() & status & Interrupt::SOF as u32) != 0 { // Clear SOF
-            let newval = self.registers.interrupt_mask.get() & !(Interrupt::SOF as u32);
-            self.registers.interrupt_mask.set(newval);
-        }
-
-        if status & Interrupt::Reset as u32 != 0 ||
-           status & Interrupt::ResetDetected as u32 != 0 {
-            self.usb_reset();
-        }
-
-        if status & Interrupt::InEndpoints as u32 != 0 ||
-           status & Interrupt::OutEndpoints as u32 != 0 { // Interrupt pending
-            let pending_interrupts = self.registers.device_all_ep_interrupt.get();
-            let inter_ep0_out = (pending_interrupts & AllEndpointInterruptMask::OUT0 as u32) != 0;
-            let inter_ep0_in =  (pending_interrupts & AllEndpointInterruptMask::IN0 as u32)  != 0;
-            let inter_ep1_out = (pending_interrupts & AllEndpointInterruptMask::OUT1 as u32) != 0;
-            let inter_ep1_in =  (pending_interrupts & AllEndpointInterruptMask::IN1 as u32)  != 0;
-            int_debug!(" - handling endpoint interrupts {:032b}\n", pending_interrupts);
-            int_debug!(" -      all endpoint mask       {:032b}\n", self.registers.device_all_ep_interrupt_mask.get());
-            int_debug!(" -     out1 endpoint ints       {:032b}\n", self.registers.out_endpoints[1].interrupt.get());
-            int_debug!(" -      in1 endpoint ints       {:032b}\n", self.registers.in_endpoints[1].interrupt.get());
-            int_debug!("                   debug reg    {:032b}\n", self.registers._grxstsr.get());
-            if inter_ep0_out || inter_ep0_in {
-                int_debug!("   - ep0out: {} ep0in: {}\n", inter_ep0_out, inter_ep0_in);
-                self.handle_endpoint0_events(inter_ep0_out, inter_ep0_in);
-            } else if inter_ep1_out || inter_ep1_in {
-                int_debug!("   - ep1out: {} ep1in: {}\n", inter_ep1_out, inter_ep1_in);
-                self.handle_endpoint1_events(inter_ep1_out, inter_ep1_in);
+        if status.is_set(Interrupt::EarlySuspend) ||
+            status.is_set(Interrupt::Suspend) {
+                // Currently do not support suspend
             }
-        }
+
+        if mask.is_set(Interrupt::StartOfFrame) &&
+            status.is_set(Interrupt::StartOfFrame) { // Clear SOF
+                self.registers.interrupt_mask.modify(Interrupt::StartOfFrame::CLEAR);
+            }
+
+        if status.is_set(Interrupt::Reset) ||
+            status.is_set(Interrupt::ResetDetected) {
+                self.usb_reset();
+            }
+
+        if status.is_set(Interrupt::InEndpoints) ||
+            status.is_set(Interrupt::OutEndpoints) { // Interrupt pending
+                let pending_interrupts = self.registers.device_all_ep_interrupt.get();
+                let inter_ep0_out = (pending_interrupts & AllEndpointInterruptMask::OUT0 as u32) != 0;
+                let inter_ep0_in =  (pending_interrupts & AllEndpointInterruptMask::IN0 as u32)  != 0;
+                let inter_ep1_out = (pending_interrupts & AllEndpointInterruptMask::OUT1 as u32) != 0;
+                let inter_ep1_in =  (pending_interrupts & AllEndpointInterruptMask::IN1 as u32)  != 0;
+                int_debug!(" - handling endpoint interrupts {:032b}\n", pending_interrupts);
+                int_debug!(" -      all endpoint mask       {:032b}\n", self.registers.device_all_ep_interrupt_mask.get());
+                int_debug!(" -     out1 endpoint ints       {:032b}\n", self.registers.out_endpoints[1].interrupt.get());
+                int_debug!(" -      in1 endpoint ints       {:032b}\n", self.registers.in_endpoints[1].interrupt.get());
+                int_debug!("                   debug reg    {:032b}\n", self.registers._grxstsr.get());
+                if inter_ep0_out || inter_ep0_in {
+                    int_debug!("   - ep0out: {} ep0in: {}\n", inter_ep0_out, inter_ep0_in);
+                    self.handle_endpoint0_events(inter_ep0_out, inter_ep0_in);
+                } else if inter_ep1_out || inter_ep1_in {
+                    int_debug!("   - ep1out: {} ep1in: {}\n", inter_ep1_out, inter_ep1_in);
+                    self.handle_endpoint1_events(inter_ep1_out, inter_ep1_in);
+                }
+            }
 
         // Clear Global OUT NAK
-        if status & Interrupt::GlobalOutNak as u32 != 0 {
+        if status.is_set(Interrupt::GlobalOutNak) {
             self.registers.device_control.modify(DeviceControl::ClearGlobalOutNak::SET);
         }
 
         // Clear Global Non-periodic IN NAK
-        if status & Interrupt::GlobalInNak as u32 != 0 {
+        if status.is_set(Interrupt::GlobalInNak) {
             self.registers.device_control.modify(DeviceControl::ClearGlobalNonPeriodicInNak::SET);
         }
 
-        self.registers.interrupt_status.set(status);
+        self.registers.interrupt_status.set(status.get());
     }
 
     /// Set up endpoint 0 OUT descriptors to receive a setup packet
@@ -1278,15 +1282,15 @@ impl<'a> USB<'a> {
         //
         self.registers
             .interrupt_mask
-            .set(Interrupt::GlobalOutNak as u32 |
-                 Interrupt::GlobalInNak as u32 |
-                 Interrupt::Reset as u32 |
-                 Interrupt::EnumDone as u32 |
-                 Interrupt::InEndpoints as u32 |
-                 Interrupt::OutEndpoints as u32 |
-                 Interrupt::EarlySuspend as u32 |
-                 Interrupt::Suspend as u32 |
-                 Interrupt::SOF as u32);
+            .write(Interrupt::GlobalOutNak::SET +
+                   Interrupt::GlobalInNak::SET +
+                   Interrupt::Reset::SET +
+                   Interrupt::EnumerationDone::SET +
+                   Interrupt::InEndpoints::SET +
+                   Interrupt::OutEndpoints::SET +
+                   Interrupt::EarlySuspend::SET +
+                   Interrupt::Suspend::SET +
+                   Interrupt::StartOfFrame::SET);
 
         // Power on programming done
         self.registers.device_control.modify(DeviceControl::PowerOnProgrammingDone::SET);
@@ -1537,31 +1541,31 @@ fn print_in_endpoint_interrupt_status(status: u32) {
     if (status & InInterrupt::SetupRecvd as u32) != 0      {data_debug!("  +Setup received\n");}
 }
 
-fn print_usb_interrupt_status(status: u32) {
-    int_debug!("USB interrupt, status: {:08x}\n", status);
-    if (status & Interrupt::HostMode as u32) != 0           {int_debug!("  +Host mode\n");}
-    if (status & Interrupt::Mismatch as u32) != 0           {int_debug!("  +Mismatch\n");}
-    if (status & Interrupt::OTG as u32) != 0                {int_debug!("  +OTG\n");}
-    if (status & Interrupt::SOF as u32) != 0                {int_debug!("  +SOF\n");}
-    if (status & Interrupt::RxFIFO as u32) != 0             {int_debug!("  +RxFIFO\n");}
-    if (status & Interrupt::GlobalInNak as u32) != 0        {int_debug!("  +GlobalInNak\n");}
-    if (status & Interrupt::GlobalOutNak as u32) != 0       {int_debug!("  +GlobalOutNak\n");}
-    if (status & Interrupt::EarlySuspend as u32) != 0       {int_debug!("  +EarlySuspend\n");}
-    if (status & Interrupt::Suspend as u32) != 0            {int_debug!("  +Suspend\n");}
-    if (status & Interrupt::Reset as u32) != 0              {int_debug!("  +USB reset\n");}
-    if (status & Interrupt::EnumDone as u32) != 0           {int_debug!("  +Speed enum done\n");}
-    if (status & Interrupt::OutISOCDrop as u32) != 0        {int_debug!("  +Out ISOC drop\n");}
-    if (status & Interrupt::EOPF as u32) != 0               {int_debug!("  +EOPF\n");}
-    if (status & Interrupt::EndpointMismatch as u32) != 0   {int_debug!("  +Endpoint mismatch\n");}
-    if (status & Interrupt::InEndpoints as u32) != 0        {int_debug!("  +IN endpoints\n");}
-    if (status & Interrupt::OutEndpoints as u32) != 0       {int_debug!("  +OUT endpoints\n");}
-    if (status & Interrupt::InISOCIncomplete as u32) != 0   {int_debug!("  +IN ISOC incomplete\n");}
-    if (status & Interrupt::IncompletePeriodic as u32) != 0 {int_debug!("  +Incomp periodic\n");}
-    if (status & Interrupt::FetchSuspend as u32) != 0       {int_debug!("  +Fetch suspend\n");}
-    if (status & Interrupt::ResetDetected as u32) != 0      {int_debug!("  +Reset detected\n");}
-    if (status & Interrupt::ConnectIDChange as u32) != 0    {int_debug!("  +Connect ID change\n");}
-    if (status & Interrupt::SessionRequest as u32) != 0     {int_debug!("  +Session request\n");}
-    if (status & Interrupt::ResumeWakeup as u32) != 0       {int_debug!("  +Resume/wakeup\n");}
+fn print_usb_interrupt_status(status: LocalRegisterCopy<u32, Interrupt::Register>) {
+    int_debug!("USB interrupt, status: {:08x}\n", status.get());
+    if status.matches_all(Interrupt::CurrentMode::Host)  {int_debug!("  +Host mode\n");}
+    if status.is_set(Interrupt::ModeMismatch)       {int_debug!("  +Mismatch\n");}
+    if status.is_set(Interrupt::OTG)                {int_debug!("  +OTG\n");}
+    if status.is_set(Interrupt::StartOfFrame)       {int_debug!("  +SOF\n");}
+    if status.is_set(Interrupt::RxFifoNotEmpty)     {int_debug!("  +RxFIFO\n");}
+    if status.is_set(Interrupt::GlobalInNak)        {int_debug!("  +GlobalInNak\n");}
+    if status.is_set(Interrupt::GlobalOutNak)       {int_debug!("  +GlobalOutNak\n");}
+    if status.is_set(Interrupt::EarlySuspend)       {int_debug!("  +EarlySuspend\n");}
+    if status.is_set(Interrupt::Suspend)            {int_debug!("  +Suspend\n");}
+    if status.is_set(Interrupt::Reset)              {int_debug!("  +USB reset\n");}
+    if status.is_set(Interrupt::EnumerationDone)    {int_debug!("  +Speed enum done\n");}
+    if status.is_set(Interrupt::EndOfPeriodicFrame) {int_debug!("  +EOPF\n");}
+    if status.is_set(Interrupt::EndpointMismatch)   {int_debug!("  +Endpoint mismatch\n");}
+    if status.is_set(Interrupt::InEndpoints)        {int_debug!("  +IN endpoints\n");}
+    if status.is_set(Interrupt::OutEndpoints)       {int_debug!("  +OUT endpoints\n");}
+    if status.is_set(Interrupt::IncompleteIsochronousInTransfer)   {int_debug!("  +IN ISOC incomplete\n");}
+    if status.is_set(Interrupt::IncompletePeriodicTransfer) {int_debug!("  +Incomp periodic\n");}
+    if status.is_set(Interrupt::DataFetchSuspended) {int_debug!("  +Fetch suspend\n");}
+    if status.is_set(Interrupt::ResetDetected)      {int_debug!("  +Reset detected\n");}
+    if status.is_set(Interrupt::ConnectIDChange)    {int_debug!("  +Connect ID change\n");}
+    if status.is_set(Interrupt::DisconnectDetected) {int_debug!("  +Disconnect detected\n");}
+    if status.is_set(Interrupt::SessionRequest)     {int_debug!("  +Session request\n");}
+    if status.is_set(Interrupt::ResumeWakeup)       {int_debug!("  +Resume/wakeup\n");}
 }
 
 /* Statically allocated in-memory state and message buffers.*/
