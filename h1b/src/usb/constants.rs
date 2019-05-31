@@ -84,32 +84,6 @@ pub enum Interrupt {
 }
 
 #[allow(dead_code)]
-pub enum Reset {
-    CSftRst          =  1 <<  0,
-    RxFFlsh          =  1 <<  4,
-    TxFFlsh          =  1 <<  5,
-    FlushFifo0       =  0 <<  6,
-    FlushFifo1       =  1 <<  6,
-    FlushFifo2       =  2 <<  6,
-    FlushFifo3       =  3 <<  6,
-    FlushFifo4       =  4 <<  6,
-    FlushFifo5       =  5 <<  6,
-    FlushFifo6       =  6 <<  6,
-    FlushFifo7       =  7 <<  6,
-    FlushFifo8       =  8 <<  6,
-    FlushFifo9       =  9 <<  6,
-    FlushFifo10      = 10 <<  6,
-    FlushFifo11      = 11 <<  6,
-    FlushFifo12      = 12 <<  6,
-    FlushFifo13      = 13 <<  6,
-    FlushFifo14      = 14 <<  6,
-    FlushFifo15      = 15 <<  6,
-    FlushFifoAll     = 16 <<  6, // It's 5 bits, 0x10 means all FIFOs
-    DMAReq           = 1 << 30,
-    AHBIdle          = 1 << 31,
-}
-
-#[allow(dead_code)]
 pub enum AllEndpointInterruptMask {
     IN0   = 1 <<  0,
     IN1   = 1 <<  1,

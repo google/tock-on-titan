@@ -38,6 +38,35 @@ register_bitfields![u32,
         InverseDescEndianness              OFFSET(24) NUMBITS(1) []
     ],
 
+    Reset [  // OTG Databook, Table 5-11
+        AhbMasterIdle                      OFFSET(31) NUMBITS(1) [],
+        DmaRequestSignal                   OFFSET(30) NUMBITS(1) [],
+        TxFifoNumber                       OFFSET(6)  NUMBITS(5) [
+            Fifo0       =  0,
+            Fifo1       =  1,
+            Fifo2       =  2,
+            Fifo3       =  3,
+            Fifo4       =  4,
+            Fifo5       =  5,
+            Fifo6       =  6,
+            Fifo7       =  7,
+            Fifo8       =  8,
+            Fifo9       =  9,
+            Fifo10      = 10,
+            Fifo11      = 11,
+            Fifo12      = 12,
+            Fifo13      = 13,
+            Fifo14      = 14,
+            Fifo15      = 15,
+            AllFifos    = 16 // It's 5 bits, 0x10 means all FIFOs
+        ],
+        TxFifoFlush                        OFFSET(5)  NUMBITS(1) [],
+        RxFifoFlush                        OFFSET(4)  NUMBITS(1) [],
+        InTokenSequenceLearningQueueFlush  OFFSET(3)  NUMBITS(1) [],
+        HostFrameCounterReset              OFFSET(2)  NUMBITS(1) [],
+        PiuFsDedicatedControllerSoftReset  OFFSET(1)  NUMBITS(1) []
+    ],
+
     DeviceConfig [  // OTG Databook, Table 5-53
         DeviceSpeed                        OFFSET(0) NUMBITS(2) [
             High  = 0b00,
@@ -62,8 +91,7 @@ register_bitfields![u32,
             Interval50 = 0b01,
             Interval75 = 0b10
         ],
-        ResuneValidationPeriod             OFFSET(26) NUMBITS(6) []
-
+        ResumeValidationPeriod             OFFSET(26) NUMBITS(6) []
     ],
 
     DeviceControl [  // OTG Databook, Table 5-54
@@ -104,7 +132,7 @@ pub struct Registers {
     pub otg_interrupt: VolatileCell<u32>,
     pub ahb_config: ReadWrite<u32, AhbConfig::Register>,
     pub configuration: VolatileCell<u32>,
-    pub reset: VolatileCell<u32>,
+    pub reset: ReadWrite<u32, Reset::Register>,
     pub interrupt_status: VolatileCell<u32>,
     pub interrupt_mask: VolatileCell<u32>,
     pub _grxstsr: VolatileCell<u32>,

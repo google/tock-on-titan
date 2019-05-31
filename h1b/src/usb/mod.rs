@@ -29,6 +29,7 @@ pub use self::registers::AhbConfig;
 pub use self::registers::DeviceConfig;
 pub use self::registers::DeviceControl;
 pub use self::registers::DMADescriptor;
+pub use self::registers::Reset;
 pub use self::types::StringDescriptor;
 
 use core::cell::Cell;
@@ -262,8 +263,7 @@ impl<'a> USB<'a> {
         control_debug!("USB: WaitingForSetupPacket in reset.\n");
         self.state.set(USBState::WaitingForSetupPacket);
         // Reset device address field (bits 10:4) of device config
-        //self.registers.device_config.set(self.registers.device_config.get() & !(0b1111111 << 4));
-
+        self.registers.device_config.modify(DeviceConfig::DeviceAddress.val(0));
         self.init_ep0_descriptors();
         self.expect_setup_packet();
     }
@@ -310,13 +310,10 @@ impl<'a> USB<'a> {
     /// Perform a soft reset on the USB core; timeout if the reset
     /// takes too long.
     fn soft_reset(&self) {
-        // Reset
-        self.registers.reset.set(Reset::CSftRst as u32);
-
-
-        // Wait until reset flag is cleared or timeout
+        // Reset and wait until flag is cleared or timeout
+        self.registers.reset.write(Reset::PiuFsDedicatedControllerSoftReset::SET);
         let mut timeout = 10000;
-        while self.registers.reset.get() & (Reset::CSftRst as u32) == 1 {
+        while self.registers.reset.is_set(Reset::PiuFsDedicatedControllerSoftReset) {
             if timeout == 0 {
                 return;
             }
@@ -325,7 +322,7 @@ impl<'a> USB<'a> {
 
         // Wait until Idle flag is set or timeout
         let mut timeout = 10000;
-        while self.registers.reset.get() & (Reset::AHBIdle as u32) == 1 {
+        while self.registers.reset.is_set(Reset::AhbMasterIdle) {
             if timeout == 0 {
                 return;
             }
@@ -946,10 +943,10 @@ impl<'a> USB<'a> {
     /// Only call this when  transaction is not underway and data from this FIFO
     /// is not being copied.
     fn flush_rx_fifo(&self) {
-        self.registers.reset.set(Reset::TxFFlsh as u32); // TxFFlsh
+        self.registers.reset.write(Reset::TxFifoFlush::SET); // TxFFlsh
 
         // Wait for TxFFlsh to clear
-        while self.registers.reset.get() & (Reset::TxFFlsh as u32) != 0 {}
+        while self.registers.reset.is_set(Reset::TxFifoFlush) {}
     }
 
     /// Flush one or all endpoint TX FIFOs.
@@ -961,31 +958,30 @@ impl<'a> USB<'a> {
     /// Only call this when  transaction is not underway and data from this FIFO
     /// is not being copied.
     fn flush_tx_fifo(&self, fifo_num: u8) {
-        let reset_val = (Reset::TxFFlsh as u32) |
-        (match fifo_num {
-            0  => Reset::FlushFifo0,
-            1  => Reset::FlushFifo1,
-            2  => Reset::FlushFifo2,
-            3  => Reset::FlushFifo3,
-            4  => Reset::FlushFifo4,
-            5  => Reset::FlushFifo5,
-            6  => Reset::FlushFifo6,
-            7  => Reset::FlushFifo7,
-            8  => Reset::FlushFifo8,
-            9  => Reset::FlushFifo9,
-            10 => Reset::FlushFifo10,
-            11 => Reset::FlushFifo11,
-            12 => Reset::FlushFifo12,
-            13 => Reset::FlushFifo13,
-            14 => Reset::FlushFifo14,
-            15 => Reset::FlushFifo15,
-            16 => Reset::FlushFifoAll,
-            _  => Reset::FlushFifoAll, // Should Panic, or make param typed
-        } as u32);
-        self.registers.reset.set(reset_val);
+        let fifo_field = match fifo_num {
+            0  => Reset::TxFifoNumber::Fifo0,
+            1  => Reset::TxFifoNumber::Fifo1,
+            2  => Reset::TxFifoNumber::Fifo2,
+            3  => Reset::TxFifoNumber::Fifo3,
+            4  => Reset::TxFifoNumber::Fifo4,
+            5  => Reset::TxFifoNumber::Fifo5,
+            6  => Reset::TxFifoNumber::Fifo6,
+            7  => Reset::TxFifoNumber::Fifo7,
+            8  => Reset::TxFifoNumber::Fifo8,
+            9  => Reset::TxFifoNumber::Fifo9,
+            10 => Reset::TxFifoNumber::Fifo10,
+            11 => Reset::TxFifoNumber::Fifo11,
+            12 => Reset::TxFifoNumber::Fifo12,
+            13 => Reset::TxFifoNumber::Fifo13,
+            14 => Reset::TxFifoNumber::Fifo14,
+            15 => Reset::TxFifoNumber::Fifo15,
+            16 => Reset::TxFifoNumber::AllFifos,
+            _  => Reset::TxFifoNumber::AllFifos, // Should Panic, or make param typed
+        };
+        self.registers.reset.write(Reset::TxFifoFlush::SET + fifo_field);
 
         // Wait for TxFFlsh to clear
-        while self.registers.reset.get() & (Reset::TxFFlsh as u32) != 0 {}
+        while self.registers.reset.is_set(Reset::TxFifoFlush) {}
     }
 
     /// Initialize hardware data fifos
