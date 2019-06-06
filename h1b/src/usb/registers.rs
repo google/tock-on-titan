@@ -458,9 +458,6 @@ impl BitAnd for EpCtl {
     }
 }
 
-
-
-
 #[repr(C)]
 #[repr(align(4))]
 #[derive(Clone, Copy, Debug)]
