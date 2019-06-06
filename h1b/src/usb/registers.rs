@@ -258,8 +258,8 @@ register_bitfields![u32,
 
 #[repr(C)]
 pub struct Registers {
-    pub otg_control: VolatileCell<u32>,
-    pub otg_interrupt: VolatileCell<u32>,
+    pub _otg_control: VolatileCell<u32>,
+    pub _otg_interrupt: VolatileCell<u32>,
     pub ahb_config: ReadWrite<u32, AhbConfig::Register>,
     pub configuration: ReadWrite<u32, UsbConfiguration::Register>,
     pub reset: ReadWrite<u32, Reset::Register>,
@@ -285,13 +285,13 @@ pub struct Registers {
     ///   GP_IN:
     ///    bits 7:0    value read back from register when GP_OUT[15] is clear
     pub gpio: VolatileCell<u32>,
-    pub guid: VolatileCell<u32>,
-    pub gsnpsid: VolatileCell<u32>,
-    pub user_hw_config: [VolatileCell<u32>; 4],
+    pub _guid: VolatileCell<u32>,
+    pub _gsnpsid: VolatileCell<u32>,
+    pub _user_hw_config: [VolatileCell<u32>; 4],
 
     _reserved0: [u32; 2],
 
-    pub gdfifocfg: VolatileCell<u32>,
+    pub _gdfifocfg: VolatileCell<u32>,
 
     _reserved1: [u32; 41],
 
@@ -301,7 +301,7 @@ pub struct Registers {
 
     pub device_config: ReadWrite<u32, DeviceConfig::Register>,
     pub device_control: ReadWrite<u32, DeviceControl::Register>,
-    pub device_status: VolatileCell<u32>,
+    pub _device_status: VolatileCell<u32>,
 
     _reserved_3: u32,
     // 0x810
@@ -312,10 +312,10 @@ pub struct Registers {
 
     _reserved_4: [u32; 2],
     // 0x828
-    pub device_vbus_discharge_time: VolatileCell<u32>,
-    pub device_vbus_pulsing_time: VolatileCell<u32>,
-    pub device_threshold_control: VolatileCell<u32>,
-    pub device_in_ep_fifo_empty_interrupt_mask: VolatileCell<u32>,
+    pub _device_vbus_discharge_time: VolatileCell<u32>,
+    pub _device_vbus_pulsing_time: VolatileCell<u32>,
+    pub _device_threshold_control: VolatileCell<u32>,
+    pub _device_in_ep_fifo_empty_interrupt_mask: VolatileCell<u32>,
 
     _reserved_5: [u32; 50],
     // 0x900
@@ -325,7 +325,7 @@ pub struct Registers {
     // 0xd00
     _reserved6: [u32; 64],
     // 0xe00
-    pub power_clock_gating_control: VolatileCell<u32>,
+    pub _power_clock_gating_control: VolatileCell<u32>,
 }
 
 #[repr(C)]
