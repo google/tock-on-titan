@@ -263,6 +263,29 @@ register_bitfields![u32,
         OUT13 29,
         OUT14 30,
         OUT15 31
+    ],
+
+    EndpointControl [
+        MaximumPacketSize                  OFFSET(0)  NUMBITS(11) [],
+        NextEndpoint                       OFFSET(11) NUMBITS(4)  [],
+        UsbActiveEndpoint                  OFFSET(15) NUMBITS(1)  [],
+        NakStatus                          OFFSET(17) NUMBITS(1)  [
+            TransmittingNonNakHandshakes = 0,
+            TransmittingNakHandshakes    = 1
+        ],
+        EndpointType                       OFFSET(18) NUMBITS(2)  [
+            Control     = 0b00,
+            Isochronous = 0b01,
+            Bulk        = 0b10,
+            Interrupt   = 0b11
+        ],
+        SnoopMode                          OFFSET(20) NUMBITS(1)  [],
+        Stall                              OFFSET(21) NUMBITS(1)  [],
+        TxFifoNumber                       OFFSET(22) NUMBITS(4)  [],
+        ClearNak                           OFFSET(26) NUMBITS(1)  [],
+        SetNak                             OFFSET(27) NUMBITS(1)  [],
+        Disable                            OFFSET(30) NUMBITS(1)  [],
+        Enable                             OFFSET(31) NUMBITS(1)  []
     ]
 ];
 
@@ -341,7 +364,7 @@ pub struct Registers {
 
 #[repr(C)]
 pub struct InEndpoint {
-    pub control: VolatileCell<EpCtl>,
+    pub control: ReadWrite<u32, EndpointControl::Register>,
     _reserved0: u32,
     pub interrupt: ReadWrite<u32, InEndpointInterruptMask::Register>,
     _reserved1: u32,
@@ -354,7 +377,7 @@ pub struct InEndpoint {
 
 #[repr(C)]
 pub struct OutEndpoint {
-    pub control: VolatileCell<EpCtl>,
+    pub control: ReadWrite<u32, EndpointControl::Register>,
     _reserved0: u32,
     pub interrupt: ReadWrite<u32, OutEndpointInterruptMask::Register>,
     _reserved1: u32,

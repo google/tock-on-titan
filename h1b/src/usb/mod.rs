@@ -31,6 +31,7 @@ pub use self::registers::AllEndpointInterrupt;
 pub use self::registers::DeviceConfig;
 pub use self::registers::DeviceControl;
 pub use self::registers::DMADescriptor;
+pub use self::registers::EndpointControl;
 pub use self::registers::Gpio;
 pub use self::registers::InEndpointInterruptMask;
 pub use self::registers::Interrupt;
@@ -45,7 +46,7 @@ use kernel::common::cells::{OptionalCell, TakeCell};
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 use self::constants::*;
-use self::registers::{EpCtl, DescFlag, Registers};
+use self::registers::{DescFlag, Registers};
 use self::types::{StaticRef};
 use self::types::{SetupRequest, SetupRequestType};
 use self::types::{SetupDirection, SetupRequestClass, SetupRecipient};
@@ -294,9 +295,8 @@ impl<'a> USB<'a> {
             desc.flags = (DescFlag::LAST |
                           DescFlag::HOST_READY |
                           DescFlag::IOC).bytes(U2F_REPORT_SIZE);
-            let mut control = self.registers.in_endpoints[1].control.get();
-            control = control | EpCtl::ENABLE | EpCtl::CNAK;
-            self.registers.in_endpoints[1].control.set(control);
+            self.registers.in_endpoints[1].control.modify(EndpointControl::Enable::SET +
+                                                          EndpointControl::ClearNak::SET);
         });
     }
 
@@ -305,9 +305,8 @@ impl<'a> USB<'a> {
             desc.flags = (DescFlag::LAST |
                           DescFlag::HOST_READY |
                           DescFlag::IOC).bytes(U2F_REPORT_SIZE);
-            let mut control = self.registers.out_endpoints[1].control.get();
-            control = control | EpCtl::ENABLE | EpCtl::CNAK;
-            self.registers.out_endpoints[1].control.set(control);
+            self.registers.out_endpoints[1].control.modify(EndpointControl::Enable::SET +
+                                                           EndpointControl::ClearNak::SET);
             data_debug!("Set EP1 receive flags.\n");
             ReturnCode::SUCCESS
         })
@@ -430,7 +429,8 @@ impl<'a> USB<'a> {
         //self.registers.device_all_ep_interrupt_mask.set(interrupts);
 
         // Clearing the NAK bit tells host that device is ready to receive.
-        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+        self.registers.out_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                      EndpointControl::ClearNak::SET);
     }
 
     /// Handles events for endpoint 1 (data to/from USB client). Clear
@@ -525,14 +525,16 @@ impl<'a> USB<'a> {
                 control_debug!("USB: state is data stage in\n");
                 if in_interrupt &&
                     ep_in_interrupts.is_set(InEndpointInterruptMask::TransferCompleted) {
-                        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
+                        self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET);
                     }
 
                 if out_interrupt {
                     if transfer_type == TableCase::B {
                         // IN detected
-                        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
-                        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+                        self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                                     EndpointControl::ClearNak::SET);
+                        self.registers.out_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                                      EndpointControl::ClearNak::SET);
                     } else if transfer_type == TableCase::A || transfer_type == TableCase::C {
                         if setup_ready {
                             self.handle_setup(transfer_type);
@@ -545,14 +547,16 @@ impl<'a> USB<'a> {
             USBState::NoDataStage => {
                 if in_interrupt &&
                     ep_in_interrupts.is_set(InEndpointInterruptMask::TransferCompleted) {
-                        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
+                        self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET);
                 }
 
                 if out_interrupt {
                     if transfer_type == TableCase::B {
                         // IN detected
-                        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
-                        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+                        self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                                     EndpointControl::ClearNak::SET);
+                        self.registers.out_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                                      EndpointControl::ClearNak::SET);
                     } else if transfer_type == TableCase::A || transfer_type == TableCase::C {
                         if setup_ready {
                             self.handle_setup(transfer_type);
@@ -871,9 +875,10 @@ impl<'a> USB<'a> {
             // a non-setup packet, leading to failure as the code
             // needs to first respond to a setup packet.
             if transfer_type == TableCase::C {
-                self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+                self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                             EndpointControl::ClearNak::SET);
             } else {
-                self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
+                self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET);
             }
 
             self.ep0_out_descriptors.map(|descs| {
@@ -885,9 +890,10 @@ impl<'a> USB<'a> {
             // a non-setup packet, leading to failure as the code
             // needs to first respond to a setup packet.
             if transfer_type == TableCase::C {
-                self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+                self.registers.out_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                              EndpointControl::ClearNak::SET);
             } else {
-                self.registers.out_endpoints[0].control.set(EpCtl::ENABLE);
+                self.registers.out_endpoints[0].control.write(EndpointControl::Enable::SET);
             }
             control_debug!("Registering for IN0 and OUT0 interrupts.\n");
             self.registers
@@ -919,9 +925,11 @@ impl<'a> USB<'a> {
             self.registers.in_endpoints[0].dma_address.set(&descs[0]);
 
             if transfer_type == TableCase::C {
-                self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+                self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                             EndpointControl::ClearNak::SET);
+
             } else {
-                self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
+                self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET);
             }
 
 
@@ -931,9 +939,10 @@ impl<'a> USB<'a> {
             });
 
             if transfer_type == TableCase::C {
-                self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
+                self.registers.out_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                              EndpointControl::ClearNak::SET);
             } else {
-                self.registers.out_endpoints[0].control.set(EpCtl::ENABLE);
+                self.registers.out_endpoints[0].control.write(EndpointControl::Enable::SET);
             }
 
             let mask = self.registers.device_all_ep_interrupt_mask.extract();
@@ -1099,9 +1108,11 @@ impl<'a> USB<'a> {
         // Enable OUT and disable IN interrupts
         self.registers.device_all_ep_interrupt_mask.modify(AllEndpointInterrupt::OUT0::SET + AllEndpointInterrupt::IN0::CLEAR);
 
-        self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
+        self.registers.out_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                      EndpointControl::Stall::SET);
         self.flush_tx_fifo(0);
-        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
+        self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET +
+                                                     EndpointControl::Stall::SET);
     }
 
     // Helper function which swaps which EP0 out descriptor is set up
@@ -1351,17 +1362,20 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
 
         self.ep1_out_descriptor.map(|_out_desc| {
             self.ep1_out_buffer.get().map(|_out_buf| {
-                let out_control = (EpCtl::ENABLE | EpCtl::CNAK |
-                                   EpCtl::USBACTEP | EpCtl::INTERRUPT).epn_mps(U2F_REPORT_SIZE as u32);
-                self.registers.out_endpoints[1].control.set(out_control);
+                self.registers.out_endpoints[1].control.write(EndpointControl::Enable::SET +
+                                                              EndpointControl::ClearNak::SET +
+                                                              EndpointControl::UsbActiveEndpoint::SET +
+                                                              EndpointControl::EndpointType::Interrupt +
+                                                              EndpointControl::MaximumPacketSize.val(U2F_REPORT_SIZE as u32));
             });
         });
 
         self.ep1_in_descriptor.map(|_in_desc| {
             self.ep1_in_buffer.map(|_in_buf| {
-                let in_control  = (EpCtl::USBACTEP | EpCtl::INTERRUPT |
-                                   EpCtl::TXFNUM_1).epn_mps(U2F_REPORT_SIZE as u32);
-                self.registers.in_endpoints[1].control.set(in_control);
+                self.registers.in_endpoints[1].control.write(EndpointControl::UsbActiveEndpoint::SET +
+                                                             EndpointControl::TxFifoNumber.val(1) +
+                                                             EndpointControl::EndpointType::Interrupt +
+                                                             EndpointControl::MaximumPacketSize.val(U2F_REPORT_SIZE as u32));
             });
         });
 
