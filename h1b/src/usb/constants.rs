@@ -40,59 +40,10 @@ pub const TX_FIFO_SIZE: u16 = 2 * MAX_PACKET_SIZE / 4;
 
 
 #[repr(u32)]
-pub enum Configuration {
-    // Timing values copied from Cr50 C reference code
-    TimeoutCalibration7 = 7  <<  0,
-    Unidirectional6Pin  = 0  <<  5,
-    FullSpeed1_1        = 1  <<  6,
-    TurnaroundTime14    = 14 << 10,
-}
-
-#[repr(u32)]
 pub enum Gpio {
     PhyA       = 0b100 << 4,
     PhyB       = 0b101 << 4,
     WriteMode  = 1 << 15,
-}
-
-// OTG Databook, Table 5-58
-#[allow(dead_code)]
-pub enum OutInterrupt {
-    XferComplete =      1 <<  0,
-    EPDisabled =        1 <<  1,
-    AHBErr =            1 <<  2,
-    SetUP =             1 <<  3,
-    OutToknEPdis =      1 <<  4,
-    StsPhseRcvd =       1 <<  5,
-    Back2BackSETup =    1 <<  6,
-    // Bit 7 reserved
-    OutPkrErr =         1 <<  8,
-    BnaOutIntr =        1 <<  9,
-    // Bits 10-11 reserved
-    BbleErr =           1 << 12,
-    NAK =               1 << 13,
-    NYET =              1 << 14,
-    // Bits 15-31 reserved
-}
-
-// OTG Databook, Table 5-76
-#[allow(dead_code)]
-pub enum InInterrupt {
-    XferComplete =         1 << 0,
-    EPDisabled   =         1 << 1,
-    AHBErr       =         1 << 2,
-    Timeout      =         1 << 3,
-    InTokenRecv  =         1 << 4,
-    InTokenEPMis =         1 << 5,
-    InNakEffect  =         1 << 6,
-    TxFifoReady  =         1 << 7,
-    TxFifoUnder  =         1 << 8,
-    BuffNotAvail =         1 << 9,
-    PacketDrop   =         1 << 11,
-    BabbleErr    =         1 << 12,
-    NAK          =         1 << 13,
-    NYET         =         1 << 14,
-    SetupRecvd   =         1 << 15,
 }
 
 #[repr(u8)]

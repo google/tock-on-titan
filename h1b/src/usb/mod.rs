@@ -35,6 +35,8 @@ pub use self::registers::InEndpointInterruptMask;
 pub use self::registers::Interrupt;
 pub use self::registers::OutEndpointInterruptMask;
 pub use self::registers::Reset;
+pub use self::registers::UsbConfiguration;
+
 pub use self::types::StringDescriptor;
 
 use core::cell::Cell;
@@ -436,11 +438,11 @@ impl<'a> USB<'a> {
         data_debug!("Handling endpoint 1 events: out {}, in {}\n", out_interrupt, in_interrupt);
         if in_interrupt {
             let ep_in = &self.registers.in_endpoints[1];
-            let ep_in_interrupts = ep_in.interrupt.get();
-            data_debug!("In interrupts: {:#x}\n", ep_in_interrupts);
+            let ep_in_interrupts = ep_in.interrupt.extract();
+            data_debug!("In interrupts: {:#x}\n", ep_in_interrupts.get());
             print_in_endpoint_interrupt_status(ep_in_interrupts);
-            ep_in.interrupt.set(ep_in_interrupts);
-            if (ep_in_interrupts & InInterrupt::XferComplete as u32) != 0  {
+            ep_in.interrupt.set(ep_in_interrupts.get());
+            if ep_in_interrupts.is_set(InEndpointInterruptMask::TransferCompleted) {
                 data_debug!("U2F: frame_transmitted callback on ep1.\n");
                 self.u2f_client.map(|client| client.frame_transmitted());
             }
@@ -448,10 +450,10 @@ impl<'a> USB<'a> {
         }
         if out_interrupt {
             let ep_out = &self.registers.out_endpoints[1];
-            let ep_out_interrupts = ep_out.interrupt.get();
-            data_debug!("Out interrupts: {:#x}\n", ep_out_interrupts);
-            ep_out.interrupt.set(ep_out_interrupts);
-            if (ep_out_interrupts & OutInterrupt::XferComplete as u32) != 0 {
+            let ep_out_interrupts = ep_out.interrupt.extract();
+            data_debug!("Out interrupts: {:#x}\n", ep_out_interrupts.get());
+            ep_out.interrupt.set(ep_out_interrupts.get());
+            if ep_out_interrupts.is_set(OutEndpointInterruptMask::TransferCompleted) {
                 data_debug!("U2F: ep1 frame received.\n");
                 self.u2f_client.map(|client| client.frame_received());
             }
@@ -465,20 +467,20 @@ impl<'a> USB<'a> {
     /// on whether the setup packet is ready.
     fn handle_endpoint0_events(&self, out_interrupt: bool, in_interrupt: bool) {
         let ep_out = &self.registers.out_endpoints[0];
-        let ep_out_interrupts = ep_out.interrupt.get();
+        let ep_out_interrupts = ep_out.interrupt.extract();
         if out_interrupt {
-            ep_out.interrupt.set(ep_out_interrupts);
+            ep_out.interrupt.set(ep_out_interrupts.get());
         }
 
         let ep_in = &self.registers.in_endpoints[0];
-        let ep_in_interrupts = ep_in.interrupt.get();
+        let ep_in_interrupts = ep_in.interrupt.extract();
         if in_interrupt { // Clear interrupts
-            ep_in.interrupt.set(ep_in_interrupts);
+            ep_in.interrupt.set(ep_in_interrupts.get());
         }
 
         // If the transfer is compelte (XferCompl), swap which EP0
         // OUT descriptor to use so stack can immediately receive again.
-        if out_interrupt && ep_out_interrupts & (OutInterrupt::XferComplete as u32) != 0 {
+        if out_interrupt && ep_out_interrupts.is_set(OutEndpointInterruptMask::TransferCompleted) {
             self.swap_ep0_out_descriptors();
         }
 
@@ -499,8 +501,8 @@ impl<'a> USB<'a> {
                     } else {
 
                         control_debug!("Unhandled USB event out:{:#x} in:{:#x} ",
-                                   ep_out_interrupts,
-                                   ep_in_interrupts);
+                                   ep_out_interrupts.get(),
+                                   ep_in_interrupts.get());
                         control_debug!("flags: \n");
                         if (flags & DescFlag::LAST) == DescFlag::LAST                {control_debug!(" +LAST\n");}
                         if (flags & DescFlag::SHORT) == DescFlag::SHORT              {control_debug!(" +SHORT\n");}
@@ -521,7 +523,7 @@ impl<'a> USB<'a> {
             USBState::DataStageIn => {
                 control_debug!("USB: state is data stage in\n");
                 if in_interrupt &&
-                    ep_in_interrupts & (InInterrupt::XferComplete as u32) != 0 {
+                    ep_in_interrupts.is_set(InEndpointInterruptMask::TransferCompleted) {
                         self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                     }
 
@@ -541,8 +543,8 @@ impl<'a> USB<'a> {
             }
             USBState::NoDataStage => {
                 if in_interrupt &&
-                    ep_in_interrupts & (InInterrupt::XferComplete as u32) != 0 {
-                    self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
+                    ep_in_interrupts.is_set(InEndpointInterruptMask::TransferCompleted) {
+                        self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                 }
 
                 if out_interrupt {
@@ -1196,18 +1198,20 @@ impl<'a> USB<'a> {
                                  sel_phy as u32) << 16);
 
         // Configure the chip
-        self.registers.configuration.set(Configuration::FullSpeed1_1 as u32 |
-                                         Configuration::Unidirectional6Pin as u32 |
-                                         Configuration::TurnaroundTime14 as u32 |
-                                         Configuration::TimeoutCalibration7 as u32);
+        // Timing values copied from Cr50 C reference code
+        self.registers.configuration.write(UsbConfiguration::PhySelect::Usb11FullSpeed +
+                                           UsbConfiguration::FullSpeedSerialInterfaceSelect::Unidirectional6Pin +
+                                           UsbConfiguration::UsbTurnaroundTime.val(14) +
+                                           UsbConfiguration::TimeoutCalibration.val(7));
+
         // Soft reset
         self.soft_reset();
 
         // Configure the chip
-        self.registers.configuration.set(Configuration::FullSpeed1_1 as u32 |
-                                         Configuration::Unidirectional6Pin as u32 |
-                                         Configuration::TurnaroundTime14 as u32 |
-                                         Configuration::TimeoutCalibration7 as u32);
+        self.registers.configuration.write(UsbConfiguration::PhySelect::Usb11FullSpeed +
+                                           UsbConfiguration::FullSpeedSerialInterfaceSelect::Unidirectional6Pin +
+                                           UsbConfiguration::UsbTurnaroundTime.val(14) +
+                                           UsbConfiguration::TimeoutCalibration.val(7));
 
         // === Begin Core Initialization ==//
 
@@ -1263,12 +1267,12 @@ impl<'a> USB<'a> {
 
         // Unmask some endpoint interrupts
         //    Device OUT SETUP & XferCompl
-        self.registers.device_out_ep_interrupt_mask.set(OutInterrupt::XferComplete as u32 |
-                                                        OutInterrupt::EPDisabled as u32 |
-                                                        OutInterrupt::SetUP as u32);
+        self.registers.device_out_ep_interrupt_mask.write(OutEndpointInterruptMask::TransferCompleted::SET +
+                                                          OutEndpointInterruptMask::EndpointDisabled::SET +
+                                                          OutEndpointInterruptMask::SetupPhaseDone::SET);
         //    Device IN XferCompl & TimeOut
-        self.registers.device_in_ep_interrupt_mask.set(InInterrupt::XferComplete as u32 |
-                                                       InInterrupt::EPDisabled as u32);
+        self.registers.device_in_ep_interrupt_mask.write(InEndpointInterruptMask::TransferCompleted::SET +
+                                                         InEndpointInterruptMask::EndpointDisabled::SET);
 
         // To set ourselves up for processing the state machine through interrupts,
         // unmask:
@@ -1500,17 +1504,17 @@ impl TableCase {
     ///
     /// Only properly decodes values with the combinations shown in the
     /// programming guide.
-    pub fn decode_interrupt(device_out_int: u32) -> TableCase {
-        if device_out_int & (OutInterrupt::XferComplete as u32) != 0 {
-            if device_out_int & (OutInterrupt::SetUP as u32) != 0 {
+    pub fn decode_interrupt(device_out_int: LocalRegisterCopy<u32, OutEndpointInterruptMask::Register>) -> TableCase {
+        if device_out_int.is_set(OutEndpointInterruptMask::TransferCompleted) {
+            if device_out_int.is_set(OutEndpointInterruptMask::SetupPhaseDone) {
                 TableCase::C
-            } else if device_out_int & (OutInterrupt::StsPhseRcvd as u32) != 0 {
+            } else if device_out_int.is_set(OutEndpointInterruptMask::StatusPhaseReceived) {
                 TableCase::E
             } else {
                 TableCase::A
             }
         } else {
-            if device_out_int & (OutInterrupt::SetUP as u32) != 0 {
+            if device_out_int.is_set(OutEndpointInterruptMask::SetupPhaseDone) {
                 TableCase::B
             } else {
                 TableCase::D
@@ -1519,23 +1523,18 @@ impl TableCase {
     }
 }
 
-fn print_in_endpoint_interrupt_status(status: u32) {
+fn print_in_endpoint_interrupt_status(status: LocalRegisterCopy<u32, InEndpointInterruptMask::Register>) {
     int_debug!("USB in endpoint interrupt, status: {:08x}\n", status);
-    if (status & InInterrupt::XferComplete as u32) != 0    {data_debug!("  +Transfer complete\n");}
-    if (status & InInterrupt::EPDisabled as u32) != 0      {data_debug!("  +Endpoint disabled\n");}
-    if (status & InInterrupt::AHBErr as u32) != 0          {data_debug!("  +AHB Error\n");}
-    if (status & InInterrupt::Timeout as u32) != 0         {data_debug!("  +Timeout\n");}
-    if (status & InInterrupt::InTokenRecv as u32) != 0     {data_debug!("  +In token received\n");}
-    if (status & InInterrupt::InTokenEPMis as u32) != 0    {data_debug!("  +In token EP mismatch\n");}
-    if (status & InInterrupt::InNakEffect as u32) != 0     {data_debug!("  +In NAK effective\n");}
-    if (status & InInterrupt::TxFifoReady as u32) != 0     {data_debug!("  +TXFifo ready\n");}
-    if (status & InInterrupt::TxFifoUnder as u32) != 0     {data_debug!("  +TXFifo under\n");}
-    if (status & InInterrupt::BuffNotAvail as u32) != 0    {data_debug!("  +Buff not available\n");}
-    if (status & InInterrupt::PacketDrop as u32) != 0      {data_debug!("  +Packet drop\n");}
-    if (status & InInterrupt::BabbleErr as u32) != 0       {data_debug!("  +Babble error\n");}
-    if (status & InInterrupt::NAK as u32) != 0             {data_debug!("  +NAK\n");}
-    if (status & InInterrupt::NYET as u32) != 0            {data_debug!("  +NYET\n");}
-    if (status & InInterrupt::SetupRecvd as u32) != 0      {data_debug!("  +Setup received\n");}
+    if status.is_set(InEndpointInterruptMask::TransferCompleted)    {data_debug!("  +Transfer complete\n");}
+    if status.is_set(InEndpointInterruptMask::EndpointDisabled)    {data_debug!("  +Endpoint disabled\n");}
+    if status.is_set(InEndpointInterruptMask::AhbError)            {data_debug!("  +AHB Error\n");}
+    if status.is_set(InEndpointInterruptMask::Timeout)             {data_debug!("  +Timeout\n");}
+    if status.is_set(InEndpointInterruptMask::InTokenReceivedWhenTxFifoEmpty)      {data_debug!("  +In token received when TX FIFO empty\n");}
+    if status.is_set(InEndpointInterruptMask::InTokenEndpointMismatched)           {data_debug!("  +In token endpoint mismatch\n");}
+    if status.is_set(InEndpointInterruptMask::InEndpointNakEffective)              {data_debug!("  +In endpoint NAK effective\n");}
+    if status.is_set(InEndpointInterruptMask::TxFifoUnderrun)      {data_debug!("  +TXFifo underrun\n");}
+    if status.is_set(InEndpointInterruptMask::BufferNotAvailable)  {data_debug!("  +Buff not available\n");}
+    if status.is_set(InEndpointInterruptMask::NAK)                 {data_debug!("  +NAK\n");}
 }
 
 fn print_usb_interrupt_status(status: LocalRegisterCopy<u32, Interrupt::Register>) {

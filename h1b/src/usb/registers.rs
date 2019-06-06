@@ -38,6 +38,35 @@ register_bitfields![u32,
         InverseDescEndianness              OFFSET(24) NUMBITS(1) []
     ],
 
+    UsbConfiguration [  // OTG Databook, Table 5-10
+        TimeoutCalibration                 OFFSET(0)  NUMBITS(3) [],
+        PhysicalInterface                  OFFSET(3)  NUMBITS(1) [
+            Bits8  = 0,
+            Bits16 = 1
+        ],
+        UlpiUtmiSelect                     OFFSET(4)  NUMBITS(1) [
+            Utmi = 0,
+            Ulpi = 1
+        ],
+        FullSpeedSerialInterfaceSelect     OFFSET(5)  NUMBITS(1) [
+            Unidirectional6Pin = 0,
+            Bidirectional3Pin  = 1
+        ],
+        PhySelect                          OFFSET(6)  NUMBITS(1) [
+            Usb20HighSpeed     = 0,
+            Usb11FullSpeed     = 1
+        ],
+        UlpiDdrSelect                      OFFSET(7)  NUMBITS(1) [
+            SingleDataRate8bit = 0,
+            DoubleDataRate4bit = 1
+        ],
+        SrpCapable                         OFFSET(8)  NUMBITS(1) [],
+        HnpCapable                         OFFSET(9)  NUMBITS(1) [],
+        UsbTurnaroundTime                  OFFSET(10) NUMBITS(4) []
+        // Bit 14 reserved
+        // Bits 15+ not used by SW; not included because they won't be tested
+    ],
+
     Reset [  // OTG Databook, Table 5-11
         AhbMasterIdle                      OFFSET(31) NUMBITS(1) [],
         DmaRequestSignal                   OFFSET(30) NUMBITS(1) [],
@@ -159,14 +188,14 @@ register_bitfields![u32,
     InEndpointInterruptMask [  // OTG Databook, Table 5-57
         TransferCompleted                0,
         EndpointDisabled                 1,
-        AhbErr                           2,
+        AhbError                         2,
         Timeout                          3,
         InTokenReceivedWhenTxFifoEmpty   4,
         InTokenEndpointMismatched        5,
         InEndpointNakEffective           6,
         // Bit 7 reserved
         TxFifoUnderrun                   8,
-        Bna                              9,
+        BufferNotAvailable               9,
         // Bits 10-12 reserved
         NAK                             13
         // Bits 14-31 reserved
@@ -224,7 +253,6 @@ register_bitfields![u32,
         OUT14 30,
         OUT15 31
     ]
-
 ];
 
 
@@ -233,7 +261,7 @@ pub struct Registers {
     pub otg_control: VolatileCell<u32>,
     pub otg_interrupt: VolatileCell<u32>,
     pub ahb_config: ReadWrite<u32, AhbConfig::Register>,
-    pub configuration: VolatileCell<u32>,
+    pub configuration: ReadWrite<u32, UsbConfiguration::Register>,
     pub reset: ReadWrite<u32, Reset::Register>,
     pub interrupt_status: ReadWrite<u32, Interrupt::Register>,
     pub interrupt_mask: ReadWrite<u32, Interrupt::Register>,
@@ -304,7 +332,7 @@ pub struct Registers {
 pub struct InEndpoint {
     pub control: VolatileCell<EpCtl>,
     _reserved0: u32,
-    pub interrupt: VolatileCell<u32>,
+    pub interrupt: ReadWrite<u32, InEndpointInterruptMask::Register>,
     _reserved1: u32,
     // We use scatter-gather mode so transfer-size isn't used
     _transfer_size: VolatileCell<u32>,
@@ -317,7 +345,7 @@ pub struct InEndpoint {
 pub struct OutEndpoint {
     pub control: VolatileCell<EpCtl>,
     _reserved0: u32,
-    pub interrupt: VolatileCell<u32>,
+    pub interrupt: ReadWrite<u32, OutEndpointInterruptMask::Register>,
     _reserved1: u32,
     _transfer_size: VolatileCell<u32>,
     pub dma_address: VolatileCell<&'static DMADescriptor>,
