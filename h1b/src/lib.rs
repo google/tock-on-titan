@@ -19,6 +19,15 @@
 #![feature(attr_literals, naked_functions)]
 
 extern crate cortexm3;
+
+#[allow(unused_imports)]
+#[macro_use(
+    debug,
+    debug_gpio,
+    static_init,
+    register_bitfields,
+    register_bitmasks
+)]
 extern crate kernel;
 
 #[macro_use]
