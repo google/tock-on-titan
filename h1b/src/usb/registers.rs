@@ -95,6 +95,7 @@ register_bitfields![u32,
         HostFrameCounterReset              OFFSET(2)  NUMBITS(1) [],
         PiuFsDedicatedControllerSoftReset  OFFSET(1)  NUMBITS(1) []
     ],
+
     Interrupt [  // OTG Databook, Table 5-13
         // Note this field is not valid on the Mask register
         CurrentMode                        OFFSET(0)  NUMBITS(1) [
@@ -126,6 +127,16 @@ register_bitfields![u32,
         DisconnectDetected                 OFFSET(29) NUMBITS(1) [],
         SessionRequest                     OFFSET(30) NUMBITS(1) [],
         ResumeWakeup                       OFFSET(31) NUMBITS(1) []
+    ],
+
+    Gpio [  // OTG Databook, Table 5-22
+        Gpi                                OFFSET(0)  NUMBITS(16) [],
+        GpoRegister                        OFFSET(16) NUMBITS(4)  [],
+        GpoValue                           OFFSET(20) NUMBITS(8)  [],
+        GpoOperation                       OFFSET(31) NUMBITS(1)  [
+            Read  = 0,
+            Write = 1
+        ]
     ],
 
     DeviceConfig [  // OTG Databook, Table 5-53
@@ -284,7 +295,7 @@ pub struct Registers {
     ///    bits 3:0    custom register to access
     ///   GP_IN:
     ///    bits 7:0    value read back from register when GP_OUT[15] is clear
-    pub gpio: VolatileCell<u32>,
+    pub gpio: ReadWrite<u32, Gpio::Register>,
     pub _guid: VolatileCell<u32>,
     pub _gsnpsid: VolatileCell<u32>,
     pub _user_hw_config: [VolatileCell<u32>; 4],

@@ -39,13 +39,6 @@ pub const RX_FIFO_SIZE: u16 = (4 * MAX_CONTROL_ENDPOINTS + 6) +
 pub const TX_FIFO_SIZE: u16 = 2 * MAX_PACKET_SIZE / 4;
 
 
-#[repr(u32)]
-pub enum Gpio {
-    PhyA       = 0b100 << 4,
-    PhyB       = 0b101 << 4,
-    WriteMode  = 1 << 15,
-}
-
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(dead_code)]

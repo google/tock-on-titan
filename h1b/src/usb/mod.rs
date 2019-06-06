@@ -31,6 +31,7 @@ pub use self::registers::AllEndpointInterrupt;
 pub use self::registers::DeviceConfig;
 pub use self::registers::DeviceControl;
 pub use self::registers::DMADescriptor;
+pub use self::registers::Gpio;
 pub use self::registers::InEndpointInterruptMask;
 pub use self::registers::Interrupt;
 pub use self::registers::OutEndpointInterruptMask;
@@ -1190,12 +1191,13 @@ impl<'a> USB<'a> {
 
         // This code below still needs significant cleanup -pal
         let sel_phy = match phy {
-            PHY::A => Gpio::PhyA, // USB PHY0
-            PHY::B => Gpio::PhyB, // USB PHY1
+            PHY::A => 0b100, // USB PHY0
+            PHY::B => 0b101, // USB PHY1
         };
         // Select PHY A
-        self.registers.gpio.set((Gpio::WriteMode as u32 |
-                                 sel_phy as u32) << 16);
+        self.registers.gpio.write(Gpio::GpoOperation::Write +
+                                  Gpio::GpoRegister.val(0) +
+                                  Gpio::GpoValue.val(sel_phy as u32));
 
         // Configure the chip
         // Timing values copied from Cr50 C reference code
