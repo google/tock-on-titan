@@ -21,39 +21,29 @@ mod serialize;
 pub mod types;
 pub mod u2f;
 
-use cortexm3::support;
-use kernel::ReturnCode;
-use kernel::common::registers::LocalRegisterCopy;
-
 pub use self::constants::Descriptor;
-pub use self::registers::AhbConfig;
-pub use self::registers::AllEndpointInterrupt;
-pub use self::registers::DeviceConfig;
-pub use self::registers::DeviceControl;
-pub use self::registers::DMADescriptor;
-pub use self::registers::EndpointControl;
-pub use self::registers::Gpio;
-pub use self::registers::InEndpointInterruptMask;
-pub use self::registers::Interrupt;
-pub use self::registers::OutEndpointInterruptMask;
-pub use self::registers::Reset;
-pub use self::registers::UsbConfiguration;
-
 pub use self::types::StringDescriptor;
 
 use core::cell::Cell;
+use cortexm3::support;
+use kernel::ReturnCode;
 use kernel::common::cells::{OptionalCell, TakeCell};
+use kernel::common::registers::LocalRegisterCopy;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 use self::constants::*;
-use self::registers::{DescFlag, Registers};
-use self::types::{StaticRef};
-use self::types::{SetupRequest, SetupRequestType};
-use self::types::{SetupDirection, SetupRequestClass, SetupRecipient};
-use self::types::{DeviceDescriptor, ConfigurationDescriptor};
-use self::types::{InterfaceDescriptor, EndpointDescriptor, HidDeviceDescriptor};
-use self::types::{EndpointAttributes, EndpointUsageType, EndpointTransferType};
-use self::types::{EndpointSynchronizationType};
+use self::registers::{AhbConfig, AllEndpointInterrupt, DescFlag,
+                      DeviceConfig, DeviceControl, DMADescriptor,
+                      EndpointControl, Gpio, InEndpointInterruptMask,
+                      Interrupt, OutEndpointInterruptMask, Registers,
+                      Reset, UsbConfiguration};
+use self::types::{ConfigurationDescriptor, DeviceDescriptor,
+                  EndpointAttributes, EndpointDescriptor,
+                  EndpointSynchronizationType, EndpointTransferType,
+                  EndpointUsageType, HidDeviceDescriptor,
+                  InterfaceDescriptor, SetupDirection, SetupRecipient,
+                  SetupRequest, SetupRequestClass, SetupRequestType,
+                  StaticRef};
 use self::u2f::{UsbHidU2f, UsbHidU2fClient};
 
 // Simple macros for USB debugging output: default definitions do nothing,
