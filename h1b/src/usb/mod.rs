@@ -27,10 +27,13 @@ use kernel::common::registers::LocalRegisterCopy;
 
 pub use self::constants::Descriptor;
 pub use self::registers::AhbConfig;
+pub use self::registers::AllEndpointInterrupt;
 pub use self::registers::DeviceConfig;
 pub use self::registers::DeviceControl;
 pub use self::registers::DMADescriptor;
+pub use self::registers::InEndpointInterruptMask;
 pub use self::registers::Interrupt;
+pub use self::registers::OutEndpointInterruptMask;
 pub use self::registers::Reset;
 pub use self::types::StringDescriptor;
 
@@ -369,12 +372,12 @@ impl<'a> USB<'a> {
 
         if status.is_set(Interrupt::InEndpoints) ||
             status.is_set(Interrupt::OutEndpoints) { // Interrupt pending
-                let pending_interrupts = self.registers.device_all_ep_interrupt.get();
-                let inter_ep0_out = (pending_interrupts & AllEndpointInterruptMask::OUT0 as u32) != 0;
-                let inter_ep0_in =  (pending_interrupts & AllEndpointInterruptMask::IN0 as u32)  != 0;
-                let inter_ep1_out = (pending_interrupts & AllEndpointInterruptMask::OUT1 as u32) != 0;
-                let inter_ep1_in =  (pending_interrupts & AllEndpointInterruptMask::IN1 as u32)  != 0;
-                int_debug!(" - handling endpoint interrupts {:032b}\n", pending_interrupts);
+                let pending_interrupts = self.registers.device_all_ep_interrupt.extract();
+                let inter_ep0_out = pending_interrupts.is_set(AllEndpointInterrupt::OUT0);
+                let inter_ep0_in = pending_interrupts.is_set(AllEndpointInterrupt::IN0);
+                let inter_ep1_out = pending_interrupts.is_set(AllEndpointInterrupt::OUT1);
+                let inter_ep1_in = pending_interrupts.is_set(AllEndpointInterrupt::IN1);
+                int_debug!(" - handling endpoint interrupts {:032b}\n", pending_interrupts.get());
                 int_debug!(" -      all endpoint mask       {:032b}\n", self.registers.device_all_ep_interrupt_mask.get());
                 int_debug!(" -     out1 endpoint ints       {:032b}\n", self.registers.out_endpoints[1].interrupt.get());
                 int_debug!(" -      in1 endpoint ints       {:032b}\n", self.registers.in_endpoints[1].interrupt.get());
@@ -420,10 +423,8 @@ impl<'a> USB<'a> {
         });
 
         // Enable OUT and disable IN interrupts
-        let mut interrupts = self.registers.device_all_ep_interrupt_mask.get();
-        interrupts |= AllEndpointInterruptMask::OUT0 as u32;
-        interrupts &= !(AllEndpointInterruptMask::IN0 as u32);
-        self.registers.device_all_ep_interrupt_mask.set(interrupts);
+        self.registers.device_all_ep_interrupt_mask.modify(AllEndpointInterrupt::OUT0::SET + AllEndpointInterrupt::IN0::CLEAR);
+        //self.registers.device_all_ep_interrupt_mask.set(interrupts);
 
         // Clearing the NAK bit tells host that device is ready to receive.
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::CNAK);
@@ -471,7 +472,7 @@ impl<'a> USB<'a> {
 
         let ep_in = &self.registers.in_endpoints[0];
         let ep_in_interrupts = ep_in.interrupt.get();
-        if in_interrupt {
+        if in_interrupt { // Clear interrupts
             ep_in.interrupt.set(ep_in_interrupts);
         }
 
@@ -539,7 +540,8 @@ impl<'a> USB<'a> {
                 }
             }
             USBState::NoDataStage => {
-                if in_interrupt && ep_in_interrupts & (AllEndpointInterruptMask::IN0 as u32) != 0 {
+                if in_interrupt &&
+                    ep_in_interrupts & (InInterrupt::XferComplete as u32) != 0 {
                     self.registers.in_endpoints[0].control.set(EpCtl::ENABLE);
                 }
 
@@ -887,9 +889,8 @@ impl<'a> USB<'a> {
             control_debug!("Registering for IN0 and OUT0 interrupts.\n");
             self.registers
                 .device_all_ep_interrupt_mask
-                .set(self.registers.device_all_ep_interrupt_mask.get() |
-                     AllEndpointInterruptMask::IN0 as u32 |
-                     AllEndpointInterruptMask::OUT0 as u32);
+                .modify(AllEndpointInterrupt::IN0::SET +
+                        AllEndpointInterrupt::OUT0::SET);
         });
     }
 
@@ -932,11 +933,12 @@ impl<'a> USB<'a> {
                 self.registers.out_endpoints[0].control.set(EpCtl::ENABLE);
             }
 
+            let mask = self.registers.device_all_ep_interrupt_mask.extract();
             self.registers
                 .device_all_ep_interrupt_mask
-                .set(self.registers.device_all_ep_interrupt_mask.get() |
-                     AllEndpointInterruptMask::IN0 as u32 |
-                     AllEndpointInterruptMask::OUT0 as u32);
+                .modify_no_read(mask,
+                                AllEndpointInterrupt::IN0::SET +
+                                AllEndpointInterrupt::OUT0::SET);
         });
     }
 
@@ -1092,10 +1094,7 @@ impl<'a> USB<'a> {
         });
 
         // Enable OUT and disable IN interrupts
-        let mut interrupts = self.registers.device_all_ep_interrupt_mask.get();
-        interrupts |= AllEndpointInterruptMask::OUT0 as u32;
-        interrupts &= !(AllEndpointInterruptMask::IN0 as u32);
-        self.registers.device_all_ep_interrupt_mask.set(interrupts);
+        self.registers.device_all_ep_interrupt_mask.modify(AllEndpointInterrupt::OUT0::SET + AllEndpointInterrupt::IN0::CLEAR);
 
         self.registers.out_endpoints[0].control.set(EpCtl::ENABLE | EpCtl::STALL);
         self.flush_tx_fifo(0);
@@ -1360,9 +1359,7 @@ impl<'a> UsbHidU2f<'a> for USB<'a> {
             });
         });
 
-        let mut interrupts = self.registers.device_all_ep_interrupt_mask.get();
-        interrupts |=  AllEndpointInterruptMask::OUT1 as u32 | AllEndpointInterruptMask::IN1 as u32;
-        self.registers.device_all_ep_interrupt_mask.set(interrupts);
+        self.registers.device_all_ep_interrupt_mask.modify(AllEndpointInterrupt::OUT1::SET + AllEndpointInterrupt::IN1::SET);
     }
 
     fn force_reconnect(&self) -> ReturnCode {

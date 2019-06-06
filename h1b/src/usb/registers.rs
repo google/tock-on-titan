@@ -66,6 +66,38 @@ register_bitfields![u32,
         HostFrameCounterReset              OFFSET(2)  NUMBITS(1) [],
         PiuFsDedicatedControllerSoftReset  OFFSET(1)  NUMBITS(1) []
     ],
+    Interrupt [  // OTG Databook, Table 5-13
+        // Note this field is not valid on the Mask register
+        CurrentMode                        OFFSET(0)  NUMBITS(1) [
+            Host   = 0b0,
+            Device = 0b1
+        ],
+        ModeMismatch                       OFFSET(1)  NUMBITS(1) [],
+        OTG                                OFFSET(2)  NUMBITS(1) [],
+        StartOfFrame                       OFFSET(3)  NUMBITS(1) [],
+        RxFifoNotEmpty                     OFFSET(4)  NUMBITS(1) [],
+        NonPeriodicTxFifoEmpty             OFFSET(5)  NUMBITS(1) [],
+        GlobalInNak                        OFFSET(6)  NUMBITS(1) [],
+        GlobalOutNak                       OFFSET(7)  NUMBITS(1) [],
+        EarlySuspend                       OFFSET(10) NUMBITS(1) [],
+        Suspend                            OFFSET(11) NUMBITS(1) [],
+        Reset                              OFFSET(12) NUMBITS(1) [],
+        EnumerationDone                    OFFSET(13) NUMBITS(1) [],
+        OutIsochronousPacketDropped        OFFSET(14) NUMBITS(1) [],
+        EndOfPeriodicFrame                 OFFSET(15) NUMBITS(1) [],
+        RestoreDone                        OFFSET(16) NUMBITS(1) [],
+        EndpointMismatch                   OFFSET(17) NUMBITS(1) [],
+        InEndpoints                        OFFSET(18) NUMBITS(1) [],
+        OutEndpoints                       OFFSET(19) NUMBITS(1) [],
+        IncompleteIsochronousInTransfer    OFFSET(20) NUMBITS(1) [],
+        IncompletePeriodicTransfer         OFFSET(21) NUMBITS(1) [],
+        DataFetchSuspended                 OFFSET(22) NUMBITS(1) [],
+        ResetDetected                      OFFSET(23) NUMBITS(1) [],
+        ConnectIDChange                    OFFSET(28) NUMBITS(1) [],
+        DisconnectDetected                 OFFSET(29) NUMBITS(1) [],
+        SessionRequest                     OFFSET(30) NUMBITS(1) [],
+        ResumeWakeup                       OFFSET(31) NUMBITS(1) []
+    ],
 
     DeviceConfig [  // OTG Databook, Table 5-53
         DeviceSpeed                        OFFSET(0) NUMBITS(2) [
@@ -124,38 +156,75 @@ register_bitfields![u32,
         DeepSleepBESLReject                OFFSET(18) NUMBITS(1) []
     ],
 
-    Interrupt [  // OTG Databook, Table 5-13
-        // Note this field is not valid on the Mask register
-        CurrentMode                        OFFSET(0)  NUMBITS(1) [
-            Host   = 0b0,
-            Device = 0b1
-        ],
-        ModeMismatch                       OFFSET(1)  NUMBITS(1) [],
-        OTG                                OFFSET(2)  NUMBITS(1) [],
-        StartOfFrame                       OFFSET(3)  NUMBITS(1) [],
-        RxFifoNotEmpty                     OFFSET(4)  NUMBITS(1) [],
-        NonPeriodicTxFifoEmpty             OFFSET(5)  NUMBITS(1) [],
-        GlobalInNak                        OFFSET(6)  NUMBITS(1) [],
-        GlobalOutNak                       OFFSET(7)  NUMBITS(1) [],
-        EarlySuspend                       OFFSET(10) NUMBITS(1) [],
-        Suspend                            OFFSET(11) NUMBITS(1) [],
-        Reset                              OFFSET(12) NUMBITS(1) [],
-        EnumerationDone                    OFFSET(13) NUMBITS(1) [],
-        OutIsochronousPacketDropped        OFFSET(14) NUMBITS(1) [],
-        EndOfPeriodicFrame                 OFFSET(15) NUMBITS(1) [],
-        RestoreDone                        OFFSET(16) NUMBITS(1) [],
-        EndpointMismatch                   OFFSET(17) NUMBITS(1) [],
-        InEndpoints                        OFFSET(18) NUMBITS(1) [],
-        OutEndpoints                       OFFSET(19) NUMBITS(1) [],
-        IncompleteIsochronousInTransfer    OFFSET(20) NUMBITS(1) [],
-        IncompletePeriodicTransfer         OFFSET(21) NUMBITS(1) [],
-        DataFetchSuspended                 OFFSET(22) NUMBITS(1) [],
-        ResetDetected                      OFFSET(23) NUMBITS(1) [],
-        ConnectIDChange                    OFFSET(28) NUMBITS(1) [],
-        DisconnectDetected                 OFFSET(29) NUMBITS(1) [],
-        SessionRequest                     OFFSET(30) NUMBITS(1) [],
-        ResumeWakeup                       OFFSET(31) NUMBITS(1) []
+    InEndpointInterruptMask [  // OTG Databook, Table 5-57
+        TransferCompleted                0,
+        EndpointDisabled                 1,
+        AhbErr                           2,
+        Timeout                          3,
+        InTokenReceivedWhenTxFifoEmpty   4,
+        InTokenEndpointMismatched        5,
+        InEndpointNakEffective           6,
+        // Bit 7 reserved
+        TxFifoUnderrun                   8,
+        Bna                              9,
+        // Bits 10-12 reserved
+        NAK                             13
+        // Bits 14-31 reserved
+    ],
+
+    OutEndpointInterruptMask [  // OTG Databook, Table 5-58
+        TransferCompleted                     0,
+        EndpointDisabled                      1,
+        AhbError                              2,
+        SetupPhaseDone                        3,
+        OutTokenReceivedWhenEndpointDisabled  4,
+        StatusPhaseReceived                   5,
+        BackToBackSetupPacketsReceived        6,
+        // Bit 7 reserved
+        OutPacketError                        8,
+        BnaInterrupt                          9,
+        // Bits 10-11 reserved
+        BabbleError                          12,
+        Nak                                  13,
+        Nyet                                 14
+        // Bits 15-31 reserved
+    ],
+
+    AllEndpointInterrupt [  // OTG Databook Table 5-59
+        IN0    0,
+        IN1    1,
+        IN2    2,
+        IN3    3,
+        IN4    4,
+        IN5    5,
+        IN6    6,
+        IN7    7,
+        IN8    8,
+        IN9    9,
+        IN10  10,
+        IN11  11,
+        IN12  12,
+        IN13  13,
+        IN14  14,
+        IN15  15,
+        OUT0  16,
+        OUT1  17,
+        OUT2  18,
+        OUT3  19,
+        OUT4  20,
+        OUT5  21,
+        OUT6  22,
+        OUT7  23,
+        OUT8  24,
+        OUT9  25,
+        OUT10 26,
+        OUT11 27,
+        OUT12 28,
+        OUT13 29,
+        OUT14 30,
+        OUT15 31
     ]
+
 ];
 
 
@@ -208,10 +277,10 @@ pub struct Registers {
 
     _reserved_3: u32,
     // 0x810
-    pub device_in_ep_interrupt_mask: VolatileCell<u32>,  // DOIPMASK
-    pub device_out_ep_interrupt_mask: VolatileCell<u32>, // DOEPMASK
-    pub device_all_ep_interrupt: VolatileCell<u32>,      // DAINT
-    pub device_all_ep_interrupt_mask: VolatileCell<u32>, // DAINTMASK
+    pub device_in_ep_interrupt_mask: ReadWrite<u32, InEndpointInterruptMask::Register>,  // DIEPMASK
+    pub device_out_ep_interrupt_mask: ReadWrite<u32, OutEndpointInterruptMask::Register>, // DOEPMASK
+    pub device_all_ep_interrupt: ReadWrite<u32, AllEndpointInterrupt::Register>,      // DAINT
+    pub device_all_ep_interrupt_mask: ReadWrite<u32, AllEndpointInterrupt::Register>, // DAINTMASK
 
     _reserved_4: [u32; 2],
     // 0x828

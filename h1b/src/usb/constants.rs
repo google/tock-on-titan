@@ -55,42 +55,6 @@ pub enum Gpio {
     WriteMode  = 1 << 15,
 }
 
-#[allow(dead_code)]
-pub enum AllEndpointInterruptMask {
-    IN0   = 1 <<  0,
-    IN1   = 1 <<  1,
-    IN2   = 1 <<  2,
-    IN3   = 1 <<  3,
-    IN4   = 1 <<  4,
-    IN5   = 1 <<  5,
-    IN6   = 1 <<  6,
-    IN7   = 1 <<  7,
-    IN8   = 1 <<  8,
-    IN9   = 1 <<  9,
-    IN10  = 1 << 10,
-    IN11  = 1 << 11,
-    IN12  = 1 << 12,
-    IN13  = 1 << 13,
-    IN14  = 1 << 14,
-    IN15  = 1 << 15,
-    OUT0  = 1 << 16,
-    OUT1  = 1 << 17,
-    OUT2  = 1 << 18,
-    OUT3  = 1 << 19,
-    OUT4  = 1 << 20,
-    OUT5  = 1 << 21,
-    OUT6  = 1 << 22,
-    OUT7  = 1 << 23,
-    OUT8  = 1 << 24,
-    OUT9  = 1 << 25,
-    OUT10 = 1 << 26,
-    OUT11 = 1 << 27,
-    OUT12 = 1 << 28,
-    OUT13 = 1 << 29,
-    OUT14 = 1 << 30,
-    OUT15 = 1 << 31,
-}
-
 // OTG Databook, Table 5-58
 #[allow(dead_code)]
 pub enum OutInterrupt {
