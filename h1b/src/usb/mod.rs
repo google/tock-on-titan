@@ -126,6 +126,7 @@ const EP0_OUT_BUFFER_COUNT: usize = 2;
 /// StringDescriptors, which are provided by the boot sequence. The
 /// meaning of each StringDescriptor is defined by its index, in
 /// usb::constants.
+///
 
 pub struct USB<'a> {
     registers: StaticRef<Registers>,
@@ -504,15 +505,7 @@ impl<'a> USB<'a> {
                         if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_BUSY      {control_debug!(" +HOST_BUSY\n");}
                         control_debug!("Non-setup packet received before setup: host thinks we've already enumerated.");
 
-                        // USB 2.0 specification, 9.2.7 "Request Error"
-                        // "When a request is received by a device that is not defined for the device,
-                        // is inappropriate for the current setting of the device, or has values that
-                        // are not compatible with the request, then a Request Error exists.
-                        // The device deals with the Request Error by returning a STALL PID in response
-                        // to the next Data stage transaction or in the Status stage of the message.
-                        // It is preferred that the STALL PID be returned at the next Data stage transaction,
-                        // as this avoids unnecessary bus activity."
-                        self.stall_both_fifos();
+                        self.handle_unexpected_packet();
                     }
                 } else if transfer_type == TableCase::B {
                     // Only happens when we're stalling, so just keep waiting
@@ -576,7 +569,7 @@ impl<'a> USB<'a> {
     /// endpoint-0's interrupt register. Based on the direction of the
     /// request and data size, this function calls one of
     ///   - handle_standard_device_to_host: getting status, descriptors, etc.,
-    ///   - handle_standard_host_to_device: none supported yet (panics),
+    ///   - handle_standard_host_to_device: none supported yet
     ///   - handle_standard_no_data_phase: setting configuration and address,
     ///   - handle_class_interface_to_host: getting HID report descriptor, or
     ///   - handle_class_host_to_interface: setting idle interval.
@@ -712,10 +705,8 @@ impl<'a> USB<'a> {
                         });
                     }
                     _ => {
-                        // The specification says that a not-understood request should send an
-                        // error response. Cr52 just stalls, this seems to work. -pal
-                        self.stall_both_fifos();
                         control_debug!("USB: unhandled setup descriptor type: {}", descriptor_type);
+                        self.handle_unexpected_packet();
                     }
                 }
             }
@@ -743,7 +734,7 @@ impl<'a> USB<'a> {
                 self.expect_status_phase_in(transfer_type);
             }
             _ => {
-                panic!("USB: unhandled device-to-host setup request code: {}", request.b_request as u8);
+                self.handle_unexpected_packet();
             }
         }
     }
@@ -751,8 +742,7 @@ impl<'a> USB<'a> {
 
 
     /// Responds to a SETUP message destined to an interface. Currently
-    /// only handles GetDescriptor requests for Report descriptors, otherwise
-    /// panics.
+    /// only handles GetDescriptor requests for Report descriptors.
     fn handle_standard_interface_to_host(&self, transfer_type: TableCase, request: &SetupRequest) {
         control_debug!("Handle setup interface, device to host.\n");
         let request_type = request.request();
@@ -766,7 +756,8 @@ impl<'a> USB<'a> {
                 match descriptor {
                     Descriptor::Report => {
                         if U2F_REPORT_DESCRIPTOR.len() != len {
-                            panic!("Requested report of length {} but length is {}", request.length(), U2F_REPORT_DESCRIPTOR.len());
+                            control_debug!("Requested report of length {} but length is {}", request.length(), U2F_REPORT_DESCRIPTOR.len());
+                            self.handle_bad_packet();
                         }
 
                         self.ep0_in_buffers.map(|buf| {
@@ -786,28 +777,35 @@ impl<'a> USB<'a> {
                             self.expect_data_phase_in(transfer_type);
                         });
                     },
-                    _ => panic!("Interface device to host, unhandled request")
+                    _ => {
+                        control_debug!("Interface device to host, unhandled request");
+                        self.handle_unexpected_packet();
+                    }
                 }
             },
-            _ => panic!("Interface device to host, unhandled request: {:?}", request_type)
+            _ => {
+                control_debug!("Interface device to host, unhandled request: {:?}", request_type);
+                self.handle_unexpected_packet();
+            }
         }
     }
 
     /// Handles a setup message to an interface, host-to-device
-    /// communication.  Currently not supported: panics.
+    /// communication.  Not supported.
     fn handle_standard_host_to_interface(&self, _transfer_type: TableCase, _request: &SetupRequest) {
-        panic!("Unhandled setup: interface, host to device!");
+        control_debug!("Unhandled setup: interface, host to device!");
+        self.handle_unexpected_packet();
     }
 
     /// Handles a setup message to a class, device-to-host
-    /// communication.  Currently not supported: panics.
+    /// communication. Not supported.
     fn handle_class_interface_to_host(&self, _transfer_type: TableCase, _request: &SetupRequest) {
-        panic!("Unhandled setup: class, device to host.!");
+        control_debug!("Unhandled setup: class, device to host.!");
+        self.handle_unexpected_packet();
     }
 
     /// Handles a setup message to a class, host-to-device
-    /// communication.  Currently supports only SetIdle commands,
-    /// otherwise panics.
+    /// communication.  Currently supports only SetIdle commands.
     fn handle_class_host_to_interface(&self, _transfer_type: TableCase, request: &SetupRequest) {
         use self::types::SetupClassRequestType;
         control_debug!("Handle setup class, host to device.\n");
@@ -820,7 +818,7 @@ impl<'a> USB<'a> {
                 self.stall_both_fifos();
             },
             _ => {
-                panic!("Unknown handle setup case: {:?}.\n", request.class_request());
+                self.handle_unexpected_packet();
             }
         }
     }
@@ -833,7 +831,8 @@ impl<'a> USB<'a> {
         control_debug!(" - setup (no data): {:?}\n", request.request());
         match request.request() {
             GetStatus => {
-                panic!("USB: GET_STATUS no data setup packet.");
+                control_debug!("USB: GET_STATUS no data setup packet.");
+                self.handle_unexpected_packet();
             }
             SetAddress => {
                 control_debug!("Setting address: {:#x}.\n", request.w_value & 0x7f);
@@ -851,7 +850,8 @@ impl<'a> USB<'a> {
                 self.expect_status_phase_in(transfer_type);
             }
             _ => {
-                panic!("USB: unhandled no data setup packet {}", request.b_request as u8);
+                control_debug!("USB: unhandled no data setup packet {}", request.b_request as u8);
+                self.handle_unexpected_packet();
             }
         }
     }
@@ -1112,6 +1112,30 @@ impl<'a> USB<'a> {
         self.flush_tx_fifo(0);
         self.registers.in_endpoints[0].control.write(EndpointControl::Enable::SET +
                                                      EndpointControl::Stall::SET);
+    }
+
+    fn handle_unexpected_packet(&self) {
+        // USB 2.0 specification, 9.2.7 "Request Error"
+        // "When a request is received by a device that is not defined for the device,
+        // is inappropriate for the current setting of the device, or has values that
+        // are not compatible with the request, then a Request Error exists.
+        // The device deals with the Request Error by returning a STALL PID in response
+        // to the next Data stage transaction or in the Status stage of the message.
+        // It is preferred that the STALL PID be returned at the next Data stage transaction,
+        // as this avoids unnecessary bus activity."
+        self.stall_both_fifos();
+    }
+
+    fn handle_bad_packet(&self) {
+        // USB 2.0 specification, 9.2.7 "Request Error"
+        // "When a request is received by a device that is not defined for the device,
+        // is inappropriate for the current setting of the device, or has values that
+        // are not compatible with the request, then a Request Error exists.
+        // The device deals with the Request Error by returning a STALL PID in response
+        // to the next Data stage transaction or in the Status stage of the message.
+        // It is preferred that the STALL PID be returned at the next Data stage transaction,
+        // as this avoids unnecessary bus activity."
+        self.stall_both_fifos();
     }
 
     // Helper function which swaps which EP0 out descriptor is set up
