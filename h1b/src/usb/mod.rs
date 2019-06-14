@@ -490,10 +490,9 @@ impl<'a> USB<'a> {
                     if setup_ready {
                         self.handle_setup(transfer_type);
                     } else {
-
                         control_debug!("Unhandled USB event out:{:#x} in:{:#x} ",
-                                   ep_out_interrupts.get(),
-                                   ep_in_interrupts.get());
+                                       ep_out_interrupts.get(),
+                                       ep_in_interrupts.get());
                         control_debug!("flags: \n");
                         if (flags & DescFlag::LAST) == DescFlag::LAST                {control_debug!(" +LAST\n");}
                         if (flags & DescFlag::SHORT) == DescFlag::SHORT              {control_debug!(" +SHORT\n");}
@@ -503,7 +502,17 @@ impl<'a> USB<'a> {
                         if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_BUSY       {control_debug!(" +DMA_BUSY\n");}
                         if (flags & DescFlag::HOST_BUSY) == DescFlag::DMA_DONE       {control_debug!(" +DMA_DONE\n");}
                         if (flags & DescFlag::HOST_BUSY) == DescFlag::HOST_BUSY      {control_debug!(" +HOST_BUSY\n");}
-                        panic!("Waiting for set up packet but non-setup packet received.");
+                        control_debug!("Non-setup packet received before setup: host thinks we've already enumerated.");
+
+                        // USB 2.0 specification, 9.2.7 "Request Error"
+                        // "When a request is received by a device that is not defined for the device,
+                        // is inappropriate for the current setting of the device, or has values that
+                        // are not compatible with the request, then a Request Error exists.
+                        // The device deals with the Request Error by returning a STALL PID in response
+                        // to the next Data stage transaction or in the Status stage of the message.
+                        // It is preferred that the STALL PID be returned at the next Data stage transaction,
+                        // as this avoids unnecessary bus activity."
+                        self.stall_both_fifos();
                     }
                 } else if transfer_type == TableCase::B {
                     // Only happens when we're stalling, so just keep waiting
