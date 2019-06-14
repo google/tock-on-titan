@@ -12,9 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// A client of the Flash driver -- receives callbacks when flash operations
-/// complete.
-pub trait Client {
-    fn erase_done(&self, ::kernel::ReturnCode);
-    fn write_done(&self, ::kernel::ReturnCode);
-}
+mod fake;

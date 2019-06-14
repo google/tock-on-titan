@@ -17,6 +17,8 @@
 // writes and counters).
 
 mod driver;
+#[cfg(feature = "test")]
+pub mod fake;
 mod hardware;
 
 pub use self::driver::Client;
