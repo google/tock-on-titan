@@ -12,5 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod fake;
-mod h1b_hw;
+#[test]
+fn flash_size() -> bool {
+    core::mem::size_of::<h1b::hil::flash::h1b_hw::H1bHw>() == 384
+}

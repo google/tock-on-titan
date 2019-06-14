@@ -32,7 +32,8 @@ userspace/h1b_tests/devicetests: build/cargo-host/release/runner \
 
 .PHONY: userspace/h1b_tests/doc
 userspace/h1b_tests/doc:
-	cd userspace/h1b_tests && cargo doc --release -Z offline
+	cd userspace/h1b_tests && TOCK_KERNEL_VERSION=h1b_tests cargo doc \
+		--release -Z offline
 
 .PHONY: userspace/h1b_tests/localtests
 userspace/h1b_tests/localtests:
