@@ -21,6 +21,7 @@ mod driver;
 pub mod fake;
 pub mod h1b_hw;
 mod hardware;
+pub mod smart_program;
 
 pub use self::driver::Client;
 pub use self::hardware::Hardware;
