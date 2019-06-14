@@ -20,6 +20,8 @@ edition = "2018"
 publish = false
 
 [dependencies]
+h1b = { features = ["test"], path = "../../h1b" }
+kernel = { path = "../../third_party/tock/kernel" }
 libtock = { path = "../../third_party/libtock-rs" }
 
 [dev-dependencies]
