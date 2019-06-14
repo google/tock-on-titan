@@ -29,7 +29,7 @@ fn fake_hw() -> bool {
 	// Operation 1: successful write to two words.
 	fake.set_transaction(1300, 2 - 1);
 	fake.set_write_data(&[0xFFFF0FFF, 0xFFFAFFFF]);
-	fake.trigger(0x27182818);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
 	require!(fake.is_programming() == true);
 	fake.finish_operation();
 	require!(fake.read_error() == 0);
@@ -42,7 +42,7 @@ fn fake_hw() -> bool {
 	// Operation 2: failed write. Verifies the write doesn't change anything.
 	fake.set_transaction(1300, 2 - 1);
 	fake.set_write_data(&[0xFFFF00FF, 0xFFAAFFFF]);
-	fake.trigger(0x27182818);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
 	require!(fake.is_programming() == true);
 	fake.inject_error(0x8);  // Program failed
 	require!(fake.read_error() == 0x8);
@@ -56,7 +56,7 @@ fn fake_hw() -> bool {
 	// overlap to the next word.
 	fake.set_transaction(1300, 1 - 1);
 	fake.set_write_data(&[0xFFFFC0FF]);
-	fake.trigger(0x27182818);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
 	require!(fake.is_programming() == true);
 	fake.finish_operation();
 	require!(fake.read_error() == 0);
@@ -70,7 +70,7 @@ fn fake_hw() -> bool {
 	// does not affect the third page.
 	fake.set_transaction(512, 0);
 	require!(fake.is_programming() == false);
-	fake.trigger(0x31415927);
+	fake.trigger(h1b::hil::flash::driver::ERASE_OPCODE);
 	require!(fake.is_programming() == true);
 	fake.finish_operation();
 	require!(fake.read_error() == 0);
@@ -84,7 +84,7 @@ fn fake_hw() -> bool {
 	// affects the values in the third page.
 	fake.set_transaction(1024, 0);
 	require!(fake.is_programming() == false);
-	fake.trigger(0x31415927);
+	fake.trigger(h1b::hil::flash::driver::ERASE_OPCODE);
 	require!(fake.is_programming() == true);
 	fake.finish_operation();
 	require!(fake.read_error() == 0);

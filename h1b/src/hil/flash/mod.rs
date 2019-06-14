@@ -16,12 +16,18 @@
 // more representative of the H1B flash hardware's capabilities (e.g. sub-page
 // writes and counters).
 
-mod driver;
+pub mod driver;
 #[cfg(feature = "test")]
 pub mod fake;
 pub mod h1b_hw;
 mod hardware;
 pub mod smart_program;
+
+#[cfg(feature = "test")]
+pub type Flash<'h, A> = self::driver::Flash<'h, A, self::fake::FakeHw<'h>>;
+
+ #[cfg(not(feature = "test"))]
+pub type Flash<'h, A> = self::driver::Flash<'static, A, self::h1b_hw::H1bHw>;
 
 pub use self::driver::Client;
 pub use self::hardware::Hardware;

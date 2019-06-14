@@ -37,7 +37,11 @@ fn div_round_up() -> bool {
 
 #[test]
 fn successful_program() -> bool {
-	use { h1b::hil::flash::Hardware, kernel::hil::time::Alarm, test::require };
+	use h1b::hil::flash::driver::WRITE_OPCODE;
+	use h1b::hil::flash::Hardware;
+	use kernel::hil::time::Alarm;
+	use test::require;
+
 	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
 	let hw = h1b::hil::flash::fake::FakeHw::new();
 	hw.set_transaction(1300, 1);
@@ -45,14 +49,14 @@ fn successful_program() -> bool {
 
 	// First attempt.
 	let mut state = h1b::hil::flash::smart_program::SmartProgramState::init(9);
-	state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ false);
+	state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ false);
 	require!(alarm.get_alarm() == alarm.now() + 150);
 	require!(hw.is_programming() == true);
 	require!(state.return_code() == None);
 	alarm.set_time(50);
 
 	// Inject a spurious interrupt.
-	state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ false);
+	state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ false);
 	require!(alarm.get_alarm() == 150);
 	require!(hw.is_programming() == true);
 	require!(state.return_code() == None);
@@ -60,7 +64,7 @@ fn successful_program() -> bool {
 	hw.finish_operation();
 
 	// Finish.
-	state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ false);
+	state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ false);
 	require!(alarm.get_alarm() == 0);
 	require!(hw.is_programming() == false);
 	require!(state.return_code() == Some(kernel::ReturnCode::SUCCESS));
@@ -69,7 +73,11 @@ fn successful_program() -> bool {
 
 #[test]
 fn retries() -> bool {
-	use { h1b::hil::flash::Hardware, kernel::hil::time::Alarm, test::require };
+	use h1b::hil::flash::driver::WRITE_OPCODE;
+	use h1b::hil::flash::Hardware;
+	use kernel::hil::time::Alarm;
+	use test::require;
+
 	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
 	let hw = h1b::hil::flash::fake::FakeHw::new();
 	hw.set_transaction(1300, 1);
@@ -77,7 +85,7 @@ fn retries() -> bool {
 
 	// First programming attempt.
 	let mut state = h1b::hil::flash::smart_program::SmartProgramState::init(9);
-	state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ false);
+	state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ false);
 	require!(alarm.get_alarm() == alarm.now() + 150);
 	require!(hw.is_programming() == true);
 	require!(state.return_code() == None);
@@ -85,7 +93,7 @@ fn retries() -> bool {
 	hw.inject_error(0b100);
 
 	// Second attempt.
-	state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ false);
+	state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ false);
 	require!(alarm.get_alarm() == alarm.now() + 150);
 	require!(hw.is_programming() == true);
 	require!(state.return_code() == None);
@@ -93,7 +101,7 @@ fn retries() -> bool {
 	hw.finish_operation();
 
 	// Finish.
-	state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ false);
+	state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ false);
 	require!(alarm.get_alarm() == 0);
 	require!(hw.is_programming() == false);
 	require!(state.return_code() == Some(kernel::ReturnCode::SUCCESS));
@@ -103,7 +111,11 @@ fn retries() -> bool {
 /// Keep throwing errors until the max retry count.
 #[test]
 fn failed() -> bool {
-	use { h1b::hil::flash::Hardware, kernel::hil::time::Alarm, test::require };
+	use h1b::hil::flash::driver::WRITE_OPCODE;
+	use h1b::hil::flash::Hardware;
+	use kernel::hil::time::Alarm;
+	use test::require;
+
 	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
 	let hw = h1b::hil::flash::fake::FakeHw::new();
 	hw.set_transaction(1300, 1);
@@ -112,7 +124,7 @@ fn failed() -> bool {
 
 	for i in 0..9 {
 		alarm.set_time(100 * i);
-		state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ false);
+		state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ false);
 		require!(alarm.get_alarm() == alarm.now() + 150);
 		require!(hw.is_programming() == true);
 		require!(state.return_code() == None);
@@ -120,7 +132,7 @@ fn failed() -> bool {
 	}
 
 	// Finish.
-	state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ false);
+	state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ false);
 	require!(alarm.get_alarm() == 0);
 	require!(hw.is_programming() == false);
 	require!(state.return_code() == Some(kernel::ReturnCode::FAIL));
@@ -129,7 +141,11 @@ fn failed() -> bool {
 
 #[test]
 fn timeout() -> bool {
-	use { h1b::hil::flash::Hardware, kernel::hil::time::Alarm, test::require };
+	use h1b::hil::flash::driver::WRITE_OPCODE;
+	use h1b::hil::flash::Hardware;
+	use kernel::hil::time::Alarm;
+	use test::require;
+
 	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
 	let hw = h1b::hil::flash::fake::FakeHw::new();
 	hw.set_transaction(1300, 1);
@@ -137,7 +153,7 @@ fn timeout() -> bool {
 
 	// First programming attempt.
 	let mut state = h1b::hil::flash::smart_program::SmartProgramState::init(9);
-	state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ false);
+	state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ false);
 	require!(alarm.get_alarm() == alarm.now() + 150);
 	require!(hw.is_programming() == true);
 	require!(state.return_code() == None);
@@ -147,7 +163,7 @@ fn timeout() -> bool {
 	alarm.set_time(200);
 
 	// Alarm trigger.
-	state = state.step(&alarm, &hw, 0x27182818, /*is_timeout:*/ true);
+	state = state.step(&alarm, &hw, WRITE_OPCODE, /*is_timeout:*/ true);
 	require!(alarm.get_alarm() == 0);
 	require!(hw.is_programming() == false);
 	require!(state.return_code() == Some(kernel::ReturnCode::FAIL));

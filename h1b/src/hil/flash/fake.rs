@@ -58,7 +58,7 @@ impl<'a> FakeHw<'a> {
 
     /// Simulates the flash module successfully finishing an operation.
     pub fn finish_operation(&self) {
-        if self.opcode.get() == 0x31415927 {
+        if self.opcode.get() == super::driver::ERASE_OPCODE {
             // An erase is recorded as a single log entry.
             self.transaction_size.set(1);
         }
@@ -66,7 +66,7 @@ impl<'a> FakeHw<'a> {
         for i in 0..self.transaction_size.get() {
             self.log[self.log_len.get()].set(LogEntry {
                 value:
-                    if self.opcode.get() == 0x31415927 {
+                    if self.opcode.get() == super::driver::ERASE_OPCODE {
                         core::u32::MAX
                     } else {
                         self.write_data[i].get()
