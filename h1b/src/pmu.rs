@@ -44,67 +44,147 @@
 use cortexm3;
 use core::mem::transmute;
 use kernel::common::cells::VolatileCell;
+use kernel::common::registers::{ReadOnly, ReadWrite};
+
+register_bitfields![u32,
+    Reset [
+        Value           OFFSET(0) NUMBITS(32) []
+    ],
+    ClearReset [
+        Value           OFFSET(0) NUMBITS(32) []
+    ],
+    ResetSource [
+        PowerOnReset              0,
+        LowPowerExit              1,
+        Watchdog                  2,
+        Lockup                    3,
+        SysReset                  4,
+        Software                  5,
+        Brownout                  6,
+        Security                  7
+    ],
+    GlobalReset [
+        Value           OFFSET(0) NUMBITS(32) []
+    ],
+    LowPowerDisable [
+        Start                     0,
+        VddlOff                   1,
+        FlashOff                  2,
+        OscillatorOff             3,
+        JitterRCOff               4
+    ],
+    LowPowerBypass [
+        Vddl                      0,
+        Flash                     1,
+        Oscillator                2,
+        OscillatorComparator      3,
+        JitterRC                  4,
+        TimerRC                   5,
+        FlashPowerDown            6,
+        VddlVddaonIsolation       7,
+        VddxoVddaonIsolation      8
+    ],
+    WakeupInterruptController [
+        Processor0                0
+    ],
+    SystemVtor [
+        Value           OFFSET(0) NUMBITS(32) []
+    ],
+    NapEnable [
+        Value           OFFSET(0) NUMBITS(32) []
+    ],
+    BatteryLevelOk [
+        OK                        0
+    ],
+    MemoryClock [
+        BankClock0                0,
+        BankClock1                1,
+        BankClock2                2,
+        BankClock3                3,
+        BankClock4                4,
+        BankClock5                5,
+        BankClock6                6
+    ],
+    PeripheralClock0 [
+        Camo                      0,
+        Dcrypto                   1,
+        Dma                       2,
+        Flash                     3,
+        Fuse                      4,
+        GlobalSec                 5,
+        GlobalSecTimer            6,
+        GlobalSecHs               7,
+        Gpio0                     8,
+        Gpio1                     9,
+        I2C0                     10,
+        I2C1                     11,
+        I2CS0                    12,
+        KeyManager               13,
+        PeripheralApb0           14,
+        PeripheralApb1           15,
+        PeripheralApb2           16,
+        PeripheralApb2Timer      17,
+        PeripheralApb3           18,
+        PeripheralApb3Hs         19,
+        PinMux                   20,
+        Pmu                      21,
+        RBox                     22,
+        Rdd                      23,
+        Rtc                      24,
+        RtcTimer                 25,
+        Spi0Hs                   26,
+        Spi1Hs                   27,
+        Sps                      28,
+        SpsTimerHs               29,
+        Swdp                     30,
+        Temp                     31
+    ],
+    PeripheralClock1 [
+        TimeHs0Timer              0,
+        TimeHs1Timer              1,
+        TimeLs                    2,
+        Timerus                   3,
+        Trng                      4,
+        Uart0                     5,
+        Uart1                     6,
+        Uart2                     7,
+        Usb                       8,
+        UsbTimerHs                9,
+        VoltRO                   10,
+        WatchdogRO               11,
+        XO                       12,
+        XOTimer                  13,
+        PeripheralMasterMatrix   14,
+        PeripheralMaster         15
+    ]
+];
 
 /// Registers for the Power Management Unit (PMU)
 // Non-public fields prefixed with "_" mark unused registers
 #[repr(C, packed)]
 pub struct PMURegisters {
-    reset: VolatileCell<u32>,
+    reset:                                 ReadWrite<u32, Reset::Register>,
     _set_reset: VolatileCell<u32>,
+    pub clear_reset:                       ReadWrite<u32, ClearReset::Register>,
+    pub reset_source:                      ReadOnly<u32, ResetSource::Register>,
 
-    /// Clear register for the reset source
-    pub clear_reset: VolatileCell<u32>,
-
-    /// Status for source of last reset event
-    ///
-    /// Bits 0-7 correspond to:
-    ///
-    /// | bit | Description                                       |
-    /// | --- | :------------------------------------------------ |
-    /// | 0   | Power on reset                                    |
-    /// | 1   | Low power exit                                    |
-    /// | 2   | Watchdog reset                                    |
-    /// | 3   | Lockup reset                                      |
-    /// | 4   | SYSRESET                                          |
-    /// | 5   | Software initiated reset through PMU_GLOBAL_RESET |
-    /// | 6   | Fast burnout circuit                              |
-    /// | 7   | Security breach reset                             |
-    ///
-    pub reset_source: VolatileCell<u32>,
-
-    /// Global chip reset
-    ///
-    /// Initiates a reset of the system similar to toggling the external reset
-    /// pin. To initiate a reset, write the key 0x7041776 to this register.
-    pub global_reset: VolatileCell<u32>,
-
-    pub low_power_disable: VolatileCell<u32>,
-
-    pub low_power_bypass: VolatileCell<u32>,
-
-    pub low_power_bypass_value: VolatileCell<u32>,
-
-    pub set_wakeup_interrupt_controller: VolatileCell<u32>,
-
-    pub clear_wakeup_interrupt_controller: VolatileCell<u32>,
-
+    /// To initiate a reset, write the key 0x7041776 to global_reset.
+    pub global_reset:                      ReadWrite<u32, GlobalReset::Register>,
+    pub low_power_disable:                 ReadWrite<u32, LowPowerDisable::Register>,
+    pub low_power_bypass:                  ReadWrite<u32, LowPowerBypass::Register>,
+    pub low_power_bypass_value:            ReadWrite<u32, LowPowerBypass::Register>,
+    pub set_wakeup_interrupt_controller:   ReadWrite<u32, WakeupInterruptController::Register>,
+    pub clear_wakeup_interrupt_controller: ReadWrite<u32, WakeupInterruptController::Register>,
     /// Value of the system vector table offset
-    pub sysvtor: VolatileCell<u32>,
-
-    /// Enable PMU to gate some clocks when processor is sleeping
-    pub nap_enable: VolatileCell<u32>,
+    pub sysvtor:                           ReadWrite<u32, SystemVtor::Register>,
+    pub nap_enable:                        ReadWrite<u32, NapEnable::Register>,
 
     _pmu_sw_pdb: VolatileCell<u32>,
     _pmu_sw_pdb_secure: VolatileCell<u32>,
     _pmu_vref: VolatileCell<u32>,
     _xtl_osc_bypass: VolatileCell<u32>,
     _flash_tm0_test_en_bypass: VolatileCell<u32>,
-
-    /// Battery level indicator
-    ///
-    /// When non-zero, the voltage level is higher than specified in the vref
-    /// register's BATMON field.
-    pub battery_level_ok: VolatileCell<u32>,
+    pub battery_level_ok:                  ReadOnly<u32, BatteryLevelOk::Register>,
 
     _b_reg_dig_ctrl: VolatileCell<u32>,
     _exitpd_mask: VolatileCell<u32>,
@@ -112,35 +192,13 @@ pub struct PMURegisters {
     _exitpd_mon: VolatileCell<u32>,
     _osc_ctrl: VolatileCell<u32>,
 
-    /// Turn on clocks for memory
-    ///
-    /// Bits 0-6 correspond to memory banks 0-6, respectively.
-    pub memory_clk_set: VolatileCell<u32>,
+    pub memory_clock_set:                  ReadWrite<u32, MemoryClock::Register>,
+    pub memory_clock_clear:                ReadWrite<u32, MemoryClock::Register>,
 
-    /// Turn off clocks for memory
-    ///
-    /// Bits 0-6 correspond to memory banks 0-6, respectively.
-    pub memory_clk_clear: VolatileCell<u32>,
-
-    /// Enable peripheral clocks (bank 0).
-    ///
-    /// Each bit corresponds to a different peripheral clock.
-    pub peripheral_clocks0_enable: VolatileCell<u32>,
-
-    /// Disable peripheral clocks (bank 0).
-    ///
-    /// Each bit corresponds to a different peripheral clock.
-    pub peripheral_clocks0_disable: VolatileCell<u32>,
-
-    /// Enable peripheral clocks (bank 1).
-    ///
-    /// Each bit corresponds to a different peripheral clock.
-    pub peripheral_clocks1_enable: VolatileCell<u32>,
-
-    /// Disable peripheral clocks (bank 1).
-    ///
-    /// Each bit corresponds to a different peripheral clock.
-    pub peripheral_clocks1_disable: VolatileCell<u32>,
+    pub peripheral_clocks0_enable:         ReadWrite<u32, PeripheralClock0::Register>,
+    pub peripheral_clocks0_disable:        ReadWrite<u32, PeripheralClock0::Register>,
+    pub peripheral_clocks1_enable:         ReadWrite<u32, PeripheralClock1::Register>,
+    pub peripheral_clocks1_disable:        ReadWrite<u32, PeripheralClock1::Register>,
 
     pub _peripheral_clocks0_ro_mask: VolatileCell<u32>,
     pub _peripheral_clocks1_ro_mask: VolatileCell<u32>,
@@ -153,10 +211,10 @@ pub struct PMURegisters {
 
     pub _clock0: VolatileCell<u32>,
     pub _reset0_write_enable: VolatileCell<u32>,
-    pub reset0: VolatileCell<u32>,
+    pub reset0:                            ReadWrite<u32, PeripheralClock0::Register>,
 
     pub _reset1_write_enable: VolatileCell<u32>,
-    pub _reset1: VolatileCell<u32>
+    pub _reset1:                           ReadWrite<u32, PeripheralClock1::Register>
 
 }
 
@@ -165,7 +223,7 @@ const PMU_BASE: isize = 0x40000000;
 static mut PMU: *mut PMURegisters = PMU_BASE as *mut PMURegisters;
 
 #[derive(Clone,Copy)]
-pub enum PeripheralClock0 {
+pub enum Peripheral0 {
     Camo0,
     Crypto0,
     Dma0,
@@ -202,7 +260,7 @@ pub enum PeripheralClock0 {
 }
 
 #[derive(Clone,Copy)]
-pub enum PeripheralClock1 {
+pub enum Peripheral1 {
     TimeHs0Timer,
     TimeHs1Timer,
     TimeLs0,
@@ -223,8 +281,8 @@ pub enum PeripheralClock1 {
 
 #[derive(Clone,Copy)]
 pub enum PeripheralClock {
-    Bank0(PeripheralClock0),
-    Bank1(PeripheralClock1),
+    Bank0(Peripheral0),
+    Bank1(Peripheral1),
 }
 
 /// Wrapper struct around `PeripheralClock` that can only be created by.

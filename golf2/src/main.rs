@@ -126,8 +126,8 @@ pub unsafe fn reset_handler() {
     let timerhs = {
         use h1b::pmu::*;
         use h1b::timeus::Timeus;
-        Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeUs0Timer)).enable();
-        Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeLs0)).enable();
+        Clock::new(PeripheralClock::Bank1(Peripheral1::TimeUs0Timer)).enable();
+        Clock::new(PeripheralClock::Bank1(Peripheral1::TimeLs0)).enable();
         let timer = Timeus::new(0);
         timer
     };
@@ -137,7 +137,7 @@ pub unsafe fn reset_handler() {
 
     {
         use h1b::pmu::*;
-        Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
+        Clock::new(PeripheralClock::Bank0(Peripheral0::Gpio0)).enable();
         let pinmux = &mut *h1b::pinmux::PINMUX;
         // LED_0
         pinmux.dioa11.select.set(h1b::pinmux::Function::Gpio0Gpio0);

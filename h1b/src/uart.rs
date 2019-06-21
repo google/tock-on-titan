@@ -52,7 +52,7 @@ use kernel::common::cells::TakeCell;
 use kernel::common::cells::VolatileCell;
 use kernel::hil;
 use kernel::ReturnCode;
-use pmu::{Clock, PeripheralClock, PeripheralClock1};
+use pmu::{Clock, PeripheralClock, Peripheral1};
 
 /// Registers for the UART controller
 #[allow(dead_code)]
@@ -72,11 +72,11 @@ const UART0_BASE: *mut Registers = 0x40600000 as *mut Registers;
 const UART1_BASE: *mut Registers = 0x40610000 as *mut Registers;
 const UART2_BASE: *mut Registers = 0x40620000 as *mut Registers;
 
-pub static mut UART0: UART = unsafe { UART::new(UART0_BASE, PeripheralClock1::Uart0Timer) };
+pub static mut UART0: UART = unsafe { UART::new(UART0_BASE, Peripheral1::Uart0Timer) };
 
-pub static mut UART1: UART = unsafe { UART::new(UART1_BASE, PeripheralClock1::Uart1Timer) };
+pub static mut UART1: UART = unsafe { UART::new(UART1_BASE, Peripheral1::Uart1Timer) };
 
-pub static mut UART2: UART = unsafe { UART::new(UART2_BASE, PeripheralClock1::Uart2Timer) };
+pub static mut UART2: UART = unsafe { UART::new(UART2_BASE, Peripheral1::Uart2Timer) };
 
 // A resumable buffer that tracks the last written index
 //struct Buffer {
@@ -98,7 +98,7 @@ pub struct UART {
 }
 
 impl UART {
-    const unsafe fn new(uart: *mut Registers, clock: PeripheralClock1) -> UART {
+    const unsafe fn new(uart: *mut Registers, clock: Peripheral1) -> UART {
         UART {
             regs: uart,
             clock: Clock::new(PeripheralClock::Bank1(clock)),

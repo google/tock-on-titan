@@ -29,7 +29,7 @@ use cortexm3::support;
 use kernel::ReturnCode;
 use kernel::common::cells::{OptionalCell, TakeCell};
 use kernel::common::registers::LocalRegisterCopy;
-use pmu::{Clock, PeripheralClock, PeripheralClock1};
+use pmu::{Clock, PeripheralClock, Peripheral1};
 
 use self::constants::*;
 use self::registers::{AhbConfig, AllEndpointInterrupt, DescFlag,
@@ -206,8 +206,8 @@ impl<'a> USB<'a> {
     const unsafe fn new() -> USB<'a> {
         USB {
             registers: StaticRef::new(BASE_ADDR),
-            core_clock: Clock::new(PeripheralClock::Bank1(PeripheralClock1::Usb0)),
-            timer_clock: Clock::new(PeripheralClock::Bank1(PeripheralClock1::Usb0TimerHs)),
+            core_clock: Clock::new(PeripheralClock::Bank1(Peripheral1::Usb0)),
+            timer_clock: Clock::new(PeripheralClock::Bank1(Peripheral1::Usb0TimerHs)),
             state: Cell::new(USBState::WaitingForSetupPacket),
             ep0_out_descriptors: TakeCell::empty(),
             ep0_out_buffers: Cell::new(None),

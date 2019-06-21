@@ -56,7 +56,7 @@ use kernel::common::cells::TakeCell;
 use kernel::common::cells::VolatileCell;
 use kernel::ReturnCode;
 
-use pmu::{Clock, PeripheralClock, PeripheralClock0, reset_dcrypto};
+use pmu::{Clock, PeripheralClock, Peripheral0, reset_dcrypto};
 
 
 
@@ -288,7 +288,7 @@ impl<'a> DcryptoEngine<'a> {
             ReturnCode::EALREADY
         } else {
             // Enable PMU and reset it
-            unsafe {Clock::new(PeripheralClock::Bank0(PeripheralClock0::Crypto0)).enable();}
+            unsafe {Clock::new(PeripheralClock::Bank0(Peripheral0::Crypto0)).enable();}
             reset_dcrypto();
 
             // Turn off random no-ops
