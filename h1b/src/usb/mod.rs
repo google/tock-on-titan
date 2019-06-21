@@ -126,7 +126,6 @@ const EP0_OUT_BUFFER_COUNT: usize = 2;
 /// StringDescriptors, which are provided by the boot sequence. The
 /// meaning of each StringDescriptor is defined by its index, in
 /// usb::constants.
-///
 
 pub struct USB<'a> {
     registers: StaticRef<Registers>,
