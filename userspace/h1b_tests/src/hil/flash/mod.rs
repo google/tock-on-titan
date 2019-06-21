@@ -14,3 +14,5 @@
 
 mod fake;
 mod h1b_hw;
+mod mock_alarm;
+mod smart_program;
