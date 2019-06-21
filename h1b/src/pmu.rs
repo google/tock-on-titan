@@ -42,9 +42,9 @@
 //!
 
 use cortexm3;
-use core::mem::transmute;
 use kernel::common::cells::VolatileCell;
 use kernel::common::registers::{ReadOnly, ReadWrite};
+use kernel::common::StaticRef;
 
 register_bitfields![u32,
     Reset [
@@ -169,7 +169,7 @@ register_bitfields![u32,
 
 /// Registers for the Power Management Unit (PMU)
 // Non-public fields prefixed with "_" mark unused registers
-#[repr(C, packed)]
+#[repr(C)]
 pub struct Registers {
     reset:                                 ReadWrite<u32, Reset::Register>,
     _set_reset: VolatileCell<u32>,
@@ -226,9 +226,9 @@ pub struct Registers {
 
 }
 
-const PMU_BASE: isize = 0x40000000;
+const PMU_REGISTERS: StaticRef<Registers> =
+    unsafe { StaticRef::new(0x40000000 as *const Registers) };
 
-static mut PMU: *mut Registers = PMU_BASE as *mut Registers;
 
 #[derive(Clone,Copy)]
 pub enum Peripheral0 {
@@ -307,33 +307,33 @@ impl Clock {
     }
 
     pub fn enable(&self) {
-        let pmu: &mut Registers = unsafe { transmute(PMU) };
+        let registers = &*PMU_REGISTERS;
         match self.clock {
             PeripheralClock::Bank0(clock) => {
-                unsafe {pmu.peripheral_clocks0_enable.set(1 << (clock as u32))};
+                registers.peripheral_clocks0_enable.set(1 << (clock as u32));
             }
             PeripheralClock::Bank1(clock) => {
-                unsafe {pmu.peripheral_clocks1_enable.set(1 << (clock as u32))};
+                registers.peripheral_clocks1_enable.set(1 << (clock as u32));
             }
         }
     }
 
     pub fn disable(&self) {
-        let pmu: &mut Registers = unsafe { transmute(PMU) };
+        let registers = &*PMU_REGISTERS;
         match self.clock {
             PeripheralClock::Bank0(clock) => {
-                unsafe {pmu.peripheral_clocks0_disable.set(1 << (clock as u32))};
+                registers.peripheral_clocks0_disable.set(1 << (clock as u32));
             }
             PeripheralClock::Bank1(clock) => {
-                unsafe {pmu.peripheral_clocks1_disable.set(1 << (clock as u32))};
+                registers.peripheral_clocks1_disable.set(1 << (clock as u32));
             }
         }
     }
 }
 // This should be refactored to be a general reset
 pub fn reset_dcrypto() {
-    let pmu: &mut Registers = unsafe { transmute(PMU) };
-    pmu.reset0.modify(PeripheralClock0::Dcrypto::CLEAR);
+    let registers = &*PMU_REGISTERS;
+    registers.reset0.modify(PeripheralClock0::Dcrypto::CLEAR);
 }
 
 
@@ -348,7 +348,7 @@ pub fn disable_deep_sleep() {
 }
 
 pub fn prepare_for_sleep() {
-    let registers: &mut Registers = unsafe {transmute(PMU)};
+    let registers = &*PMU_REGISTERS;
 /*
         unsafe {
         static mut val: usize = 0;
@@ -427,4 +427,11 @@ pub fn prepare_for_sleep() {
                 GC_PMU_LOW_POWER_DIS_VDDL_MASK;
              */
 
+}
+
+pub fn resume_from_sleep() {
+    let registers = &*PMU_REGISTERS;
+    /* Prevent accidental reentry */
+    /* Cr50 code does this, don't know why, but better safe than sorry. -pal */
+    registers.low_power_disable.set(0);
 }

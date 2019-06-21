@@ -116,6 +116,8 @@ impl Chip for Hotel {
         unsafe {
             cortexm3::support::wfi();
         }
+
+        pmu::resume_from_sleep();
     }
 
     unsafe fn atomic<F, R>(&self, f: F) -> R
