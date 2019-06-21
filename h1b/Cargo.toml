@@ -23,3 +23,7 @@ build = "build.rs"
 kernel = { path = "../third_party/tock/kernel" }
 cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
 
+[features]
+# Exports testing-specific features for use by h1b_tests. Should not be enabled
+# when compiled for the kernel.
+test = []
