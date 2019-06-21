@@ -434,4 +434,5 @@ pub fn resume_from_sleep() {
     /* Prevent accidental reentry */
     /* Cr50 code does this, don't know why, but better safe than sorry. -pal */
     registers.low_power_disable.set(0);
+    disable_deep_sleep();
 }

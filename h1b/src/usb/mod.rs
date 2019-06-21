@@ -29,7 +29,7 @@ use cortexm3::support;
 use kernel::ReturnCode;
 use kernel::common::cells::{OptionalCell, TakeCell};
 use kernel::common::registers::LocalRegisterCopy;
-use pmu::{Clock, PeripheralClock, Peripheral1};
+use pmu::{self,Clock, PeripheralClock, Peripheral1};
 
 use self::constants::*;
 use self::registers::{AhbConfig, AllEndpointInterrupt, DescFlag,
@@ -349,7 +349,9 @@ impl<'a> USB<'a> {
 
         if status.is_set(Interrupt::EarlySuspend) ||
             status.is_set(Interrupt::Suspend) {
+                print!("USB: Suspending device, entering deep sleep!\n");
                 // Currently do not support suspend
+                pmu::enable_deep_sleep();
             }
 
         if mask.is_set(Interrupt::StartOfFrame) &&
