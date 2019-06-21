@@ -15,7 +15,7 @@
 # Prevent cargo from downloading the crates index or crates: all source should
 # be vendored in third_party/
 [http]
-proxy = "socks://proxy.invalid/"
+proxy = "socks://cargo.invalid/"
 
 # Point cargo to our vendored dependencies.
 [source.crates-io]
