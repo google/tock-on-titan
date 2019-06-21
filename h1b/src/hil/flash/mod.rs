@@ -19,6 +19,7 @@
 mod driver;
 #[cfg(feature = "test")]
 pub mod fake;
+pub mod h1b_hw;
 mod hardware;
 
 pub use self::driver::Client;
