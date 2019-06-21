@@ -259,7 +259,7 @@ impl<'a> USB<'a> {
 
     /// Reset the device in response to a USB RESET.
     fn usb_reset(&self) {
-        control_debug!("USB: WaitingForSetupPacket in reset.\n");
+        control_debug!("USB: resetting device.\n");
         self.state.set(USBState::WaitingForSetupPacket);
         // Reset device address field (bits 10:4) of device config
         self.registers.device_config.modify(DeviceConfig::DeviceAddress.val(0));

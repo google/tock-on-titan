@@ -41,6 +41,7 @@
 //!     * Designed for 1.8-3.6V
 //!
 
+use cortexm3;
 use core::mem::transmute;
 use kernel::common::cells::VolatileCell;
 
@@ -149,14 +150,14 @@ pub struct PMURegisters {
 
     pub _gate_on_sleep_set1: VolatileCell<u32>,
     pub _gate_on_sleep_clr1: VolatileCell<u32>,
-    
+
     pub _clock0: VolatileCell<u32>,
     pub _reset0_write_enable: VolatileCell<u32>,
     pub reset0: VolatileCell<u32>,
 
     pub _reset1_write_enable: VolatileCell<u32>,
     pub _reset1: VolatileCell<u32>
-    
+
 }
 
 const PMU_BASE: isize = 0x40000000;
@@ -268,4 +269,76 @@ pub fn reset_dcrypto() {
     let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
     // Clear the DCRYPTO bit, which is 0x2
     unsafe {pmu.reset.set(pmu.reset0.get() & !(0x2));}
+}
+
+
+static mut SLEEP_DEEPLY: bool = false;
+
+pub fn enable_deep_sleep() {
+    unsafe {SLEEP_DEEPLY = true;}
+}
+
+pub fn disable_deep_sleep() {
+    unsafe {SLEEP_DEEPLY = false;}
+}
+
+pub fn prepare_for_sleep() {
+    unsafe {
+        /*
+        interrupt_disable();
+
+        //
+        GR_PMU_EXITPD_MASK =
+                GC_PMU_EXITPD_MASK_PIN_PD_EXIT_MASK |
+                GC_PMU_EXITPD_MASK_RDD0_PD_EXIT_TIMER_MASK |
+                GC_PMU_EXITPD_MASK_RBOX_WAKEUP_MASK |
+                GC_PMU_EXITPD_MASK_TIMELS0_PD_EXIT_TIMER0_MASK |
+                GC_PMU_EXITPD_MASK_TIMELS0_PD_EXIT_TIMER1_MASK;
+
+        // Clear the RBOX wakeup signal and status bits
+        GREG32(RBOX, WAKEUP) = GC_RBOX_WAKEUP_CLEAR_MASK;
+        //  Wake on RBOX interrupts
+        GREG32(RBOX, WAKEUP) = GC_RBOX_WAKEUP_ENABLE_MASK;
+
+        if (utmi_wakeup_is_enabled() && idle_action != IDLE_DEEP_SLEEP)
+                GR_PMU_EXITPD_MASK |=
+                        GC_PMU_EXITPD_MASK_UTMI_SUSPEND_N_MASK;
+
+        // Which rails should we turn off?
+        GR_PMU_LOW_POWER_DIS =
+                GC_PMU_LOW_POWER_DIS_VDDIOF_MASK |
+                GC_PMU_LOW_POWER_DIS_VDDXO_MASK |
+                GC_PMU_LOW_POWER_DIS_JTR_RC_MASK;
+         */
+
+
+        if SLEEP_DEEPLY {
+            /*
+            __hw_clock_event_clear();
+            board_configure_deep_sleep_wakepins();
+            clock_enable_module(MODULE_USB, 1);
+
+            if (!GREAD_FIELD(USB, PCGCCTL, RSTPDWNMODULE))
+                usb_save_suspended_state();
+
+            GREG32(PMU, PWRDN_SCRATCH17) =
+                GREG32(PMU, PWRDN_SCRATCH17) + 1;
+
+            GREG32(PINMUX, HOLD) = 1;
+
+            GWRITE_FIELD(USB, PCGCCTL, PWRCLMP, 1);
+            GWRITE_FIELD(USB, PCGCCTL, RSTPDWNMODULE, 1);
+            GWRITE_FIELD(USB, PCGCCTL, STOPPCLK, 1);
+
+
+            GR_PMU_LOW_POWER_DIS |=
+                GC_PMU_LOW_POWER_DIS_VDDL_MASK;
+             */
+
+            cortexm3::scb::set_sleepdeep();
+
+        } else {
+            cortexm3::scb::unset_sleepdeep();
+        }
+    }
 }

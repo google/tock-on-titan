@@ -16,6 +16,7 @@ use cortexm3;
 use crypto;
 use gpio;
 use kernel::Chip;
+use pmu;
 use timels;
 use trng;
 use uart;
@@ -110,9 +111,7 @@ impl Chip for Hotel {
     }
 
     fn sleep(&self) {
-        unsafe {
-                cortexm3::scb::unset_sleepdeep();
-        }
+        pmu::prepare_for_sleep();
 
         unsafe {
             cortexm3::support::wfi();
