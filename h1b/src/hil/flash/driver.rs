@@ -14,6 +14,7 @@
 
 use core::cell::Cell;
 use ::kernel::hil::time::Alarm;
+use ::kernel::ReturnCode;
 use super::hardware::Hardware;
 use super::smart_program::SmartProgramState;
 
@@ -40,14 +41,16 @@ pub struct Flash<'d, A: Alarm + 'd, H: Hardware<'d> + 'd> {
 /// A client of the Flash driver -- receives callbacks when flash operations
 /// complete.
 pub trait Client {
-    fn erase_done(&self, ::kernel::ReturnCode);
-    fn write_done(&self, ::kernel::ReturnCode);
+    fn erase_done(&self, ReturnCode);
+    fn write_done(&self, ReturnCode);
 }
 
+// Public API for Flash.
 impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
-    /// Construct a driver for the given hardware interface. Unsafe because
+    /// Constructs a driver for the given hardware interface. Unsafe because
     /// constructing multiple drivers for the same hardware seems like a bad
-    /// idea.
+    /// idea. The caller must set the driver as the hardware's client before
+    /// executing any flash operations.
     pub unsafe fn new(alarm: &'d A, hw: &'d H) -> Self {
         Flash {
             alarm,
@@ -58,6 +61,25 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
         }
     }
 
+    /// Writes a buffer (of up to 32 words) into the given location in flash.
+    /// The target location is specific as an offset from the beginning of flash
+    /// in units of words.
+    pub fn write(&self, target: usize, data: &[u32]) -> ReturnCode {
+        if data.len() > 32 { return ReturnCode::ESIZE; }
+        if self.program_in_progress() { return ReturnCode::EBUSY; }
+
+        self.hw.set_write_data(data);
+        self.smart_program(WRITE_OPCODE, 9, target, data.len());
+        ReturnCode::SUCCESS
+    }
+
+    /// Links this driver to its client.
+    pub fn set_client(&self, client: &'d Client) {
+        self.client.set(Some(client));
+    }
+}
+
+impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
     /// Returns true if an operation is in progress and false otherwise.
     fn program_in_progress(&self) -> bool {
         // SmartProgramState is not Copy, so we can't use Cell::get() or
@@ -67,28 +89,6 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
         let in_progress = smart_program_state.is_some();
         self.smart_program_state.set(smart_program_state);
         in_progress
-    }
-
-    /// Should be called when the flash controller sends an interrupt.
-    pub fn program_interrupt(&self) {
-        self.step(false);
-    }
-
-    /// Writes a buffer (of up to 32 words) into the given location in flash.
-    /// The target location is specific as an offset from the beginning of flash
-    /// in units of words.
-    pub fn write(&self, target: usize, data: &[u32]) -> ::kernel::ReturnCode {
-        if data.len() > 32 { return ::kernel::ReturnCode::ESIZE; }
-        if self.program_in_progress() { return ::kernel::ReturnCode::EBUSY; }
-
-        self.hw.set_write_data(data);
-        self.smart_program(WRITE_OPCODE, 9, target, data.len());
-        ::kernel::ReturnCode::SUCCESS
-    }
-
-    /// Links this driver to its client.
-    pub fn set_client(&self, client: &'d Client) {
-        self.client.set(Some(client));
     }
 
     /// Begins the smart programming procedure. Note that size must be >= 1 to
@@ -118,6 +118,12 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
                 self.smart_program_state.set(Some(state));
             }
         }
+    }
+}
+
+impl<'d, A: Alarm, H: Hardware<'d>> super::hardware::Client for Flash<'d, A, H> {
+    fn interrupt(&self) {
+        self.step(false);
     }
 }
 
