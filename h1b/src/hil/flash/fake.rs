@@ -63,6 +63,13 @@ impl<'a> FakeHw<'a> {
             self.transaction_size.set(1);
         }
 
+        // Check if we will overflow the log. If this will overfill the log then
+        // indicate an error.
+        if self.log_len.get() + self.transaction_size.get() > self.log.len() {
+            // "Program failed" error.
+            return self.inject_error(0x8);
+        }
+
         for i in 0..self.transaction_size.get() {
             self.log[self.log_len.get()].set(LogEntry {
                 value:
