@@ -42,7 +42,7 @@ pub trait Hardware<'a> {
 	fn trigger(&self, opcode: u32);
 }
 
-trait Client {
+pub trait Client {
 	/// Called when a flash programming operation completes.
 	fn interrupt(&self);
 }

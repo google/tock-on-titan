@@ -15,8 +15,7 @@
 #![crate_name = "h1b"]
 #![crate_type = "rlib"]
 #![no_std]
-#![feature(asm, core_intrinsics, const_fn)]
-#![feature(attr_literals, naked_functions)]
+#![feature(asm, core_intrinsics, const_fn, naked_functions)]
 
 extern crate cortexm3;
 
