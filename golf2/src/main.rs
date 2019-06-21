@@ -269,23 +269,57 @@ pub unsafe fn reset_handler() {
     // TODO(alevy): refactor out
     {
         use core::intrinsics::volatile_store as vs;
+        const GLOBALSEC_BASE:      usize = 0x40090000;
 
-        vs(0x40090000 as *mut u32, !0);
-        vs(0x40090004 as *mut u32, !0);
-        vs(0x40090008 as *mut u32, !0);
-        vs(0x4009000c as *mut u32, !0);
+        const CPU0_D_REGION0_CTRL: usize = GLOBALSEC_BASE + 0x0;
+        const CPU0_D_REGION1_CTRL: usize = GLOBALSEC_BASE + 0x4;
+        const CPU0_D_REGION2_CTRL: usize = GLOBALSEC_BASE + 0x8;
+        const CPU0_D_REGION3_CTRL: usize = GLOBALSEC_BASE + 0xc;
+
+        const DDMA0_REGION0_CTRL: usize = GLOBALSEC_BASE + 0x80;
+        const DDMA0_REGION1_CTRL: usize = GLOBALSEC_BASE + 0x84;
+        const DDMA0_REGION2_CTRL: usize = GLOBALSEC_BASE + 0x88;
+        const DDMA0_REGION3_CTRL: usize = GLOBALSEC_BASE + 0x8c;
+
+        const DUSB0_REGION0_CTRL: usize = GLOBALSEC_BASE + 0xc0;
+        const DUSB0_REGION1_CTRL: usize = GLOBALSEC_BASE + 0xc4;
+        const DUSB0_REGION2_CTRL: usize = GLOBALSEC_BASE + 0xc8;
+        const DUSB0_REGION3_CTRL: usize = GLOBALSEC_BASE + 0xcc;
+
+        const FLASH_REGION2_BASE: usize = GLOBALSEC_BASE + 0x240;
+        const FLASH_REGION2_SIZE: usize = GLOBALSEC_BASE + 0x244;
+        const FLASH_REGION2_CTRL: usize = GLOBALSEC_BASE + 0x0e8;
+
+        vs(CPU0_D_REGION0_CTRL as *mut u32, !0);
+        vs(CPU0_D_REGION1_CTRL as *mut u32, !0);
+        vs(CPU0_D_REGION2_CTRL as *mut u32, !0);
+        vs(CPU0_D_REGION3_CTRL as *mut u32, !0);
 
         // GLOBALSEC_DDMA0-DDMA3
-        vs(0x40090080 as *mut u32, !0);
-        vs(0x40090084 as *mut u32, !0);
-        vs(0x40090088 as *mut u32, !0);
-        vs(0x4009008c as *mut u32, !0);
+        vs(DDMA0_REGION0_CTRL as *mut u32, !0);
+        vs(DDMA0_REGION1_CTRL as *mut u32, !0);
+        vs(DDMA0_REGION2_CTRL as *mut u32, !0);
+        vs(DDMA0_REGION3_CTRL as *mut u32, !0);
 
         // GLOBALSEC_DUSB_REGION0-DUSB_REGION3
-        vs(0x400900c0 as *mut u32, !0);
-        vs(0x400900c4 as *mut u32, !0);
-        vs(0x400900c8 as *mut u32, !0);
-        vs(0x400900cc as *mut u32, !0);
+        vs(DUSB0_REGION0_CTRL as *mut u32, !0);
+        vs(DUSB0_REGION1_CTRL as *mut u32, !0);
+        vs(DUSB0_REGION2_CTRL as *mut u32, !0);
+        vs(DUSB0_REGION3_CTRL as *mut u32, !0);
+
+        // Flash region initialization. We initialize a single region for the
+        // last two pages of the second flash macro, used by the non-volatile
+        // counter implementation.
+        const FLASH_START: usize = 0x40000;
+        const FLASH_SIZE: usize = 512 * 1024;
+        const FLASH_PAGE_SIZE: usize = 2048;
+        vs(FLASH_REGION2_BASE as *mut u32, (FLASH_START + FLASH_SIZE - 2*FLASH_PAGE_SIZE) as u32);
+        // The value of the SIZE register is one less than the size of the
+        // region, i.e. the last address within the region is the start address
+        // + the size register.
+        vs(FLASH_REGION2_SIZE as *mut u32, (2*FLASH_PAGE_SIZE - 1) as u32);
+        // Enable the region for reads and writes.
+        vs(FLASH_REGION2_CTRL as *mut u32, 0b111);
     }
 
     let mut _ctr = 0;
