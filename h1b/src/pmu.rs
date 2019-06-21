@@ -68,7 +68,7 @@ register_bitfields![u32,
     ],
     LowPowerDisable [
         Start                     0,
-        VddlOff                   1,
+        VddiOff                   1,
         FlashOff                  2,
         OscillatorOff             3,
         JitterRCOff               4
@@ -95,6 +95,14 @@ register_bitfields![u32,
     ],
     BatteryLevelOk [
         OK                        0
+    ],
+    ExitPowerdown [
+        EnablePinPd               0,
+        EnableUtmiSuspend         1,
+        EnableRdd0PdTimer         2,
+        EnableTimeLs0Timer0       3,
+        EnableTimeLs0Timer1       4,
+        EnableRboxWakeup          5
     ],
     MemoryClock [
         BankClock0                0,
@@ -162,7 +170,7 @@ register_bitfields![u32,
 /// Registers for the Power Management Unit (PMU)
 // Non-public fields prefixed with "_" mark unused registers
 #[repr(C, packed)]
-pub struct PMURegisters {
+pub struct Registers {
     reset:                                 ReadWrite<u32, Reset::Register>,
     _set_reset: VolatileCell<u32>,
     pub clear_reset:                       ReadWrite<u32, ClearReset::Register>,
@@ -187,9 +195,9 @@ pub struct PMURegisters {
     pub battery_level_ok:                  ReadOnly<u32, BatteryLevelOk::Register>,
 
     _b_reg_dig_ctrl: VolatileCell<u32>,
-    _exitpd_mask: VolatileCell<u32>,
-    _exitpd_src: VolatileCell<u32>,
-    _exitpd_mon: VolatileCell<u32>,
+    exitpd_mask:                           ReadWrite<u32, ExitPowerdown::Register>,
+    exitpd_src:                            ReadWrite<u32, ExitPowerdown::Register>,
+    exitpd_mon:                            ReadWrite<u32, ExitPowerdown::Register>,
     _osc_ctrl: VolatileCell<u32>,
 
     pub memory_clock_set:                  ReadWrite<u32, MemoryClock::Register>,
@@ -220,7 +228,7 @@ pub struct PMURegisters {
 
 const PMU_BASE: isize = 0x40000000;
 
-static mut PMU: *mut PMURegisters = PMU_BASE as *mut PMURegisters;
+static mut PMU: *mut Registers = PMU_BASE as *mut Registers;
 
 #[derive(Clone,Copy)]
 pub enum Peripheral0 {
@@ -299,7 +307,7 @@ impl Clock {
     }
 
     pub fn enable(&self) {
-        let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
+        let pmu: &mut Registers = unsafe { transmute(PMU) };
         match self.clock {
             PeripheralClock::Bank0(clock) => {
                 unsafe {pmu.peripheral_clocks0_enable.set(1 << (clock as u32))};
@@ -311,7 +319,7 @@ impl Clock {
     }
 
     pub fn disable(&self) {
-        let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
+        let pmu: &mut Registers = unsafe { transmute(PMU) };
         match self.clock {
             PeripheralClock::Bank0(clock) => {
                 unsafe {pmu.peripheral_clocks0_disable.set(1 << (clock as u32))};
@@ -324,9 +332,8 @@ impl Clock {
 }
 // This should be refactored to be a general reset
 pub fn reset_dcrypto() {
-    let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
-    // Clear the DCRYPTO bit, which is 0x2
-    unsafe {pmu.reset.set(pmu.reset0.get() & !(0x2));}
+    let pmu: &mut Registers = unsafe { transmute(PMU) };
+    pmu.reset0.modify(PeripheralClock0::Dcrypto::CLEAR);
 }
 
 
@@ -341,37 +348,64 @@ pub fn disable_deep_sleep() {
 }
 
 pub fn prepare_for_sleep() {
-    unsafe {
-        /*
-        interrupt_disable();
+    let registers: &mut Registers = unsafe {transmute(PMU)};
+/*
+        unsafe {
+        static mut val: usize = 0;
+        val = val + 1;
 
-        //
-        GR_PMU_EXITPD_MASK =
+        if (val % 20 == 0) {
+            debug!("Prepare_For_Sleep: {}", val);
+        }
+    }
+     */
+    /*    GR_PMU_EXITPD_MASK =
                 GC_PMU_EXITPD_MASK_PIN_PD_EXIT_MASK |
                 GC_PMU_EXITPD_MASK_RDD0_PD_EXIT_TIMER_MASK |
                 GC_PMU_EXITPD_MASK_RBOX_WAKEUP_MASK |
                 GC_PMU_EXITPD_MASK_TIMELS0_PD_EXIT_TIMER0_MASK |
                 GC_PMU_EXITPD_MASK_TIMELS0_PD_EXIT_TIMER1_MASK;
 
+    plus
+
+        if (utmi_wakeup_is_enabled() && idle_action != IDLE_DEEP_SLEEP)
+                GR_PMU_EXITPD_MASK |=
+                        GC_PMU_EXITPD_MASK_UTMI_SUSPEND_N_MASK;
+    */
+
+    registers.exitpd_mask.write(ExitPowerdown::EnablePinPd::SET +
+                                ExitPowerdown::EnableUtmiSuspend::SET +
+                                ExitPowerdown::EnableRdd0PdTimer::SET +
+                                ExitPowerdown::EnableRboxWakeup::SET +
+                                ExitPowerdown::EnableTimeLs0Timer0::SET +
+                                ExitPowerdown::EnableTimeLs0Timer1::SET);
+
+    /* // Which rails should we turn off?
+        GR_PMU_LOW_POWER_DIS =
+              GC_PMU_LOW_POWER_DIS_VDDIOF_MASK |
+              GC_PMU_LOW_POWER_DIS_VDDXO_MASK |
+              GC_PMU_LOW_POWER_DIS_JTR_RC_MASK;
+     */
+
+
+    registers.low_power_disable.write(LowPowerDisable::VddiOff::SET +
+                                      LowPowerDisable::OscillatorOff::SET +
+                                      LowPowerDisable::JitterRCOff::SET);
+    unsafe {
+        if SLEEP_DEEPLY {
+            cortexm3::scb::set_sleepdeep();
+        } else {
+            cortexm3::scb::unset_sleepdeep();
+        }
+    }
+        /*
+        interrupt_disable();
         // Clear the RBOX wakeup signal and status bits
         GREG32(RBOX, WAKEUP) = GC_RBOX_WAKEUP_CLEAR_MASK;
         //  Wake on RBOX interrupts
         GREG32(RBOX, WAKEUP) = GC_RBOX_WAKEUP_ENABLE_MASK;
 
-        if (utmi_wakeup_is_enabled() && idle_action != IDLE_DEEP_SLEEP)
-                GR_PMU_EXITPD_MASK |=
-                        GC_PMU_EXITPD_MASK_UTMI_SUSPEND_N_MASK;
-
-        // Which rails should we turn off?
-        GR_PMU_LOW_POWER_DIS =
-                GC_PMU_LOW_POWER_DIS_VDDIOF_MASK |
-                GC_PMU_LOW_POWER_DIS_VDDXO_MASK |
-                GC_PMU_LOW_POWER_DIS_JTR_RC_MASK;
-         */
-
-
         if SLEEP_DEEPLY {
-            /*
             __hw_clock_event_clear();
             board_configure_deep_sleep_wakepins();
             clock_enable_module(MODULE_USB, 1);
@@ -393,10 +427,4 @@ pub fn prepare_for_sleep() {
                 GC_PMU_LOW_POWER_DIS_VDDL_MASK;
              */
 
-            cortexm3::scb::set_sleepdeep();
-
-        } else {
-            cortexm3::scb::unset_sleepdeep();
-        }
-    }
 }
