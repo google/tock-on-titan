@@ -82,6 +82,7 @@ fn erase() -> bool {
 	require!(hw.is_programming() == false);
 	require!(hw.read(1300) == 0xFFFFFFFF);
 	require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::SUCCESS)));
+	require!(driver.read(1300) == 0xFFFFFFFF);
 
 	true
 }
@@ -114,6 +115,7 @@ fn erase_max_retries() -> bool {
 	require!(hw.is_programming() == false);
 	require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::FAIL)));
 	require!(hw.read(1300) == 0xFFFFFFFF);
+	require!(driver.read(1300) == 0xFFFFFFFF);
 
 	true
 }
@@ -138,6 +140,7 @@ fn write_then_erase() -> bool {
 	require!(hw.is_programming() == false);
 	require!(hw.read(1300) == 0xFFFFABCD);
 	require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::SUCCESS)));
+	require!(driver.read(1300) == 0xFFFFABCD);
 
 	// Erase
 	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
@@ -152,6 +155,7 @@ fn write_then_erase() -> bool {
 	require!(hw.is_programming() == false);
 	require!(hw.read(1300) == 0xFFFFFFFF);
 	require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::SUCCESS)));
+	require!(driver.read(1300) == 0xFFFFFFFF);
 
 	true
 }
@@ -190,6 +194,7 @@ fn successful_program() -> bool {
 	require!(alarm.get_alarm() == 0);
 	require!(hw.is_programming() == false);
 	require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::SUCCESS)));
+	require!(driver.read(1300) == 0xFFFFABCD);
 
 	true
 }
