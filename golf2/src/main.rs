@@ -35,7 +35,9 @@ pub mod dcrypto;
 pub mod dcrypto_test;
 pub mod debug_syscall;
 
+use capsules::alarm::AlarmDriver;
 use capsules::console;
+use capsules::virtual_alarm::VirtualMuxAlarm;
 use capsules::virtual_uart::{UartDevice, UartMux};
 
 use kernel::{Chip, Platform};
@@ -68,7 +70,7 @@ pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 pub struct Golf {
     console: &'static capsules::console::Console<'static, UartDevice<'static>>,
     gpio: &'static capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
-    timer: &'static capsules::alarm::AlarmDriver<'static, h1b::timels::Timels<'static>>,
+    timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>>,
     ipc: kernel::ipc::IPC,
     digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
@@ -218,11 +220,24 @@ pub unsafe fn reset_handler() {
         pin.set_client(gpio)
     }
 
+    let alarm_mux = static_init!(
+        capsules::virtual_alarm::MuxAlarm<'static, h1b::timels::Timels<'static>>,
+        capsules::virtual_alarm::MuxAlarm::new(&h1b::timels::TIMELS0));
+    h1b::timels::TIMELS0.set_client(alarm_mux);
+
+    let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>,
+                                           VirtualMuxAlarm::new(alarm_mux));
+    let flash = static_init!(
+        h1b::hil::flash::Flash<'static, VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>>,
+        h1b::hil::flash::Flash::new(flash_virtual_alarm, &*h1b::hil::flash::h1b_hw::H1B_HW));
+    flash_virtual_alarm.set_client(flash);
+
+    let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>,
+                                           VirtualMuxAlarm::new(alarm_mux));
     let timer = static_init!(
-        capsules::alarm::AlarmDriver<'static, h1b::timels::Timels<'static>>,
-        capsules::alarm::AlarmDriver::new(
-            &h1b::timels::TIMELS0, kernel.create_grant(&grant_cap)));
-    h1b::timels::TIMELS0.set_client(timer);
+        AlarmDriver<'static, VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>>,
+        AlarmDriver::new(timer_virtual_alarm, kernel.create_grant(&grant_cap)));
+    timer_virtual_alarm.set_client(timer);
 
     let digest = static_init!(
         digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,

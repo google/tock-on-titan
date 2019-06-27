@@ -15,6 +15,10 @@
 use kernel::common::cells::VolatileCell;
 use kernel::common::registers::ReadWrite;
 
+// The hardware flash controller. Cannot be used in userspace (accessing will
+// trigger a fault), and should only be manipulated by the flash hardware.
+pub static mut H1B_HW: *const H1bHw = 0x40720000 as *const H1bHw;
+
 // We're relying on the fact that Tock is single-threaded for thread safety.
 static mut CLIENT: Option<&'static super::hardware::Client> = None;
 
