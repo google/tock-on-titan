@@ -68,6 +68,11 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
         ReturnCode::SUCCESS
     }
 
+    /// Reads the given word from flash.
+    pub fn read(&self, word: usize) -> u32 {
+        self.hw.read(word)
+    }
+
     /// Writes a buffer (of up to 32 words) into the given location in flash.
     /// The target location is specific as an offset from the beginning of flash
     /// in units of words.
