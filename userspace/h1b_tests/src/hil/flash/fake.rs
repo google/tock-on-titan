@@ -94,5 +94,20 @@ fn fake_hw() -> bool {
 	require!(fake.read(1300) == 0xFFFFFFFF);
 	require!(fake.read(1301) == 0xFFFFFFFF);
 
+	// At this point, the fake flash module's log is full. Attempting another
+	// operation should result in a flash error even if the operation is
+	// otherwise valid.
+	fake.set_transaction(1300, 1 - 1);
+	fake.set_write_data(&[0xABCDC0FF]);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
+	require!(fake.is_programming() == true);
+	fake.finish_operation();
+	require!(fake.read_error() == 0x8);
+	require!(fake.is_programming() == false);
+	require!(fake.read(512) == 0xFFFFFFFF);
+	require!(fake.read(1023) == 0xFFFFFFFF);
+	require!(fake.read(1300) == 0xFFFFFFFF);
+	require!(fake.read(1301) == 0xFFFFFFFF);
+
 	true
 }
