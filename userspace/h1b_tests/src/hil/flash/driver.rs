@@ -55,6 +55,7 @@ fn successful_program() -> bool {
 
 	// First attempt.
 	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
+	hw.set_client(&driver);
 	driver.set_client(&client);
 	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
 	require!(alarm.get_alarm() == alarm.now() + 150);
@@ -63,7 +64,6 @@ fn successful_program() -> bool {
 
 	// Inject a spurious interrupt.
 	alarm.set_time(50);
-	driver.program_interrupt();
 	require!(alarm.get_alarm() == 150);
 	require!(hw.is_programming() == true);
 	require!(client.state() == None);
@@ -71,7 +71,6 @@ fn successful_program() -> bool {
 	// Indicate an error, let the driver retry.
 	alarm.set_time(100);
 	hw.inject_error(0b100);
-	driver.program_interrupt();
 	require!(alarm.get_alarm() == 250);
 	require!(hw.is_programming() == true);
 	require!(client.state() == None);
@@ -79,7 +78,6 @@ fn successful_program() -> bool {
 	// Let the operation finish successfully.
 	alarm.set_time(200);
 	hw.finish_operation();
-	driver.program_interrupt();
 	require!(alarm.get_alarm() == 0);
 	require!(hw.is_programming() == false);
 	require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::SUCCESS)));
@@ -122,6 +120,7 @@ fn write_max_retries() -> bool {
 	hw.set_transaction(1300, 1);
 	hw.set_write_data(&[0xFFFF0FFF]);
 	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
+	hw.set_client(&driver);
 	driver.set_client(&client);
 	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
 	require!(alarm.get_alarm() == alarm.now() + 150);
@@ -132,7 +131,6 @@ fn write_max_retries() -> bool {
 		// Indicate an error, let the driver retry.
 		alarm.set_time(100 * i);
 		hw.inject_error(0b100);
-		driver.program_interrupt();
 		require!(alarm.get_alarm() == alarm.now() + 150);
 		require!(hw.is_programming() == true);
 		require!(client.state() == None);
@@ -140,7 +138,6 @@ fn write_max_retries() -> bool {
 
 	// Last try.
 	hw.inject_error(0b100);
-	driver.program_interrupt();
 	require!(alarm.get_alarm() == 0);
 	require!(hw.is_programming() == false);
 	require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::FAIL)));
