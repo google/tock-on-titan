@@ -16,7 +16,7 @@
 MEMORY
 {
   rom (rx)     : ORIGIN = 0x00044400, LENGTH = 0x00021c00
-  prog (rx)    : ORIGIN = 0x00066000, LENGTH = 0x00020000
+  prog (rx)    : ORIGIN = 0x00076000, LENGTH = 0x00010000
   ram (rwx)    : ORIGIN = 0x00010000, LENGTH = 0x00004000
   appram (rwx) : ORIGIN = 0x00014000, LENGTH = 0x0000c000
 }
