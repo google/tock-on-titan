@@ -42,9 +42,12 @@
 //!
 
 use cortexm3;
+
 use kernel::common::cells::VolatileCell;
 use kernel::common::registers::{ReadOnly, ReadWrite};
 use kernel::common::StaticRef;
+
+use usb::u2f::UsbHidU2f;
 
 register_bitfields![u32,
     Reset [
@@ -68,7 +71,7 @@ register_bitfields![u32,
     ],
     LowPowerDisable [
         Start                     0,
-        VddiOff                   1,
+        VddlOff                   1,
         FlashOff                  2,
         OscillatorOff             3,
         JitterRCOff               4
@@ -340,10 +343,12 @@ pub fn reset_dcrypto() {
 static mut SLEEP_DEEPLY: bool = false;
 
 pub fn enable_deep_sleep() {
+    //debug!("PMU: Enabling DEEP sleep.\n");
     unsafe {SLEEP_DEEPLY = true;}
 }
 
 pub fn disable_deep_sleep() {
+    //debug!("PMU: Disabling DEEP sleep.\n");
     unsafe {SLEEP_DEEPLY = false;}
 }
 
@@ -374,11 +379,15 @@ pub fn prepare_for_sleep() {
     */
 
     registers.exitpd_mask.write(ExitPowerdown::EnablePinPd::SET +
-                                ExitPowerdown::EnableUtmiSuspend::SET +
                                 ExitPowerdown::EnableRdd0PdTimer::SET +
                                 ExitPowerdown::EnableRboxWakeup::SET +
                                 ExitPowerdown::EnableTimeLs0Timer0::SET +
                                 ExitPowerdown::EnableTimeLs0Timer1::SET);
+    let deep = unsafe {SLEEP_DEEPLY};
+
+    if !deep {
+        registers.exitpd_mask.modify(ExitPowerdown::EnableUtmiSuspend::SET);
+    }
 
     /* // Which rails should we turn off?
         GR_PMU_LOW_POWER_DIS =
@@ -386,28 +395,48 @@ pub fn prepare_for_sleep() {
               GC_PMU_LOW_POWER_DIS_VDDXO_MASK |
               GC_PMU_LOW_POWER_DIS_JTR_RC_MASK;
      */
-
-
-    registers.low_power_disable.write(LowPowerDisable::VddiOff::SET +
+    registers.low_power_disable.write(LowPowerDisable::FlashOff::SET +
                                       LowPowerDisable::OscillatorOff::SET +
                                       LowPowerDisable::JitterRCOff::SET);
-    unsafe {
-        if SLEEP_DEEPLY {
-            cortexm3::scb::set_sleepdeep();
-        } else {
-            cortexm3::scb::unset_sleepdeep();
-        }
-    }
-        /*
-        interrupt_disable();
-        // Clear the RBOX wakeup signal and status bits
-        GREG32(RBOX, WAKEUP) = GC_RBOX_WAKEUP_CLEAR_MASK;
-        //  Wake on RBOX interrupts
-        GREG32(RBOX, WAKEUP) = GC_RBOX_WAKEUP_ENABLE_MASK;
 
-        if SLEEP_DEEPLY {
-            __hw_clock_event_clear();
-            board_configure_deep_sleep_wakepins();
+    //interrupt_disable();
+    // Clear the RBOX wakeup signal and status bits
+    // GREG32(RBOX, WAKEUP) = GC_RBOX_WAKEUP_CLEAR_MASK;
+    // Wake on RBOX interrupts
+    // GREG32(RBOX, WAKEUP) = GC_RBOX_WAKEUP_ENABLE_MASK;
+
+
+    if deep {
+        // __hw_clock_event_clear(); // really, no timers! the world of USB.
+
+        unsafe {
+            let pinmux = &mut *::pinmux::PINMUX;
+            pinmux.dioa11.select.set(::pinmux::Function::Default);
+            pinmux.dioa5.select.set(::pinmux::Function::Default);
+            //pinmux.hold.set(1);
+
+            //::gpio::PORT0.pins[0].clear();
+            //::gpio::PORT0.pins[1].clear();
+            //h1b::gpio::PORT0.pins[1].disable();
+
+
+        /* Turn off all LEDS to save power during sleep */
+        //SET_LED(GPIO_LED0, 0);
+        //SET_LED(GPIO_LED1, 0);
+        //SET_LED(GPIO_LED2, 0);
+        //SET_LED(GPIO_LED3, 0);
+        /* Ask RO to be silent (== faster) upon resume */
+        //GWRITE_FIELD(PMU, LONG_LIFE_SCRATCH_WR_EN, REG1, 1);
+        //GREG32(PMU, LONG_LIFE_SCRATCH1) |= BOARD_NO_RO_UART;
+        //GWRITE_FIELD(PMU, LONG_LIFE_SCRATCH_WR_EN, REG1, 0);
+        /* The USB PHY is our only wake-up source from deep-sleep */
+
+        //GR_PMU_EXITPD_MASK = GC_PMU_EXITPD_MASK_UTMI_SUSPEND_N_MASK;
+
+            registers.exitpd_mask.write(ExitPowerdown::EnableUtmiSuspend::SET);
+            registers.peripheral_clocks1_enable.write(PeripheralClock1::Usb::SET);
+
+    /*
             clock_enable_module(MODULE_USB, 1);
 
             if (!GREAD_FIELD(USB, PCGCCTL, RSTPDWNMODULE))
@@ -425,7 +454,21 @@ pub fn prepare_for_sleep() {
 
             GR_PMU_LOW_POWER_DIS |=
                 GC_PMU_LOW_POWER_DIS_VDDL_MASK;
-             */
+         */
+
+            //pinmux.hold.set(1);
+            registers.peripheral_clocks1_enable.write(PeripheralClock1::Usb::SET);
+            //::usb::USB0.power_down();
+            registers.low_power_disable.modify(LowPowerDisable::VddlOff::SET);
+        }
+        unsafe {cortexm3::scb::set_sleepdeep();}
+    } else {
+        unsafe {cortexm3::scb::unset_sleepdeep();}
+    }
+
+
+
+
 
 }
 
@@ -434,5 +477,29 @@ pub fn resume_from_sleep() {
     /* Prevent accidental reentry */
     /* Cr50 code does this, don't know why, but better safe than sorry. -pal */
     registers.low_power_disable.set(0);
+    registers.exitpd_mask.set(0);
+
+    unsafe {
+        if SLEEP_DEEPLY {
+            ::usb::USB0.init(&mut ::usb::EP0_OUT_DESCRIPTORS,
+                             &mut ::usb::EP0_OUT_BUFFERS,
+                             &mut ::usb::EP0_IN_DESCRIPTORS,
+                             &mut ::usb::EP0_IN_BUFFER,
+                             &mut ::usb::EP1_OUT_DESCRIPTOR,
+                             &mut ::usb::EP1_OUT_BUFFER,
+                             &mut ::usb::EP1_IN_DESCRIPTOR,
+                             &mut ::usb::EP1_IN_BUFFER,
+                             &mut ::usb::CONFIGURATION_BUFFER,
+                             ::usb::PHY::A,
+                             None,
+                             Some(0x18d1),  // Google vendor ID
+                             Some(0x5026),  // proto2
+                             &mut ::usb::u2f::STRINGS);
+            //print!("Leaving deep sleep.\n");
+            ::usb::USB0.power_up();
+            //::usb::USB0.resume(::usb::PHY::A);
+            //print!("USB powered up.\n");
+        }
+    }
     disable_deep_sleep();
 }

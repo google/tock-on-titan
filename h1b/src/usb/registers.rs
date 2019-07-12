@@ -286,6 +286,27 @@ register_bitfields![u32,
         SetNak                             OFFSET(27) NUMBITS(1)  [],
         Disable                            OFFSET(30) NUMBITS(1)  [],
         Enable                             OFFSET(31) NUMBITS(1)  []
+    ],
+
+    PowerClockGatingControl [
+        StopPhyClock                       OFFSET(0)  NUMBITS(1)  [],
+        GateHClock                         OFFSET(1)  NUMBITS(1)  [],
+        PowerClamp                         OFFSET(2)  NUMBITS(1)  [],
+        ResetPowerDownModule               OFFSET(3)  NUMBITS(1)  [],
+        Reserved                           OFFSET(4)  NUMBITS(1)  [],
+        EnableSleepClockGating             OFFSET(5)  NUMBITS(1)  [],
+        PhySleep                           OFFSET(6)  NUMBITS(1)  [],
+        Suspended                          OFFSET(7)  NUMBITS(1)  [],
+        ResetAfterSuspend                  OFFSET(8)  NUMBITS(1)  [],
+        RestoreMode                        OFFSET(9)  NUMBITS(1)  [
+            DeviceInitiated = 0,
+            HostInitiated   = 1
+        ],
+        EnableExtendedHibernation          OFFSET(10) NUMBITS(1)  [],
+        EnableHibernationClamp             OFFSET(11) NUMBITS(1)  [],
+        ExtendedHiberationSwitch           OFFSET(12) NUMBITS(1)  [],
+        EssentialRegisterValuesRestored    OFFSET(13) NUMBITS(1)  [],
+        RestoreValue                       OFFSET(14) NUMBITS(16) []
     ]
 ];
 
@@ -359,7 +380,7 @@ pub struct Registers {
     // 0xd00
     _reserved6: [u32; 64],
     // 0xe00
-    pub _power_clock_gating_control: VolatileCell<u32>,
+    pub power_clock_gating_control: ReadWrite<u32, PowerClockGatingControl::Register>,
 }
 
 #[repr(C)]

@@ -160,6 +160,10 @@ pub struct Registers {
     pub xo0_testbus5: Peripheral,
     pub xo0_testbus6: Peripheral,
     pub xo0_testbus7: Peripheral,
+    pub exit_en0: VolatileCell<u32>,
+    pub exit_edge0: VolatileCell<u32>,
+    pub exit_inv0: VolatileCell<u32>,
+    pub hold: VolatileCell<u32>
 }
 
 pub const PINMUX: *mut Registers = 0x40060000 as *mut Registers;

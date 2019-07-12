@@ -156,7 +156,7 @@ static void cancel_lock_timeout(void) {
  */
 static int u2fhid_cmd_lock(const uint32_t cid, const uint8_t duration) {
   if (!duration) {
-    printf("Lock %04lx canceled\n", cid);
+    //printf("Lock %04lx canceled\n", cid);
     lock_CID = 0;
     //hook_call_deferred(&cancel_lock_timeout_data, -1);
   } else {
@@ -411,6 +411,7 @@ static void u2fhid_cmd_init(U2FHID_FRAME *f_p) {
   //        response.init.cmd);
   //printf("bcnth:%02x bcntl:%02x ", response.init.bcnth, response.init.bcntl);
   usbu2f_put_frame(&response);
+  //printf("put frame\n");
 }
 
 void u2fhid_process_frame(U2FHID_FRAME *f_p);

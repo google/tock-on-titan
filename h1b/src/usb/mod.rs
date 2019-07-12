@@ -35,8 +35,8 @@ use self::constants::*;
 use self::registers::{AhbConfig, AllEndpointInterrupt, DescFlag,
                       DeviceConfig, DeviceControl, DMADescriptor,
                       EndpointControl, Gpio, InEndpointInterruptMask,
-                      Interrupt, OutEndpointInterruptMask, Registers,
-                      Reset, UsbConfiguration};
+                      Interrupt, OutEndpointInterruptMask, PowerClockGatingControl,
+                      Registers, Reset, UsbConfiguration};
 use self::types::{ConfigurationDescriptor, DeviceDescriptor,
                   EndpointAttributes, EndpointDescriptor,
                   EndpointSynchronizationType, EndpointTransferType,
@@ -347,22 +347,20 @@ impl<'a> USB<'a> {
             //  enumerated speed."
         }
 
-        if status.is_set(Interrupt::EarlySuspend) ||
-            status.is_set(Interrupt::Suspend) {
-                print!("USB: Suspending device, entering deep sleep!\n");
-                // Currently do not support suspend
-                pmu::enable_deep_sleep();
-            }
+        if status.is_set(Interrupt::Suspend) {
+            //print!("USB: Suspending device, entering deep sleep!\n");
+            pmu::enable_deep_sleep();
+        }
 
         if mask.is_set(Interrupt::StartOfFrame) &&
             status.is_set(Interrupt::StartOfFrame) { // Clear SOF
                 self.registers.interrupt_mask.modify(Interrupt::StartOfFrame::CLEAR);
-            }
+        }
 
         if status.is_set(Interrupt::Reset) ||
             status.is_set(Interrupt::ResetDetected) {
                 self.usb_reset();
-            }
+        }
 
         if status.is_set(Interrupt::InEndpoints) ||
             status.is_set(Interrupt::OutEndpoints) { // Interrupt pending
@@ -432,7 +430,7 @@ impl<'a> USB<'a> {
         if in_interrupt {
             let ep_in = &self.registers.in_endpoints[1];
             let ep_in_interrupts = ep_in.interrupt.extract();
-            data_debug!("In interrupts: {:#x}\n", ep_in_interrupts.get());
+            data_debug!("In1 interrupts: {:#x}\n", ep_in_interrupts.get());
             print_in_endpoint_interrupt_status(ep_in_interrupts);
             ep_in.interrupt.set(ep_in_interrupts.get());
             if ep_in_interrupts.is_set(InEndpointInterruptMask::TransferCompleted) {
@@ -444,7 +442,7 @@ impl<'a> USB<'a> {
         if out_interrupt {
             let ep_out = &self.registers.out_endpoints[1];
             let ep_out_interrupts = ep_out.interrupt.extract();
-            data_debug!("Out interrupts: {:#x}\n", ep_out_interrupts.get());
+            data_debug!("Out1 interrupts: {:#x}\n", ep_out_interrupts.get());
             ep_out.interrupt.set(ep_out_interrupts.get());
             if ep_out_interrupts.is_set(OutEndpointInterruptMask::TransferCompleted) {
                 data_debug!("U2F: ep1 frame received.\n");
@@ -1150,7 +1148,6 @@ impl<'a> USB<'a> {
         }
     }
 
-
     /// Initialize the USB driver in device mode, so it can be begin
     /// communicating with a connected host.
     pub fn init(&self,
@@ -1168,6 +1165,7 @@ impl<'a> USB<'a> {
                 vendor_id: Option<u16>,
                 product_id: Option<u16>,
                 strings: &'static mut [StringDescriptor]) {
+        //print!("Initializing USB driver.\n");
         self.ep0_out_descriptors.replace(ep0_out_descriptors);
         self.ep0_out_buffers.set(Some(ep0_out_buffers));
         self.ep0_in_descriptors.replace(ep0_in_descriptors);
@@ -1331,6 +1329,23 @@ impl<'a> USB<'a> {
 /// Implementation of the HID U2F API for the USB device. It assumes
 /// that U2F is over endpoint 1.
 impl<'a> UsbHidU2f<'a> for USB<'a> {
+
+
+    fn power_down(&self) -> ReturnCode {
+        self.registers.power_clock_gating_control.modify(PowerClockGatingControl::PowerClamp::SET);
+        //self.registers.power_clock_gating_control.modify(PowerClockGatingControl::ResetPowerDownModule::SET);
+        //self.registers.power_clock_gating_control.modify(PowerClockGatingControl::StopPhyClock::SET);
+        ReturnCode::SUCCESS
+    }
+
+    fn power_up(&self) -> ReturnCode {
+        self.registers.power_clock_gating_control.modify(PowerClockGatingControl::StopPhyClock::CLEAR);
+        self.registers.power_clock_gating_control.modify(PowerClockGatingControl::ResetPowerDownModule::CLEAR);
+        self.registers.power_clock_gating_control.modify(PowerClockGatingControl::PowerClamp::CLEAR);
+
+        ReturnCode::SUCCESS
+    }
+
     fn set_u2f_client(&self, client: &'a UsbHidU2fClient<'a>) {
         self.u2f_client.set(client);
     }
@@ -1541,7 +1556,7 @@ impl TableCase {
 }
 
 fn print_in_endpoint_interrupt_status(status: LocalRegisterCopy<u32, InEndpointInterruptMask::Register>) {
-    int_debug!("USB in endpoint interrupt, status: {:08x}\n", status);
+    int_debug!("USB in endpoint interrupt, status: {:08x}\n", status.get());
     if status.is_set(InEndpointInterruptMask::TransferCompleted)    {data_debug!("  +Transfer complete\n");}
     if status.is_set(InEndpointInterruptMask::EndpointDisabled)    {data_debug!("  +Endpoint disabled\n");}
     if status.is_set(InEndpointInterruptMask::AhbError)            {data_debug!("  +AHB Error\n");}
