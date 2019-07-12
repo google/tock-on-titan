@@ -13,9 +13,11 @@
  * limitations under the License.
  */
 
+/* Note: modifications to prog and appram should be reflected in
+   userspace/layout.ld or Rust userspace (and tests) will fail. */
 MEMORY
 {
-  rom (rx)     : ORIGIN = 0x00044400, LENGTH = 0x00021c00
+  rom (rx)     : ORIGIN = 0x00044400, LENGTH = 0x00031c00
   prog (rx)    : ORIGIN = 0x00076000, LENGTH = 0x00010000
   ram (rwx)    : ORIGIN = 0x00010000, LENGTH = 0x00004000
   appram (rwx) : ORIGIN = 0x00014000, LENGTH = 0x0000c000

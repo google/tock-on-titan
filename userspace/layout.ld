@@ -13,8 +13,11 @@
  * limitations under the License.
  */
 
+/* Note: modifications should be reflected in chip_layout.ld or Rust
+   userspace (and tests) will fail. */
+
 MEMORY {
-  FLASH (rx) : ORIGIN = 0x00066040, LENGTH = 0x0001FFC0
+  FLASH (rx) : ORIGIN = 0x00076040, LENGTH = 0x0000FFC0
   SRAM (rwx) : ORIGIN = 0x00014000, LENGTH = 0x0000c000
 }
 
