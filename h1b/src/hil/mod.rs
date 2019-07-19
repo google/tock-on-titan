@@ -16,4 +16,5 @@ pub mod aes;
 pub mod common;
 pub mod digest;
 pub mod flash;
+pub mod personality;
 pub mod rng;

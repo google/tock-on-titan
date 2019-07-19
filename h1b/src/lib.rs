@@ -36,6 +36,7 @@ pub mod chip;
 pub mod crypto;
 pub mod gpio;
 pub mod hil;
+pub mod personality;
 pub mod pinmux;
 pub mod pmu;
 pub mod timels;
@@ -43,6 +44,7 @@ pub mod timeus;
 pub mod trng;
 pub mod uart;
 pub mod usb;
+
 
 pub mod test_rng;
 pub mod test_dcrypto;
