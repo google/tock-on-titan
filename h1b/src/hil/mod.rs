@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod aes;
 pub mod common;
 pub mod digest;
-pub mod aes;
+pub mod flash;
 pub mod rng;

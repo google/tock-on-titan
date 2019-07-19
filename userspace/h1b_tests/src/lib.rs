@@ -14,6 +14,8 @@
 
 #![no_std]
 
+mod hil;
+
 #[test]
 fn basic_test() -> bool {
     use core::fmt::Write;

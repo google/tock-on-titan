@@ -35,7 +35,9 @@ pub mod dcrypto;
 pub mod dcrypto_test;
 pub mod debug_syscall;
 
+use capsules::alarm::AlarmDriver;
 use capsules::console;
+use capsules::virtual_alarm::VirtualMuxAlarm;
 use capsules::virtual_uart::{UartDevice, UartMux};
 
 use kernel::{Chip, Platform};
@@ -68,7 +70,7 @@ pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 pub struct Golf {
     console: &'static capsules::console::Console<'static, UartDevice<'static>>,
     gpio: &'static capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
-    timer: &'static capsules::alarm::AlarmDriver<'static, h1b::timels::Timels<'static>>,
+    timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>>,
     ipc: kernel::ipc::IPC,
     digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
@@ -218,11 +220,24 @@ pub unsafe fn reset_handler() {
         pin.set_client(gpio)
     }
 
+    let alarm_mux = static_init!(
+        capsules::virtual_alarm::MuxAlarm<'static, h1b::timels::Timels<'static>>,
+        capsules::virtual_alarm::MuxAlarm::new(&h1b::timels::TIMELS0));
+    h1b::timels::TIMELS0.set_client(alarm_mux);
+
+    let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>,
+                                           VirtualMuxAlarm::new(alarm_mux));
+    let flash = static_init!(
+        h1b::hil::flash::Flash<'static, VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>>,
+        h1b::hil::flash::Flash::new(flash_virtual_alarm, &*h1b::hil::flash::h1b_hw::H1B_HW));
+    flash_virtual_alarm.set_client(flash);
+
+    let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>,
+                                           VirtualMuxAlarm::new(alarm_mux));
     let timer = static_init!(
-        capsules::alarm::AlarmDriver<'static, h1b::timels::Timels<'static>>,
-        capsules::alarm::AlarmDriver::new(
-            &h1b::timels::TIMELS0, kernel.create_grant(&grant_cap)));
-    h1b::timels::TIMELS0.set_client(timer);
+        AlarmDriver<'static, VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>>,
+        AlarmDriver::new(timer_virtual_alarm, kernel.create_grant(&grant_cap)));
+    timer_virtual_alarm.set_client(timer);
 
     let digest = static_init!(
         digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
@@ -269,23 +284,57 @@ pub unsafe fn reset_handler() {
     // TODO(alevy): refactor out
     {
         use core::intrinsics::volatile_store as vs;
+        const GLOBALSEC_BASE:      usize = 0x40090000;
 
-        vs(0x40090000 as *mut u32, !0);
-        vs(0x40090004 as *mut u32, !0);
-        vs(0x40090008 as *mut u32, !0);
-        vs(0x4009000c as *mut u32, !0);
+        const CPU0_D_REGION0_CTRL: usize = GLOBALSEC_BASE + 0x0;
+        const CPU0_D_REGION1_CTRL: usize = GLOBALSEC_BASE + 0x4;
+        const CPU0_D_REGION2_CTRL: usize = GLOBALSEC_BASE + 0x8;
+        const CPU0_D_REGION3_CTRL: usize = GLOBALSEC_BASE + 0xc;
+
+        const DDMA0_REGION0_CTRL: usize = GLOBALSEC_BASE + 0x80;
+        const DDMA0_REGION1_CTRL: usize = GLOBALSEC_BASE + 0x84;
+        const DDMA0_REGION2_CTRL: usize = GLOBALSEC_BASE + 0x88;
+        const DDMA0_REGION3_CTRL: usize = GLOBALSEC_BASE + 0x8c;
+
+        const DUSB0_REGION0_CTRL: usize = GLOBALSEC_BASE + 0xc0;
+        const DUSB0_REGION1_CTRL: usize = GLOBALSEC_BASE + 0xc4;
+        const DUSB0_REGION2_CTRL: usize = GLOBALSEC_BASE + 0xc8;
+        const DUSB0_REGION3_CTRL: usize = GLOBALSEC_BASE + 0xcc;
+
+        const FLASH_REGION2_BASE: usize = GLOBALSEC_BASE + 0x240;
+        const FLASH_REGION2_SIZE: usize = GLOBALSEC_BASE + 0x244;
+        const FLASH_REGION2_CTRL: usize = GLOBALSEC_BASE + 0x0e8;
+
+        vs(CPU0_D_REGION0_CTRL as *mut u32, !0);
+        vs(CPU0_D_REGION1_CTRL as *mut u32, !0);
+        vs(CPU0_D_REGION2_CTRL as *mut u32, !0);
+        vs(CPU0_D_REGION3_CTRL as *mut u32, !0);
 
         // GLOBALSEC_DDMA0-DDMA3
-        vs(0x40090080 as *mut u32, !0);
-        vs(0x40090084 as *mut u32, !0);
-        vs(0x40090088 as *mut u32, !0);
-        vs(0x4009008c as *mut u32, !0);
+        vs(DDMA0_REGION0_CTRL as *mut u32, !0);
+        vs(DDMA0_REGION1_CTRL as *mut u32, !0);
+        vs(DDMA0_REGION2_CTRL as *mut u32, !0);
+        vs(DDMA0_REGION3_CTRL as *mut u32, !0);
 
         // GLOBALSEC_DUSB_REGION0-DUSB_REGION3
-        vs(0x400900c0 as *mut u32, !0);
-        vs(0x400900c4 as *mut u32, !0);
-        vs(0x400900c8 as *mut u32, !0);
-        vs(0x400900cc as *mut u32, !0);
+        vs(DUSB0_REGION0_CTRL as *mut u32, !0);
+        vs(DUSB0_REGION1_CTRL as *mut u32, !0);
+        vs(DUSB0_REGION2_CTRL as *mut u32, !0);
+        vs(DUSB0_REGION3_CTRL as *mut u32, !0);
+
+        // Flash region initialization. We initialize a single region for the
+        // last two pages of the second flash macro, used by the non-volatile
+        // counter implementation.
+        const FLASH_START: usize = 0x40000;
+        const FLASH_SIZE: usize = 512 * 1024;
+        const FLASH_PAGE_SIZE: usize = 2048;
+        vs(FLASH_REGION2_BASE as *mut u32, (FLASH_START + FLASH_SIZE - 2*FLASH_PAGE_SIZE) as u32);
+        // The value of the SIZE register is one less than the size of the
+        // region, i.e. the last address within the region is the start address
+        // + the size register.
+        vs(FLASH_REGION2_SIZE as *mut u32, (2*FLASH_PAGE_SIZE - 1) as u32);
+        // Enable the region for reads and writes.
+        vs(FLASH_REGION2_CTRL as *mut u32, 0b111);
     }
 
     let mut _ctr = 0;

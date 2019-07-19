@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,15 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Test harness that can run as a Tock application. Note that the application
-// itself should be a library crate, as the Rust test harness includes main().
-// Relies on internal details of rustc, so this may break during toolchain
-// updates.
-
-#![no_std]
-
-mod assertions;
-mod compiler_required;
-
-pub use self::assertions::*;
-pub use self::compiler_required::*;
+#[test]
+fn flash_size() -> bool {
+    core::mem::size_of::<h1b::hil::flash::h1b_hw::H1bHw>() == 384
+}

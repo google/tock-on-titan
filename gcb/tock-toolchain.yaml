@@ -1,4 +1,4 @@
-# Copyright 2018 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[package]
-name = "h1b"
-version = "0.1.0"
-authors = ["Amit Levy <amit@amitlevy.com>"]
+# Google Cloud Build configuration for building a Docker image with the
+# toolchains necessary to build and run the tock-on-titan binaries and tests.
 
-build = "build.rs"
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-f', 'Dockerfile.tock-toolchain', '-t',
+         'gcr.io/opentitan/tock-toolchain', '.']
 
-[dependencies]
-kernel = { path = "../third_party/tock/kernel" }
-cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
-
-[features]
-# Exports testing-specific features for use by h1b_tests. Should not be enabled
-# when compiled for the kernel.
-test = []
+images: ['gcr.io/opentitan/tock-toolchain']
