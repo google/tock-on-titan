@@ -14,12 +14,14 @@
 
 #include "fips_aes.h"
 #include "sha256.h"
+#include "storage.h"
 #include "trng.h"
 #include "u2f_hid_corp.h"
 
 #include "digest_syscalls.h"
-#include "u2f_syscalls.h"
 #include "h1b_aes_syscalls.h"
+#include "personality_syscalls.h"
+#include "u2f_syscalls.h"
 
 #include "tock.h"
 #include "rng.h"
@@ -307,4 +309,20 @@ int kl_derive_origin(const uint32_t input[8],
 int kl_derive_ssh(const uint32_t input[8] ,
                   uint32_t output[8]) {
   return kl_derive(KL_SEED_SSH, input, output);
+}
+
+static perso_st personality;
+
+const perso_st* get_personality(void) {
+  tock_get_personality(&personality);
+  return &personality;
+}
+
+int set_personality(const perso_st* id) {
+  int rval = tock_set_personality(id);
+  if (rval == TOCK_SUCCESS) {
+    return EC_SUCCESS;
+  } else {
+    return EC_ERROR_UNKNOWN;
+  }
 }

@@ -44,10 +44,6 @@ static void check_device_setup(void);
 static void process_frame(U2FHID_FRAME* frame);
 static void setup_personality(void);
 
-const perso_st* get_personality(void) {
-  return &me;
-}
-
 int check_personality(const perso_st* id) {
   return id != NULL;
 }
@@ -60,18 +56,9 @@ int new_personality(perso_st* id) {
   }
 }
 
-int set_personality(const perso_st* id) {
-  if (id == NULL) {
-    return 0;
-  } else {
-    return 1;
-  }
-}
-
-
 static void setup_personality(void) {
-  if (check_personality(get_personality()) == 1) return;
-  if (new_personality(&me) == 1) set_personality(&me);
+  if (check_personality(get_personality()) == EC_SUCCESS) return;
+  if (new_personality(&me) == EC_SUCCESS) set_personality(&me);
   printf("    - Personality configured\n");
 }
 
