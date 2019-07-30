@@ -69,6 +69,7 @@ impl SmartProgramState {
 						return Running(0, false, timeout_nanoseconds);
 					}
 					alarm.disable();
+					// TODO: Extra pulse for writes?!
 					return Finished(ReturnCode::SUCCESS);
 				}
 
