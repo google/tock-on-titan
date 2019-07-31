@@ -67,7 +67,7 @@ int tock_set_personality(const perso_st* personality) {
   }
 
   ret = allow(H1B_DRIVER_PERSONALITY, TOCK_PERSONALITY_ALLOW,
-              personality, sizeof(perso_st));
+              (perso_st*)personality, sizeof(perso_st));
   if (ret < 0) {
     printf("Could not give kernel access to personality buffer.\n");
     return ret;
