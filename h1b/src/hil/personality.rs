@@ -17,8 +17,6 @@
 
 use kernel::ReturnCode;
 
-
-
 /// Structure of device attestation data.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -32,6 +30,7 @@ pub struct PersonalityData {
     pub certificate: [u8; 2048 - (4 + 5 * 32)],
 }
 
+
 /// Trait for getting and setting device attestation data.
 ///
 /// Implementors should assume the client implements the
@@ -41,10 +40,12 @@ pub trait Personality<'a> {
     fn set_client(&self, client: &'a Client);
 
     /// Fetch the device's attestation data.
-    fn get(&self, personality: &'a mut PersonalityData);
+    fn get(&self, personality: &mut PersonalityData);
+    fn get_u8(&self, personality: &mut [u8]) -> ReturnCode;
 
     /// Set the device's attestation data.
-    fn set(&self, personality: &'a PersonalityData) -> ReturnCode;
+    fn set(&self, personality: &PersonalityData) -> ReturnCode;
+    fn set_u8(&self, personality: &[u8]) -> ReturnCode;
 }
 
 /// A [Personality](trait.Personality.html) client
