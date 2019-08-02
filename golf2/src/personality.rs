@@ -12,9 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(dead_code)]
-
-//! System call driver for device attestation (personality) data.
+//! System call driver for device attestation (personality) data. This
+//! is per-device data that will be stored durably on the device; current
+//! implementations store it in RAM.
+//!
+//! The driver implements 3 commands:
+//!   0. check if the driver is present (ReturnCode::SUCCESS if so)
+//!   1. read personality data into a user buffer.
+//!   2. durably write personality data from a user buffer, completion signaled
+//!      by a callback.
+//!
+//! The driver implements 1 allow:
+//!   0. userspace buffer used for read and write (commands 1 and 2).
+//!
+//! The driver implements 1 subscribe:
+//!   0. callback for when a durable write completes.
 
 use core::cell::Cell;
 use h1b::personality;
@@ -24,18 +36,17 @@ use kernel::common::cells::MapCell;
 
 pub const DRIVER_NUM: usize = 0x5000b;
 
+
+const COMMAND_CHECK: usize             = 0;
+const COMMAND_READ: usize              = 1;
+const COMMAND_WRITE: usize             = 2;
+const ALLOW_BUFFER: usize              = 0;
+const SUBSCRIBE_WRITE_DONE: usize      = 0;
+
+#[derive(Default)]
 pub struct App {
     data: Option<AppSlice<Shared, u8>>,
     callback: Option<Callback>,
-}
-
-impl Default for App {
-    fn default() -> App {
-        App {
-            data: None,
-            callback: None,
-        }
-    }
 }
 
 pub struct PersonalitySyscall<'a> {
@@ -61,7 +72,7 @@ impl<'a> Driver for PersonalitySyscall<'a> {
                  _app_id: AppId,
     ) -> ReturnCode {
         match subscribe_num {
-            0 => {
+            SUBSCRIBE_WRITE_DONE => {
                 self.app.map(|app| {
                     app.callback = callback;
                 });
@@ -73,8 +84,8 @@ impl<'a> Driver for PersonalitySyscall<'a> {
 
     fn command(&self, command_num: usize, _: usize, _: usize, _: AppId) -> ReturnCode {
         match command_num {
-            0 /* Check if present */ => ReturnCode::SUCCESS,
-            1 /* Read personality */ => {
+            COMMAND_CHECK => ReturnCode::SUCCESS,
+            COMMAND_READ  => {
                 if self.busy.get() {
                     ReturnCode::EBUSY
                 } else {
@@ -89,7 +100,7 @@ impl<'a> Driver for PersonalitySyscall<'a> {
 
                 }
             },
-            2 /* Write personality */ => {
+            COMMAND_WRITE => {
                 if self.busy.get() {
                     ReturnCode::EBUSY
                 } else {
@@ -112,7 +123,7 @@ impl<'a> Driver for PersonalitySyscall<'a> {
              slice: Option<AppSlice<Shared, u8>>,
     ) -> ReturnCode {
         match minor_num {
-            0 => {
+            ALLOW_BUFFER => {
                 self.app.map(|app_data| {
                     app_data.data = slice;
                     ReturnCode::SUCCESS
@@ -123,4 +134,4 @@ impl<'a> Driver for PersonalitySyscall<'a> {
         }
     }
 
-    }
+}
