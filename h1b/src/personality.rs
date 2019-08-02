@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(dead_code)]
-
-//! Driver for device attestation (personality) data.
+//! Peripheral driver for device attestation (personality) data.  This
+//! is per-device data that will be stored durably on the device; this
+//! implementations currently stores it in RAM.
 
 use core::mem;
 use hil::personality::{Client, Personality, PersonalityData};

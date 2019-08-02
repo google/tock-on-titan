@@ -39,12 +39,17 @@ pub trait Personality<'a> {
     /// Set the client for callbacks on set calls.
     fn set_client(&self, client: &'a Client);
 
-    /// Fetch the device's attestation data.
+    /// Fetch the device's attestation data into a typed PersonalityData
+    /// structure.
     fn get(&self, personality: &mut PersonalityData);
+    /// Fetch the device's attestation data into a slice; this slice
+    /// must be at least 2048 bytes long.
     fn get_u8(&self, personality: &mut [u8]) -> ReturnCode;
 
     /// Set the device's attestation data.
     fn set(&self, personality: &PersonalityData) -> ReturnCode;
+    /// Set the device's attestation data from a slice; this slice
+    /// must be at least 2048 bytes long.
     fn set_u8(&self, personality: &[u8]) -> ReturnCode;
 }
 
