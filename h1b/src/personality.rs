@@ -27,6 +27,8 @@ pub struct PersonalityDriver<'a> {
 
 pub static mut PERSONALITY: PersonalityDriver<'static> = unsafe {PersonalityDriver::new() };
 
+const PERSONALITY_SIZE: usize = 2048;
+
 static mut PERSO: PersonalityData = PersonalityData {
     checksum: [0; 8],
     salt: [0; 8],
@@ -34,7 +36,7 @@ static mut PERSO: PersonalityData = PersonalityData {
     pub_y: [0; 8],
     certificate_hash: [0; 8],
     certificate_len: 0,
-    certificate: [0; 2048 - (4 + 5 * 32)],
+    certificate: [0; PERSONALITY_SIZE - (4 + 5 * 32)],
 };
 
 
@@ -59,7 +61,7 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
     }
 
     fn get_u8(&self, data: &mut [u8]) -> ReturnCode {
-        if data.len() < 2048 {
+        if data.len() < PERSONALITY_SIZE {
             ReturnCode::ESIZE
         } else {
             unsafe {
@@ -79,7 +81,7 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
     }
 
     fn set_u8(&self, data: &[u8]) -> ReturnCode {
-        if data.len() < 2048 {
+        if data.len() < PERSONALITY_SIZE {
             ReturnCode::ESIZE
         } else {
             unsafe {

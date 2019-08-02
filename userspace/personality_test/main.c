@@ -94,40 +94,40 @@ static void print_personality(void) {
   perso_st* person = get_personality();
   printf(" === PERSONALITY === \n");
   printf("Checksum: ");
-  for (int i = 0; i < 8; i++) {
-    printf("%08x ", person->chksum[i]);
+  for (unsigned int i = 0; i < 8; i++) {
+    printf("%08x ", (unsigned int)person->chksum[i]);
   }
   printf("\n");
 
   printf("Salt:     ");
-  for (int i = 0; i < 8; i++) {
-    printf("%08x ", person->salt[i]);
+  for (unsigned int i = 0; i < 8; i++) {
+    printf("%08x ", (unsigned int)person->salt[i]);
   }
   printf("\n");
 
   printf("X:        ");
-  for (int i = 0; i < 8; i++) {
-    printf("%08x ", P256_DIGIT(&person->pub_x, i));
+  for (unsigned int i = 0; i < 8; i++) {
+    printf("%08x ", (unsigned int)P256_DIGIT(&person->pub_x, i));
   }
   printf("\n");
 
   printf("Y:        ");
-  for (int i = 0; i < 8; i++) {
-    printf("%08x ", P256_DIGIT(&person->pub_y, i));
+  for (unsigned int i = 0; i < 8; i++) {
+    printf("%08x ", (unsigned int)P256_DIGIT(&person->pub_y, i));
   }
   printf("\n");
 
   printf("Hash:     ");
-  for (int i = 0; i < 8; i++) {
-    printf("%08x ", person->cert_hash[i]);
+  for (unsigned int i = 0; i < 8; i++) {
+    printf("%08x ", (unsigned int)person->cert_hash[i]);
   }
   printf("\n");
 
   printf("Len: %i\n", person->cert_len);
 
   printf("Cert:\n");
-  for (int i = 0; i < person->cert_len; i += 16) {
-    for (int j = i; j < person->cert_len && j < i + 16; j++) {
+  for (unsigned int i = 0; i < person->cert_len; i += 16) {
+    for (unsigned int j = i; j < person->cert_len && j < i + 16; j++) {
       printf("%02x ", person->cert[j]);
     }
     printf("\n");
