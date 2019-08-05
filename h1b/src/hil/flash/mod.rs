@@ -31,3 +31,6 @@ pub type Flash<'h, A> = self::driver::Flash<'static, A, self::h1b_hw::H1bHw>;
 
 pub use self::driver::Client;
 pub use self::hardware::Hardware;
+
+// Constants used by multiple submodules.
+const WORDS_PER_PAGE: usize = 512;
