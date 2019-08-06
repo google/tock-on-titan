@@ -26,8 +26,7 @@ struct LogEntry {
 /// A fake version of H1B's flash modules. Starts initialized with all 1's as if
 /// the flash had just been erased. To keep memory usage small, this supports a
 /// limited number of operations before panicking.
-pub struct FakeHw<'a> {
-    client: core::cell::Cell<Option<&'a super::hardware::Client>>,
+pub struct FakeHw {
     error: core::cell::Cell<u16>,
     // Currently-executing opcode; 0 if no transaction is ongoing.
     opcode: core::cell::Cell<u32>,
@@ -42,10 +41,9 @@ pub struct FakeHw<'a> {
     log_len: core::cell::Cell<usize>,
 }
 
-impl<'a> FakeHw<'a> {
+impl FakeHw {
     pub fn new() -> Self {
         Self {
-            client:             Default::default(),
             error:              Default::default(),
             opcode:             Default::default(),
             transaction_offset: Default::default(),
@@ -67,7 +65,7 @@ impl<'a> FakeHw<'a> {
         // indicate an error.
         if self.log_len.get() + self.transaction_size.get() > self.log.len() {
             // "Program failed" error.
-            return self.inject_error(0x8);
+            return self.inject_result(0x8);
         }
 
         for i in 0..self.transaction_size.get() {
@@ -83,18 +81,17 @@ impl<'a> FakeHw<'a> {
             self.log_len.set(self.log_len.get() + 1);
         }
         self.opcode.set(0);
-        if let Some(client) = self.client.get() { client.interrupt(); }
     }
 
-    /// Simulates a flash error.
-    pub fn inject_error(&self, error: u16) {
+    /// Injects a smart program result. 0 for a successful validation, nonzero
+    /// for an error.
+    pub fn inject_result(&self, error: u16) {
         self.error.set(error);
         self.opcode.set(0);
-        if let Some(client) = self.client.get() { client.interrupt(); }
     }
 }
 
-impl<'a> super::hardware::Hardware<'a> for FakeHw<'a> {
+impl super::hardware::Hardware for FakeHw {
     fn is_programming(&self) -> bool {
         self.opcode.get() != 0
     }
@@ -124,10 +121,6 @@ impl<'a> super::hardware::Hardware<'a> for FakeHw<'a> {
         let out = self.error.get();
         self.error.set(0);
         out
-    }
-
-    fn set_client(&self, client: &'a super::hardware::Client) {
-        self.client.set(Some(client));
     }
 
     fn set_transaction(&self, offset: usize, size: usize) {

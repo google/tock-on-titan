@@ -14,7 +14,7 @@
 
 /// The interface between the flash driver and the (real or fake) flash module.
 
-pub trait Hardware<'a> {
+pub trait Hardware {
 	/// Returns true if an operation is running, false otherwise.
 	fn is_programming(&self) -> bool;
 
@@ -24,10 +24,6 @@ pub trait Hardware<'a> {
 
 	/// Reads the flash error code.
 	fn read_error(&self) -> u16;
-
-	/// Sets the client (the job receiving interrupts from the underlying
-	/// hardware).
-	fn set_client(&self, client: &'a Client);
 
 	/// Set flash transaction parameters (word offset and size). The word offset
 	/// is relative to the start of flash and the size is one less than the
@@ -40,9 +36,4 @@ pub trait Hardware<'a> {
 
 	/// Kick off a smart program execution.
 	fn trigger(&self, opcode: u32);
-}
-
-pub trait Client {
-	/// Called when a flash programming operation completes.
-	fn interrupt(&self);
 }

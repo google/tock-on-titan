@@ -24,7 +24,7 @@ pub const WRITE_OPCODE: u32 = 0x27182818;
 /// The H1B flash driver. The hardware interface (either the real flash modules
 /// or the fake) is injected to support testing. This will not configure the
 /// globalsec flash regions -- that must be done independently.
-pub struct Flash<'d, A: Alarm + 'd, H: Hardware<'d> + 'd> {
+pub struct Flash<'d, A: Alarm + 'd, H: Hardware + 'd> {
     alarm: &'d A,
     client: Cell<Option<&'d Client>>,
 
@@ -46,7 +46,7 @@ pub trait Client {
 }
 
 // Public API for Flash.
-impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
+impl<'d, A: Alarm, H: Hardware> Flash<'d, A, H> {
     /// Constructs a driver for the given hardware interface. Unsafe because
     /// constructing multiple drivers for the same hardware seems like a bad
     /// idea. The caller must set the driver as the hardware's client before
@@ -64,7 +64,9 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
     /// Erases the specified flash page, setting it to all ones.
     pub fn erase(&self, page: usize) -> ReturnCode {
         if self.program_in_progress() { return ReturnCode::EBUSY; }
-        self.smart_program(ERASE_OPCODE, 45, page * super::WORDS_PER_PAGE, 1);
+        self.smart_program(ERASE_OPCODE, /*max_attempts*/ 45, /*final_pulse_needed*/ false,
+                           /*timeout_nanoseconds*/ 3_353_267,
+                           /*target*/ page * super::WORDS_PER_PAGE, /*size*/ 1);
         ReturnCode::SUCCESS
     }
 
@@ -74,14 +76,16 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
     }
 
     /// Writes a buffer (of up to 32 words) into the given location in flash.
-    /// The target location is specific as an offset from the beginning of flash
-    /// in units of words.
+    /// The target location is specified as an offset from the beginning of
+    /// flash in units of words.
     pub fn write(&self, target: usize, data: &[u32]) -> ReturnCode {
         if data.len() > 32 { return ReturnCode::ESIZE; }
         if self.program_in_progress() { return ReturnCode::EBUSY; }
 
         self.hw.set_write_data(data);
-        self.smart_program(WRITE_OPCODE, 9, target, data.len());
+        self.smart_program(WRITE_OPCODE, /*max_attempts*/ 8, /*final_pulse_needed*/ true,
+                           /*timeout_nanoseconds*/ 48734 + data.len() as u32 * 3734,
+                           target, data.len());
         ReturnCode::SUCCESS
     }
 
@@ -91,7 +95,7 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
     }
 }
 
-impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
+impl<'d, A: Alarm, H: Hardware> Flash<'d, A, H> {
     /// Returns true if an operation is in progress and false otherwise.
     fn program_in_progress(&self) -> bool {
         // SmartProgramState is not Copy, so we can't use Cell::get() or
@@ -105,19 +109,22 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
 
     /// Begins the smart programming procedure. Note that size must be >= 1 to
     /// avoid underflow (use an arbitrary positive value for erases).
-    fn smart_program(&self, opcode: u32, max_attempts: u8, target: usize, size: usize) {
+    fn smart_program(&self, opcode: u32, max_attempts: u8, final_pulse_needed: bool,
+                     timeout_nanoseconds: u32, target: usize, size: usize)
+    {
         self.hw.set_transaction(target, size - 1);
         self.smart_program_state.set(Some(
-            SmartProgramState::init(max_attempts)
-                .step(self.alarm, self.hw, opcode, /*is_timeout:*/ false)));
+            SmartProgramState::init(max_attempts, final_pulse_needed, timeout_nanoseconds)
+                .step(self.alarm, self.hw, opcode)));
         self.opcode.set(opcode);
     }
+}
 
-    /// Step the smart program state machine.
-    fn step(&self, is_timeout: bool) {
+impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for Flash<'d, A, H> {
+    fn fired(&self) {
         if let Some(state) = self.smart_program_state.take() {
             let state = state.step(
-                self.alarm, self.hw, self.opcode.get(), is_timeout);
+                self.alarm, self.hw, self.opcode.get());
             if let Some(code) = state.return_code() {
                 if let Some(client) = self.client.get() {
                     if self.opcode.get() == WRITE_OPCODE {
@@ -130,17 +137,5 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
                 self.smart_program_state.set(Some(state));
             }
         }
-    }
-}
-
-impl<'d, A: Alarm, H: Hardware<'d>> super::hardware::Client for Flash<'d, A, H> {
-    fn interrupt(&self) {
-        self.step(false);
-    }
-}
-
-impl<'d, A: Alarm, H: Hardware<'d>> ::kernel::hil::time::Client for Flash<'d, A, H> {
-    fn fired(&self) {
-        self.step(true);
     }
 }

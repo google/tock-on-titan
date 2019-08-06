@@ -15,7 +15,6 @@
 use cortexm3;
 use crypto;
 use gpio;
-use hil;
 use kernel::Chip;
 use timels;
 use trng;
@@ -55,7 +54,6 @@ impl Chip for Hotel {
                     2 => crypto::dcrypto::DCRYPTO.handle_wipe_interrupt(),
                     4 => crypto::dcrypto::DCRYPTO.handle_done_interrupt(),
                     5 => crypto::dcrypto::DCRYPTO.handle_receive_interrupt(),
-                    16 | 17 => (*hil::flash::h1b_hw::H1B_HW).program_interrupt(),
 
 //                    54 => (), // KEYMGR HKEY ALERT, ignored
                     104...109 => crypto::aes::KEYMGR0_AES.handle_interrupt(nvic_num),
