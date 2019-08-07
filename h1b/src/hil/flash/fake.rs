@@ -54,7 +54,7 @@ impl FakeHw {
         }
     }
 
-    /// Simulates the flash module successfully finishing an operation.
+    /// Simulates the flash module finishing an operation.
     pub fn finish_operation(&self) {
         if self.opcode.get() == super::driver::ERASE_OPCODE {
             // An erase is recorded as a single log entry.
@@ -65,7 +65,34 @@ impl FakeHw {
         // indicate an error.
         if self.log_len.get() + self.transaction_size.get() > self.log.len() {
             // "Program failed" error.
-            return self.inject_result(0x8);
+            self.inject_result(0x8);
+            return;
+        }
+
+        // Attempting to set a 0 bit to a 1 during a write causes the flash
+        // module to emit a "program failed" error. To emulate this behavior, we
+        // scan backwards through the transaction log until we find an erase,
+        // checking if each write is compatible with this new write.
+        for entry_cell in self.log[0..self.log_len.get()].iter().rev() {
+            let entry = entry_cell.get();
+
+            // Check if it is an erase.
+            if entry.value == core::u32::MAX { break; }
+
+            // Check if this log entry is in the current operation's range.
+            if entry.offset >= self.transaction_offset.get() &&
+               entry.offset < self.transaction_offset.get() + self.transaction_size.get() {
+                // It overlaps; check whether this write has a bit set that the
+                // previous write did not.
+                let new_value =
+                    self.write_data[entry.offset - self.transaction_offset.get()].get();
+                if new_value & !entry.value != 0 {
+                    // This operation tried to flip a bit back to 1, so trigger
+                    // an error.
+                    self.inject_result(0x8);
+                    return;
+                }
+            }
         }
 
         for i in 0..self.transaction_size.get() {
@@ -97,23 +124,22 @@ impl super::hardware::Hardware for FakeHw {
     }
 
     fn read(&self, offset: usize) -> u32 {
-        // Pretend that flash was initialized to all ones.
-        let mut value = 0xFFFFFFFF;
-        // Replay the operation log to find the current value.
-        for entry in self.log[0..self.log_len.get()].iter().map(|e| e.get()) {
+        // Replay the operation log in reverse to find the current value.
+        for entry in self.log[0..self.log_len.get()].iter().rev() {
+            let entry = entry.get();
             if entry.value == core::u32::MAX {
                 // Erase
                 if offset >= entry.offset && offset < entry.offset + 512 {
-                    value = core::u32::MAX;
+                    return core::u32::MAX;
                 }
             } else {
                 // Write
-                if offset == entry.offset {
-                    value &= entry.value;
-                }
+                if offset == entry.offset { return entry.value; }
             }
         }
-        value
+
+        // Pretend that flash was initialized to all ones.
+        core::u32::MAX
     }
 
     fn read_error(&self) -> u16 {
