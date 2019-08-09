@@ -34,6 +34,7 @@ pub mod aes;
 pub mod dcrypto;
 pub mod dcrypto_test;
 pub mod debug_syscall;
+mod flash_test;
 pub mod personality;
 
 use capsules::alarm::AlarmDriver;
@@ -51,6 +52,8 @@ use kernel::hil::rng::Rng;
 
 use h1b::crypto::dcrypto::Dcrypto;
 use h1b::usb::{Descriptor, StringDescriptor};
+
+use h1b::timels::Timels;
 
 // State for loading apps
 const NUM_PROCS: usize = 1;
@@ -71,7 +74,7 @@ pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 pub struct Golf {
     console: &'static capsules::console::Console<'static, UartDevice<'static>>,
     gpio: &'static capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
-    timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>>,
+    timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
     ipc: kernel::ipc::IPC,
     digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
@@ -125,6 +128,7 @@ static mut STRINGS: [StringDescriptor; 7] = [
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
+
     h1b::init();
 
     let timerhs = {
@@ -223,21 +227,21 @@ pub unsafe fn reset_handler() {
     }
 
     let alarm_mux = static_init!(
-        capsules::virtual_alarm::MuxAlarm<'static, h1b::timels::Timels<'static>>,
+        capsules::virtual_alarm::MuxAlarm<'static, Timels<'static>>,
         capsules::virtual_alarm::MuxAlarm::new(&h1b::timels::TIMELS0));
     h1b::timels::TIMELS0.set_client(alarm_mux);
 
-    let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>,
+    let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
                                            VirtualMuxAlarm::new(alarm_mux));
     let flash = static_init!(
-        h1b::hil::flash::Flash<'static, VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>>,
+        h1b::hil::flash::Flash<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
         h1b::hil::flash::Flash::new(flash_virtual_alarm, &*h1b::hil::flash::h1b_hw::H1B_HW));
     flash_virtual_alarm.set_client(flash);
 
-    let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>,
+    let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
                                            VirtualMuxAlarm::new(alarm_mux));
     let timer = static_init!(
-        AlarmDriver<'static, VirtualMuxAlarm<'static, h1b::timels::Timels<'static>>>,
+        AlarmDriver<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
         AlarmDriver::new(timer_virtual_alarm, kernel.create_grant(&grant_cap)));
     timer_virtual_alarm.set_client(timer);
 
@@ -380,8 +384,14 @@ pub unsafe fn reset_handler() {
         uint_printer: debug_syscall::UintPrinter::new(),
     };
 
+    #[allow(unused)]
+    let flash_test = static_init!(
+        flash_test::FlashTest<VirtualMuxAlarm<'static, Timels<'static>>>,
+        flash_test::FlashTest::<VirtualMuxAlarm<'static, Timels<'static>>>::new(flash));
+
     // dcrypto_test::run_dcrypto();
     //    rng_test::run_rng();
+    //flash_test.run();
 
     extern "C" {
         /// Beginning of the ROM region containing app images.
