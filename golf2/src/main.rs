@@ -34,6 +34,7 @@ pub mod aes;
 pub mod dcrypto;
 pub mod dcrypto_test;
 pub mod debug_syscall;
+pub mod personality;
 
 use capsules::alarm::AlarmDriver;
 use capsules::console;
@@ -78,6 +79,7 @@ pub struct Golf {
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
     u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
     uint_printer: debug_syscall::UintPrinter,
+    personality: &'static personality::PersonalitySyscall<'static>,
 }
 
 static mut STRINGS: [StringDescriptor; 7] = [
@@ -280,6 +282,11 @@ pub unsafe fn reset_handler() {
     h1b::trng::TRNG0.set_client(entropy_to_random);
     entropy_to_random.set_client(rng);
 
+    let personality = static_init!(
+        personality::PersonalitySyscall<'static>,
+        personality::PersonalitySyscall::new(&mut h1b::personality::PERSONALITY));
+
+
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
     {
@@ -369,6 +376,7 @@ pub unsafe fn reset_handler() {
         dcrypto: dcrypto,
         rng: rng,
         u2f_usb: u2f,
+        personality: personality,
         uint_printer: debug_syscall::UintPrinter::new(),
     };
 
@@ -407,6 +415,7 @@ impl Platform for Golf {
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
             h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
+            personality::DRIVER_NUM       => f(Some(self.personality)),
             debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
             _ =>  f(None),
         }

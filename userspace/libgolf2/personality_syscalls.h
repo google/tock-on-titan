@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod aes;
-pub mod common;
-pub mod digest;
-pub mod flash;
-pub mod personality;
-pub mod rng;
+#ifndef TOCK_PERSONALITY_H
+#define TOCK_PERSONALITY_H
+
+#include "storage.h"
+
+int tock_personality_check(void);
+int tock_get_personality(perso_st* personality);
+int tock_set_personality(const perso_st* personality);
+
+#endif

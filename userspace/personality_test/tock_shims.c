@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@
 #include "gpio.h"
 
 #include "kl.h"
+#include "storage.h"
 
 static uint32_t current_key[SHA256_DIGEST_WORDS];
 static uint32_t current_digest[SHA256_DIGEST_WORDS];
@@ -138,17 +139,6 @@ int increment_counter(void) {
   return counter;
 }
 
-int usbu2f_put_frame(const U2FHID_FRAME* frame_p) {
-  //printf("calling tock_u2f_transmit\n");
-  tock_u2f_transmit((void*)frame_p, sizeof(U2FHID_FRAME));
-  //printf("returned from tock_u2f_transmit\n");
-  return 0;
-}
-
-void usbu2f_get_frame(U2FHID_FRAME *frame_p) {
-  tock_u2f_receive((void*)frame_p, sizeof(U2FHID_FRAME));
-}
-
 uint32_t tock_chip_dev_id0(void) {
   return 0xdeadbeef;
 }
@@ -160,9 +150,6 @@ uint32_t tock_chip_dev_id1(void) {
 int tock_chip_category(void) {
   return 0x0702;
 }
-
-
-
 
 void pop_falling_callback(int __attribute__((unused)) arg1,
                           int __attribute__((unused)) arg2,
@@ -244,11 +231,10 @@ int kl_init(void) {
   uint32_t salt[8];
   int error = 0;
   size_t i;
-  printf("tock_shims.c: kl_init()\n");
   // salt rsr some
-  printf("kl_init(): generating salt\n");
+  printf("Initializing key ladder.\n");
   rand_bytes(salt, sizeof(salt));
-  //error = error || kl_step(40, salt, NULL);
+  error = error || kl_step(40, salt, NULL);
   rand_bytes(salt, sizeof(salt));
   error = error || kl_step(28, salt, NULL);
 
@@ -262,7 +248,6 @@ int kl_init(void) {
   error = error || kl_step(20, NULL, NULL);
   for (i = 0; i < 254 + 1; ++i) error = error || kl_step(25, NULL, NULL);
   error = error || kl_step(34, ISR2_SEED, NULL);
-  printf("kl_init(): salted!\n");
   return error;
 
 }
@@ -313,7 +298,7 @@ int kl_derive_ssh(const uint32_t input[8] ,
 
 static perso_st personality;
 
-const perso_st* get_personality(void) {
+perso_st* get_personality(void) {
   tock_get_personality(&personality);
   return &personality;
 }

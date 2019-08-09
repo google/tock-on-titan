@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2019 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod aes;
-pub mod common;
-pub mod digest;
-pub mod flash;
-pub mod personality;
-pub mod rng;
+#ifndef __FIPS_ENTROPY_H
+#define __FIPS_ENTROPY_H
+
+void flash_info_read_enable(uint32_t addr, uint32_t size);
+void flash_info_read_enable(uint32_t addr, uint32_t size) {}
+
+uint32_t flash_physical_info_read_word(uint32_t addr);
+uint32_t flash_physical_info_read_word(uint32_t addr) {
+  return fips_entropy[addr];
+}
+
+#endif
