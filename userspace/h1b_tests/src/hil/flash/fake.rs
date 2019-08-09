@@ -60,7 +60,7 @@ fn fake_hw() -> bool {
 	// Operation 3: successful write to one word. Verifies the write doesn't
 	// overlap to the next word.
 	fake.set_transaction(1300, 1 - 1);
-	fake.set_write_data(&[0xFFFFC0FF]);
+	fake.set_write_data(&[0xFFFF00FF]);
 	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
 	require!(fake.is_programming() == true);
 	fake.inject_result(0);
@@ -118,6 +118,50 @@ fn fake_hw() -> bool {
 	require!(fake.read(1023) == 0xFFFFFFFF);
 	require!(fake.read(1300) == 0xFFFFFFFF);
 	require!(fake.read(1301) == 0xFFFFFFFF);
+
+	true
+}
+
+/// Verify the fake correctly emulates the flash hardware's behavior when a
+/// write operation tries to set a bit from 0 to 1.
+#[test]
+fn write_set_bit() -> bool {
+	use { h1b::hil::flash::Hardware, test::require };
+	let fake = h1b::hil::flash::fake::FakeHw::new();
+
+	// Operation 1: successful write.
+	fake.set_transaction(1300, 1 - 1);
+	fake.set_write_data(&[0xFFFF0FFF]);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
+	require!(fake.is_programming() == true);
+	fake.inject_result(0);
+	require!(fake.is_programming() == false);
+	require!(fake.read_error() == 0);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
+	require!(fake.is_programming() == true);
+	fake.finish_operation();
+	require!(fake.read_error() == 0);
+	require!(fake.is_programming() == false);
+	require!(fake.read(512) == 0xFFFFFFFF);
+	require!(fake.read(1023) == 0xFFFFFFFF);
+	require!(fake.read(1300) == 0xFFFF0FFF);
+
+	// Operation 2: failed write. Verifies the write doesn't change anything.
+	fake.set_transaction(1300, 1 - 1);
+	fake.set_write_data(&[0x0000F000]);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
+	require!(fake.is_programming() == true);
+	fake.inject_result(0);
+	require!(fake.is_programming() == false);
+	require!(fake.read_error() == 0);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
+	require!(fake.is_programming() == true);
+	fake.finish_operation();
+	require!(fake.read_error() == 0x8);
+	require!(fake.is_programming() == false);
+	require!(fake.read(512) == 0xFFFFFFFF);
+	require!(fake.read(1023) == 0xFFFFFFFF);
+	require!(fake.read(1300) == 0xFFFF0FFF);
 
 	true
 }
