@@ -261,6 +261,10 @@ impl super::hardware::Hardware<'static> for H1bHw {
 
 	fn set_transaction(&self, offset: usize, size: usize) {
 		use self::TransactionParameters::{Offset,Size};
+		// The offset is relative to the beginning of the flash module. There
+		// are 128 pages per flash module.
+		// TODO(jrvanwhy): Assumes the read is from the second flash bank.
+		let offset = offset - 128 * super::WORDS_PER_PAGE;
 		self.transaction_parameters.write(Offset.val(offset as u32) + Size.val(size as u32));
 	}
 

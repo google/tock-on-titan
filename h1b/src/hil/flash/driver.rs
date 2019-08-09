@@ -64,7 +64,7 @@ impl<'d, A: Alarm, H: Hardware<'d>> Flash<'d, A, H> {
     /// Erases the specified flash page, setting it to all ones.
     pub fn erase(&self, page: usize) -> ReturnCode {
         if self.program_in_progress() { return ReturnCode::EBUSY; }
-        self.smart_program(ERASE_OPCODE, 45, 512 * page, 1);
+        self.smart_program(ERASE_OPCODE, 45, page * super::WORDS_PER_PAGE, 1);
         ReturnCode::SUCCESS
     }
 
