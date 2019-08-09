@@ -24,7 +24,7 @@ mod hardware;
 pub mod smart_program;
 
 #[cfg(feature = "test")]
-pub type Flash<'h, A> = self::driver::Flash<'h, A, self::fake::FakeHw<'h>>;
+pub type Flash<'h, A> = self::driver::Flash<'h, A, self::fake::FakeHw>;
 
  #[cfg(not(feature = "test"))]
 pub type Flash<'h, A> = self::driver::Flash<'static, A, self::h1b_hw::H1bHw>;

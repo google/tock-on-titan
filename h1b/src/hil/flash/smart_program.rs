@@ -19,8 +19,8 @@ use ::kernel::hil::time::{Alarm,Frequency};
 use ::kernel::ReturnCode;
 
 pub enum SmartProgramState {
-	Init(/*attempts_remaining*/ u8),
-	Running(/*attempts_remaining*/ u8),
+	Init(/*attempts_remaining*/ u8, /*final_pulse_needed*/ bool, /*timeout_nanoseconds*/ u32),
+	Running(/*attempts_remaining*/ u8, /*final_pulse_needed*/ bool, /*timeout_nanoseconds*/ u32),
 	Finished(/*return_code*/ ReturnCode),
 }
 
@@ -29,8 +29,8 @@ use self::SmartProgramState::{Init,Finished,Running};
 impl SmartProgramState {
 	/// Initialize the smart programming state machine. The state machine must
 	/// be stepped before it will do anything.
-	pub fn init(max_attempts: u8) -> Self {
-		Init(max_attempts)
+	pub fn init(max_attempts: u8, final_pulse_needed: bool, timeout_nanoseconds: u32) -> Self {
+		Init(max_attempts, final_pulse_needed, timeout_nanoseconds)
 	}
 
 	/// Returns the return code for the smart program execution, or None if it
@@ -40,31 +40,34 @@ impl SmartProgramState {
 	}
 
 	/// Performs a state machine update during smart programming. This should be
-	/// done during initialization, after an interrupt, and when a timeout
-	/// expires.
-	pub fn step<'h, A: Alarm, H: super::hardware::Hardware<'h>>(
-		self, alarm: &A, hw: &H, opcode: u32, is_timeout: bool) -> Self
+	/// done during initialization and when a wait finishes.
+	pub fn step<A: Alarm, H: super::hardware::Hardware>(
+		self, alarm: &A, hw: &H, opcode: u32) -> Self
 	{
 		match self {
-			Init(attempts_remaining) => {
+			Init(attempts_remaining, final_pulse_needed, timeout_nanoseconds) => {
 				hw.trigger(opcode);
-				set_program_timeout(alarm);
-				Running(attempts_remaining - 1)
+				set_program_timeout(alarm, timeout_nanoseconds);
+				Running(attempts_remaining - 1, final_pulse_needed, timeout_nanoseconds)
 			},
-			Running(attempts_remaining) => {
+			Running(attempts_remaining, final_pulse_needed, timeout_nanoseconds) => {
 				// Copied from Cr50: a timeout causes an immediate failure with
 				// no retry.
-				if is_timeout {
+				if hw.is_programming() {
 					alarm.disable();
 					return Finished(ReturnCode::FAIL);
 				}
 
-				// If this was a spurious interrupt, ignore it.
-				if hw.is_programming() { return Running(attempts_remaining); }
-
 				// Check for a successful operation.
 				let error = hw.read_error();
 				if error == 0 {
+					// If final_pulse_needed, trigger one last smart programming
+					// cycle. Otherwise indicate success.
+					if final_pulse_needed {
+						hw.trigger(opcode);
+						set_program_timeout(alarm, timeout_nanoseconds);
+						return Running(0, false, timeout_nanoseconds);
+					}
 					alarm.disable();
 					return Finished(ReturnCode::SUCCESS);
 				}
@@ -74,8 +77,9 @@ impl SmartProgramState {
 				if attempts_remaining > 0 {
 					// Operation failed; retry.
 					hw.trigger(opcode);
-					set_program_timeout(alarm);
-					return SmartProgramState::Running(attempts_remaining - 1);
+					set_program_timeout(alarm, timeout_nanoseconds);
+					return SmartProgramState::Running(attempts_remaining - 1,
+						final_pulse_needed, timeout_nanoseconds);
 				}
 
 				// The operation failed max_attempts times -- indicate an error.
@@ -99,17 +103,12 @@ pub fn decode_error(error_flags: u16) -> ReturnCode {
 
 // Divide two u32's while rounding up (rather than the default round-down
 // behavior).
-pub fn div_round_up(numerator: u32, denominator: u32) -> u32 {
+pub fn div_round_up(numerator: u64, denominator: u64) -> u64 {
 	numerator / denominator + if numerator % denominator == 0 { 0 } else { 1 }
 }
 
-// Sets an alarm for 150ms in the future. 150ms comes from the Cr50 source code
-// ({1} at the bottom of this file).
-fn set_program_timeout<A: Alarm>(alarm: &A) {
-	// 150ms is 3/20th of a second.
-	alarm.set_alarm(alarm.now() + div_round_up(A::Frequency::frequency() * 3, 20));
+fn set_program_timeout<A: Alarm>(alarm: &A, timeout_nanoseconds: u32) {
+	alarm.set_alarm(alarm.now().wrapping_add(
+		div_round_up(A::Frequency::frequency() as u64 * timeout_nanoseconds as u64,
+		             1_000_000_000) as u32));
 }
-
-// Links that are too long to inline:
-//
-// {1} https://chromium.googlesource.com/chromiumos/platform/ec/+/8a411be5297f9886e6ee8bf1fdac7fe6b7e53667/chip/g/flash.c#242

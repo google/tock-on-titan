@@ -31,6 +31,11 @@ fn fake_hw() -> bool {
 	fake.set_write_data(&[0xFFFF0FFF, 0xFFFAFFFF]);
 	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
 	require!(fake.is_programming() == true);
+	fake.inject_result(0);
+	require!(fake.is_programming() == false);
+	require!(fake.read_error() == 0);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
+	require!(fake.is_programming() == true);
 	fake.finish_operation();
 	require!(fake.read_error() == 0);
 	require!(fake.is_programming() == false);
@@ -44,7 +49,7 @@ fn fake_hw() -> bool {
 	fake.set_write_data(&[0xFFFF00FF, 0xFFAAFFFF]);
 	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
 	require!(fake.is_programming() == true);
-	fake.inject_error(0x8);  // Program failed
+	fake.inject_result(0x8);  // Program failed
 	require!(fake.read_error() == 0x8);
 	require!(fake.is_programming() == false);
 	require!(fake.read(512) == 0xFFFFFFFF);
@@ -56,6 +61,11 @@ fn fake_hw() -> bool {
 	// overlap to the next word.
 	fake.set_transaction(1300, 1 - 1);
 	fake.set_write_data(&[0xFFFFC0FF]);
+	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
+	require!(fake.is_programming() == true);
+	fake.inject_result(0);
+	require!(fake.is_programming() == false);
+	require!(fake.read_error() == 0);
 	fake.trigger(h1b::hil::flash::driver::WRITE_OPCODE);
 	require!(fake.is_programming() == true);
 	fake.finish_operation();

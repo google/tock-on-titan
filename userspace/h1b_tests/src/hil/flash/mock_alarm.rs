@@ -29,7 +29,7 @@ impl MockAlarm {
 
 #[cfg(test)]
 impl kernel::hil::time::Time for MockAlarm {
-	type Frequency = kernel::hil::time::Freq1KHz;
+	type Frequency = kernel::hil::time::Freq16MHz;
 	fn disable(&self) { self.setpoint.set(None); }
 	fn is_armed(&self) -> bool { self.setpoint.get().is_some() }
 }

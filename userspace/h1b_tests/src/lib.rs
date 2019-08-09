@@ -14,6 +14,11 @@
 
 #![no_std]
 
+// Rust complains that things are unused if they are only used when cfg(test) is
+// true. If we include modules when cfg(test) is false, then declarations in the
+// modules need to be marked #[cfg(test)]. Instead, we simply do not include the
+// code in other configs.
+#[cfg(test)]
 mod hil;
 
 #[test]

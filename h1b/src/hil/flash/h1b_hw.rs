@@ -19,9 +19,6 @@ use kernel::common::registers::ReadWrite;
 // trigger a fault), and should only be manipulated by the flash hardware.
 pub static mut H1B_HW: *const H1bHw = 0x40720000 as *const H1bHw;
 
-// We're relying on the fact that Tock is single-threaded for thread safety.
-static mut CLIENT: Option<&'static super::hardware::Client> = None;
-
 register_bitfields![u32,
 	TransactionParameters [
 		Offset OFFSET(0) NUMBITS(16) [],
@@ -33,7 +30,7 @@ register_bitfields![u32,
 #[repr(C)]
 pub struct H1bHw {
 	/// Read/Program/Erase control for flash macro 0.
-	pe_control_0: VolatileCell<u32>,
+	_pe_control_0: VolatileCell<u32>,
 
 	/// Read/Program/Erase control for flash macro 1.
 	pe_control_1: VolatileCell<u32>,
@@ -42,17 +39,17 @@ pub struct H1bHw {
 	transaction_parameters: ReadWrite<u32, TransactionParameters::Register>,
 
 	/// Read/erase/program lockdown modes for the various flash regions.
-	lockdown_triggers: VolatileCell<u32>,
+	_lockdown_triggers: VolatileCell<u32>,
 
 	/// Triggers a read of info 0 data to check for secure data write functionality. Only available
 	/// in test mode.
 	_enable_info0_shadow_read: VolatileCell<u32>,
 
 	/// Operation-completion interrupt controls.
-	interrupt_control: VolatileCell<u32>,
+	_interrupt_control: VolatileCell<u32>,
 
 	/// Operation-completion state. Cleared on read.
-	interrupt_state: VolatileCell<u32>,
+	_interrupt_state: VolatileCell<u32>,
 
 	/// Macro 0 override signal unlock.
 	_override_0_unlock: VolatileCell<u32>,
@@ -232,14 +229,7 @@ pub struct H1bHw {
 	// and are after a large address space gap.
 }
 
-impl H1bHw {
-	/// Should be called when the flash's program interrupt fires.
-	pub fn program_interrupt(&self) {
-		if let Some(client) = unsafe { CLIENT } { client.interrupt(); }
-	}
-}
-
-impl super::hardware::Hardware<'static> for H1bHw {
+impl super::hardware::Hardware for H1bHw {
 	fn is_programming(&self) -> bool {
 		// TODO(jrvanwhy): Only checks the second flash bank.
 		self.pe_control_1.get() != 0
@@ -253,10 +243,6 @@ impl super::hardware::Hardware<'static> for H1bHw {
 
 	fn read_error(&self) -> u16 {
 		self.error_code.get() as u16
-	}
-
-	fn set_client(&self, client: &'static super::hardware::Client) {
-		unsafe { CLIENT = Some(client); }
 	}
 
 	fn set_transaction(&self, offset: usize, size: usize) {
