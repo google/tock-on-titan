@@ -18,15 +18,12 @@ use ::kernel::ReturnCode;
 use super::hardware::Hardware;
 use super::smart_program::SmartProgramState;
 
-pub const ERASE_OPCODE: u32 = 0x31415927;
-pub const WRITE_OPCODE: u32 = 0x27182818;
-
 /// The H1B flash driver. The hardware interface (either the real flash modules
 /// or the fake) is injected to support testing. This will not configure the
 /// globalsec flash regions -- that must be done independently.
-pub struct Flash<'d, A: Alarm + 'd, H: Hardware + 'd> {
+pub struct FlashImpl<'d, A: Alarm + 'd, H: Hardware + 'd> {
     alarm: &'d A,
-    client: Cell<Option<&'d Client>>,
+    client: Cell<Option<&'d super::flash::Client>>,
 
     // Hardware interface. Uses shared references rather than mutable references
     // because the fake interface used in the unit tests is shared with the unit
@@ -38,21 +35,14 @@ pub struct Flash<'d, A: Alarm + 'd, H: Hardware + 'd> {
     opcode: Cell<u32>,
 }
 
-/// A client of the Flash driver -- receives callbacks when flash operations
-/// complete.
-pub trait Client {
-    fn erase_done(&self, ReturnCode);
-    fn write_done(&self, ReturnCode);
-}
-
-// Public API for Flash.
-impl<'d, A: Alarm, H: Hardware> Flash<'d, A, H> {
+// Public API for FlashImpl.
+impl<'d, A: Alarm, H: Hardware> FlashImpl<'d, A, H> {
     /// Constructs a driver for the given hardware interface. Unsafe because
     /// constructing multiple drivers for the same hardware seems like a bad
     /// idea. The caller must set the driver as the hardware's client before
     /// executing any flash operations.
     pub unsafe fn new(alarm: &'d A, hw: &'d H) -> Self {
-        Flash {
+        FlashImpl {
             alarm,
             client: Cell::new(None),
             hw,
@@ -60,9 +50,10 @@ impl<'d, A: Alarm, H: Hardware> Flash<'d, A, H> {
             opcode: Cell::new(0)
         }
     }
+}
 
-    /// Erases the specified flash page, setting it to all ones.
-    pub fn erase(&self, page: usize) -> ReturnCode {
+impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> {
+    fn erase(&self, page: usize) -> ReturnCode {
         if self.program_in_progress() { return ReturnCode::EBUSY; }
         self.smart_program(ERASE_OPCODE, /*max_attempts*/ 45, /*final_pulse_needed*/ false,
                            /*timeout_nanoseconds*/ 3_353_267,
@@ -70,15 +61,11 @@ impl<'d, A: Alarm, H: Hardware> Flash<'d, A, H> {
         ReturnCode::SUCCESS
     }
 
-    /// Reads the given word from flash.
-    pub fn read(&self, word: usize) -> u32 {
+    fn read(&self, word: usize) -> u32 {
         self.hw.read(word)
     }
 
-    /// Writes a buffer (of up to 32 words) into the given location in flash.
-    /// The target location is specified as an offset from the beginning of
-    /// flash in units of words.
-    pub fn write(&self, target: usize, data: &[u32]) -> ReturnCode {
+    fn write(&self, target: usize, data: &[u32]) -> ReturnCode {
         if data.len() > 32 { return ReturnCode::ESIZE; }
         if self.program_in_progress() { return ReturnCode::EBUSY; }
 
@@ -89,13 +76,39 @@ impl<'d, A: Alarm, H: Hardware> Flash<'d, A, H> {
         ReturnCode::SUCCESS
     }
 
-    /// Links this driver to its client.
-    pub fn set_client(&self, client: &'d Client) {
+    fn set_client(&self, client: &'d super::flash::Client) {
         self.client.set(Some(client));
     }
 }
 
-impl<'d, A: Alarm, H: Hardware> Flash<'d, A, H> {
+// -----------------------------------------------------------------------------
+// Implementation details below.
+// -----------------------------------------------------------------------------
+
+pub const ERASE_OPCODE: u32 = 0x31415927;
+pub const WRITE_OPCODE: u32 = 0x27182818;
+
+impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for FlashImpl<'d, A, H> {
+    fn fired(&self) {
+        if let Some(state) = self.smart_program_state.take() {
+            let state = state.step(
+                self.alarm, self.hw, self.opcode.get());
+            if let Some(code) = state.return_code() {
+                if let Some(client) = self.client.get() {
+                    if self.opcode.get() == WRITE_OPCODE {
+                        client.write_done(code);
+                    } else {
+                        client.erase_done(code);
+                    }
+                }
+            } else {
+                self.smart_program_state.set(Some(state));
+            }
+        }
+    }
+}
+
+impl<'d, A: Alarm, H: Hardware> FlashImpl<'d, A, H> {
     /// Returns true if an operation is in progress and false otherwise.
     fn program_in_progress(&self) -> bool {
         // SmartProgramState is not Copy, so we can't use Cell::get() or
@@ -117,25 +130,5 @@ impl<'d, A: Alarm, H: Hardware> Flash<'d, A, H> {
             SmartProgramState::init(max_attempts, final_pulse_needed, timeout_nanoseconds)
                 .step(self.alarm, self.hw, opcode)));
         self.opcode.set(opcode);
-    }
-}
-
-impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for Flash<'d, A, H> {
-    fn fired(&self) {
-        if let Some(state) = self.smart_program_state.take() {
-            let state = state.step(
-                self.alarm, self.hw, self.opcode.get());
-            if let Some(code) = state.return_code() {
-                if let Some(client) = self.client.get() {
-                    if self.opcode.get() == WRITE_OPCODE {
-                        client.write_done(code);
-                    } else {
-                        client.erase_done(code);
-                    }
-                }
-            } else {
-                self.smart_program_state.set(Some(state));
-            }
-        }
     }
 }

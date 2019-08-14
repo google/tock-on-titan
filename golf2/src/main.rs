@@ -234,8 +234,8 @@ pub unsafe fn reset_handler() {
     let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
                                            VirtualMuxAlarm::new(alarm_mux));
     let flash = static_init!(
-        h1b::hil::flash::Flash<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
-        h1b::hil::flash::Flash::new(flash_virtual_alarm, &*h1b::hil::flash::h1b_hw::H1B_HW));
+        h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
+        h1b::hil::flash::FlashImpl::new(flash_virtual_alarm, &*h1b::hil::flash::h1b_hw::H1B_HW));
     flash_virtual_alarm.set_client(flash);
 
     let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
@@ -386,8 +386,11 @@ pub unsafe fn reset_handler() {
 
     #[allow(unused)]
     let flash_test = static_init!(
-        flash_test::FlashTest<VirtualMuxAlarm<'static, Timels<'static>>>,
-        flash_test::FlashTest::<VirtualMuxAlarm<'static, Timels<'static>>>::new(flash));
+        flash_test::FlashTest<
+            h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels<'static>>>>,
+        flash_test::FlashTest::<
+            h1b::hil::flash::FlashImpl<'static,
+                                       VirtualMuxAlarm<'static, Timels<'static>>>>::new(flash));
 
     // dcrypto_test::run_dcrypto();
     //    rng_test::run_rng();
