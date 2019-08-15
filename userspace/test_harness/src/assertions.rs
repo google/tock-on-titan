@@ -15,12 +15,35 @@
 /// Verifies its input is true, otherwise returns false. Similar to assert!(),
 /// but returns false rather than panicking on failure.
 
+pub fn print_failure(expr: &str) {
+    let mut console = libtock::console::Console::new();
+    console.write("FAILED: ");
+    console.write(expr);
+    console.write("\n");
+}
+
 #[macro_export]
 macro_rules! require {
     ($expr:expr) => (if !$expr {
-        use core::fmt::Write;
-        let _ = writeln!(libtock::console::Console::new(), "FAILED: {}", stringify!($expr));
+        test::print_failure(stringify!($expr));
         return false;
     });
     ($expr:expr,) => (require!($expr));
+}
+
+/// Verifies lhs and rhs are equal, otherwise returns false. Asks for an
+/// assertion name which is printed in the failure.
+#[macro_export]
+macro_rules! require_eq {
+    ($name:expr, $lhs:expr, $rhs:expr) => (
+        let lhs = $lhs;
+        let rhs = $rhs;
+        if lhs != rhs {
+            use core::fmt::Write;
+            let _ = writeln!(libtock::console::Console::new(),
+                             "FAILED: {}, {:?} != {:?}", $name, lhs, rhs);
+            return false;
+        }
+    );
+    ($name:expr, $lhs:expr, $rhs:expr,) => (require_eq!($name, $lhs, $rhs));
 }
