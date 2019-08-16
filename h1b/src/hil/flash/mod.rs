@@ -19,17 +19,18 @@
 pub mod driver;
 #[cfg(feature = "test")]
 pub mod fake;
+pub mod flash;
 pub mod h1b_hw;
 mod hardware;
 pub mod smart_program;
 
 #[cfg(feature = "test")]
-pub type Flash<'h, A> = self::driver::Flash<'h, A, self::fake::FakeHw>;
+pub type FlashImpl<'h, A> = self::driver::FlashImpl<'h, A, self::fake::FakeHw>;
 
  #[cfg(not(feature = "test"))]
-pub type Flash<'h, A> = self::driver::Flash<'static, A, self::h1b_hw::H1bHw>;
+pub type FlashImpl<'h, A> = self::driver::FlashImpl<'static, A, self::h1b_hw::H1bHw>;
 
-pub use self::driver::Client;
+pub use self::flash::{Client,Flash};
 pub use self::hardware::Hardware;
 
 // Constants used by multiple submodules.

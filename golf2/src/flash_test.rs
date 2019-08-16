@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ::kernel::hil::time::Alarm;
 use ::kernel::ReturnCode;
 use ::h1b::hil::flash::Flash;
 
 /// Test tool for the flash driver -- runs test cases using the provided driver.
 /// Used for integration testing against the real hardware. Will set itself as
 /// the flash driver's client.
-pub struct FlashTest<A: Alarm + 'static> {
-    driver: &'static Flash<'static, A>,
+pub struct FlashTest<F: Flash<'static> + 'static> {
+    driver: &'static F,
     state: ::core::cell::Cell<Option<Tests>>,
 }
 
-impl<A: Alarm> ::h1b::hil::flash::Client for FlashTest<A> {
+impl<F: Flash<'static> + 'static> ::h1b::hil::flash::Client for FlashTest<F> {
     fn erase_done(&self, code: ReturnCode) {
         match self.state.take() {
             None => println!("FlashTest FAIL: erase_done() w/ state == None"),
@@ -46,11 +45,11 @@ impl<A: Alarm> ::h1b::hil::flash::Client for FlashTest<A> {
     }
 }
 
-impl<A: Alarm + 'static> FlashTest<A> {
+impl<F: Flash<'static> + 'static> FlashTest<F> {
     const TEST_PAGE: usize = 255;
     const TEST_WORD: usize = 512 * Self::TEST_PAGE;
 
-    pub fn new(driver: &'static Flash<'static, A>) -> Self {
+    pub fn new(driver: &'static F) -> Self {
         FlashTest { driver, state: ::core::cell::Cell::new(None) }
     }
 

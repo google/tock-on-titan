@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(test)]
-use { h1b::hil::flash::Hardware, kernel::hil::time::Alarm, test::require };
+use h1b::hil::flash::{Flash,Hardware};
+use kernel::hil::time::Alarm;
+use test::require;
 
 // These are in counts of a 16 MHz clock.
 #[cfg(test)]
@@ -61,7 +62,7 @@ fn erase() -> bool {
 	let hw = h1b::hil::flash::fake::FakeHw::new();
 
 	// First attempt.
-	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
+	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
 	driver.set_client(&client);
 	require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
 	require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
@@ -95,7 +96,7 @@ fn erase_max_retries() -> bool {
 	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
 	let client = MockClient::new();
 	let hw = h1b::hil::flash::fake::FakeHw::new();
-	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
+	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
 	driver.set_client(&client);
 	require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
 	require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
@@ -132,7 +133,7 @@ fn write_then_erase() -> bool {
 	let hw = h1b::hil::flash::fake::FakeHw::new();
 
 	// Write
-	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
+	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
 	driver.set_client(&client);
 	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
 	require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
@@ -152,7 +153,7 @@ fn write_then_erase() -> bool {
 	require!(driver.read(1300) == 0xFFFFABCD);
 
 	// Erase
-	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
+	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
 	driver.set_client(&client);
 	require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
 	require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
@@ -177,7 +178,7 @@ fn successful_program() -> bool {
 	let hw = h1b::hil::flash::fake::FakeHw::new();
 
 	// First attempt.
-	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
+	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
 	driver.set_client(&client);
 	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
 	require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
@@ -219,7 +220,7 @@ fn timeout() -> bool {
 	hw.set_write_data(&[0xFFFF0FFF]);
 
 	// First attempt.
-	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
+	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
 	driver.set_client(&client);
 	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
 	require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
@@ -241,7 +242,7 @@ fn write_max_retries() -> bool {
 	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
 	let client = MockClient::new();
 	let hw = h1b::hil::flash::fake::FakeHw::new();
-	let driver = unsafe { h1b::hil::flash::Flash::new(&alarm, &hw) };
+	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
 	driver.set_client(&client);
 	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
 	require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
