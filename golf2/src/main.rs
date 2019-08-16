@@ -36,6 +36,7 @@ pub mod dcrypto_test;
 pub mod debug_syscall;
 mod flash_test;
 pub mod personality;
+pub mod virtual_flash;
 
 use capsules::alarm::AlarmDriver;
 use capsules::console;

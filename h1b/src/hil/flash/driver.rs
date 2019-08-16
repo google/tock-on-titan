@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use core::cell::Cell;
+use ::kernel::common::cells::TakeCell;
 use ::kernel::hil::time::Alarm;
 use ::kernel::ReturnCode;
 use super::hardware::Hardware;
@@ -23,7 +24,8 @@ use super::smart_program::SmartProgramState;
 /// globalsec flash regions -- that must be done independently.
 pub struct FlashImpl<'d, A: Alarm + 'd, H: Hardware + 'd> {
     alarm: &'d A,
-    client: Cell<Option<&'d super::flash::Client>>,
+    client: Cell<Option<&'d super::flash::Client<'d>>>,
+    write_data: TakeCell<'d, [u32]>,
 
     // Hardware interface. Uses shared references rather than mutable references
     // because the fake interface used in the unit tests is shared with the unit
@@ -45,6 +47,7 @@ impl<'d, A: Alarm, H: Hardware> FlashImpl<'d, A, H> {
         FlashImpl {
             alarm,
             client: Cell::new(None),
+            write_data: TakeCell::empty(),
             hw,
             smart_program_state: Cell::new(None),
             opcode: Cell::new(0)
@@ -65,18 +68,19 @@ impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> 
         self.hw.read(word)
     }
 
-    fn write(&self, target: usize, data: &[u32]) -> ReturnCode {
+    fn write(&self, target: usize, data: &'d mut [u32]) -> ReturnCode {
         if data.len() > 32 { return ReturnCode::ESIZE; }
         if self.program_in_progress() { return ReturnCode::EBUSY; }
-
+        let len = data.len();
         self.hw.set_write_data(data);
+        self.write_data.replace(data);
         self.smart_program(WRITE_OPCODE, /*max_attempts*/ 8, /*final_pulse_needed*/ true,
-                           /*timeout_nanoseconds*/ 48734 + data.len() as u32 * 3734,
-                           target, data.len());
+                           /*timeout_nanoseconds*/ 48734 + len as u32 * 3734,
+                           target, len);
         ReturnCode::SUCCESS
     }
 
-    fn set_client(&self, client: &'d super::flash::Client) {
+    fn set_client(&self, client: &'d super::flash::Client<'d>) {
         self.client.set(Some(client));
     }
 }
@@ -96,7 +100,8 @@ impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for FlashImpl<'d, A,
             if let Some(code) = state.return_code() {
                 if let Some(client) = self.client.get() {
                     if self.opcode.get() == WRITE_OPCODE {
-                        client.write_done(code);
+                        client.write_done(self.write_data.take().unwrap(),
+                                          code);
                     } else {
                         client.erase_done(code);
                     }
