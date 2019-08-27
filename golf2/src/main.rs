@@ -16,8 +16,6 @@
 #![no_main]
 #![feature(asm, const_fn, lang_items, compiler_builtins_lib)]
 #![feature(in_band_lifetimes)]
-#![feature(infer_outlives_requirements)]
-#![feature(panic_implementation)]
 #![feature(core_intrinsics)]
 
 extern crate capsules;
@@ -221,7 +219,7 @@ pub unsafe fn reset_handler() {
 
     let gpio = static_init!(
         capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
-        capsules::gpio::GPIO::new(gpio_pins));
+        capsules::gpio::GPIO::new(gpio_pins, kernel.create_grant(&grant_cap)));
     for pin in gpio_pins.iter() {
         pin.set_client(gpio)
     }
