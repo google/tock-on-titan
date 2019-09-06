@@ -15,7 +15,6 @@
 use core::cell::Cell;
 use ::kernel::common::cells::{OptionalCell, TakeCell};
 use ::kernel::common::{List, ListLink, ListNode};
-use ::kernel::hil::time::Alarm;
 use ::kernel::ReturnCode;
 use ::h1b::hil::flash::Flash;
 use ::h1b::hil::flash::Client;
@@ -59,6 +58,18 @@ impl<'f> Client<'f> for MuxFlash<'f> {
 }
 
 
+impl<'f> FlashUser<'f> {
+    pub const fn new(mux: &'f MuxFlash<'f>) -> FlashUser<'f> {
+        FlashUser {
+            mux: mux,
+            buffer: TakeCell::empty(),
+            operation: Cell::new(Operation::Idle),
+            next: ListLink::empty(),
+            client: OptionalCell::empty()
+        }
+    }
+}
+
 impl<'f> Flash<'f> for FlashUser<'f> {
     fn erase(&self, page: usize) -> ReturnCode {
         if self.operation.get() != Operation::Idle {
@@ -89,8 +100,13 @@ impl<'f> Flash<'f> for FlashUser<'f> {
 
 
 impl Client<'f> for FlashUser<'f> {
-    fn erase_done(&self, rcode: ReturnCode) {}
-    fn write_done(&self, data: &'f mut [u32], rcode: ReturnCode) {}
+    fn erase_done(&self, rcode: ReturnCode) {
+        self.client.map(|client| client.erase_done(rcode));
+    }
+
+    fn write_done(&self, data: &'f mut [u32], rcode: ReturnCode) {
+        self.client.map(move |client| client.write_done(data, rcode));
+    }
 }
 
 impl<'f> MuxFlash<'f> {

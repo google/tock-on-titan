@@ -36,7 +36,7 @@ impl<F: Flash<'static> + 'static> ::h1b::hil::flash::Client<'static> for FlashTe
         }
     }
 
-    fn write_done(&self, data: &'static mut [u32], code: ReturnCode) {
+    fn write_done(&self, _data: &'static mut [u32], code: ReturnCode) {
         match self.state.take() {
             None => println!("FlashTest FAIL: write_done() w/ state == None"),
             Some(Tests::Erase1) => println!("FlashTest FAIL: write_done() during Erase"),

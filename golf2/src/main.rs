@@ -232,12 +232,21 @@ pub unsafe fn reset_handler() {
         capsules::virtual_alarm::MuxAlarm::new(&h1b::timels::TIMELS0));
     h1b::timels::TIMELS0.set_client(alarm_mux);
 
+    // Create flash driver and its virtualization
     let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
                                            VirtualMuxAlarm::new(alarm_mux));
     let flash = static_init!(
         h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
         h1b::hil::flash::FlashImpl::new(flash_virtual_alarm, &*h1b::hil::flash::h1b_hw::H1B_HW));
     flash_virtual_alarm.set_client(flash);
+
+    let flash_mux = static_init!(
+        virtual_flash::MuxFlash<'static>,
+        virtual_flash::MuxFlash::new(flash));
+
+    let flash_user = static_init!(
+        virtual_flash::FlashUser<'static>,
+        virtual_flash::FlashUser::new(flash_mux));
 
     let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
                                            VirtualMuxAlarm::new(alarm_mux));
