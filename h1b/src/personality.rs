@@ -31,6 +31,9 @@ pub struct PersonalityDriver<'a> {
 pub static mut PERSONALITY: PersonalityDriver<'static> = unsafe {PersonalityDriver::new() };
 
 const PERSONALITY_SIZE: usize = 2048;
+
+// Personality data is stored as the third-to-last (N-3) page of flash;
+// it is followed by the two pages used as a counter.
 const PERSONALITY_ADDDRESS: usize = 0;
 
 static mut PERSO: PersonalityData = PersonalityData {
