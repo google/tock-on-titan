@@ -84,13 +84,13 @@ impl<'f> Flash<'f> for FlashUser<'f> {
         self.mux.read(word)
     }
 
-    fn write(&self, target: usize, data: &'f mut [u32]) -> ReturnCode {
+    fn write(&self, target: usize, data: &'f mut [u32]) -> (ReturnCode, Option<&'f mut [u32]>) {
         if self.operation.get() != Operation::Idle {
-            return ReturnCode::EBUSY;
+            return (ReturnCode::EBUSY, Some(data));
         }
         self.buffer.replace(data);
         self.operation.set(Operation::Write(target));
-        ReturnCode::SUCCESS
+        (ReturnCode::SUCCESS, None)
     }
 
     fn set_client(&self, client: &'f Client<'f>) {

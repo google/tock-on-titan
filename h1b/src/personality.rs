@@ -18,14 +18,14 @@
 
 use core::mem;
 use hil::personality::{Client, Personality, PersonalityData};
-use hil::flash::Flash;
+use hil::flash;
 use kernel::ReturnCode;
 use kernel::common::cells::OptionalCell;
 
 
 pub struct PersonalityDriver<'a> {
     client: OptionalCell<&'a Client>,
-    flash: OptionalCell<&'a Flash<'a>>,
+    flash: OptionalCell<&'a flash::Flash<'a>>,
 }
 
 pub static mut PERSONALITY: PersonalityDriver<'static> = unsafe {PersonalityDriver::new() };
@@ -51,7 +51,7 @@ impl<'a> PersonalityDriver<'a> {
         }
     }
 
-    fn set_flash(&self, flash: &'a Flash<'a>) {
+    pub fn set_flash(&self, flash: &'a flash::Flash<'a>) {
         self.flash.set(flash);
     }
 
@@ -100,5 +100,14 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
             }
             ReturnCode::SUCCESS
         }
+    }
+}
+
+impl<'a> flash::Client<'a> for PersonalityDriver<'a> {
+    fn erase_done(&self, rcode: ReturnCode) {
+
+    }
+    fn write_done(&self, data: &'a mut [u32], rcode: ReturnCode) {
+
     }
 }

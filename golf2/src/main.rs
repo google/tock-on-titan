@@ -296,6 +296,7 @@ pub unsafe fn reset_handler() {
     h1b::trng::TRNG0.set_client(entropy_to_random);
     entropy_to_random.set_client(rng);
 
+    h1b::personality::PERSONALITY.set_flash(flash_user);
     let personality = static_init!(
         personality::PersonalitySyscall<'static>,
         personality::PersonalitySyscall::new(&mut h1b::personality::PERSONALITY));
