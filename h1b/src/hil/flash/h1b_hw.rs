@@ -21,13 +21,13 @@ use kernel::common::registers::ReadWrite;
 // trigger a fault), and should only be manipulated by the flash hardware.
 pub static mut H1B_HW: *const H1bHw = 0x40720000 as *const H1bHw;
 
-const H1B_FLASH_START: usize     = 0x40000;
-const H1B_FLASH_BANK_SIZE: usize = 0x40000;
-const H1B_FLASH_SIZE: usize      = 0x80000; // Two banks
+pub const H1B_FLASH_START: usize     = 0x40000;
+pub const H1B_FLASH_BANK_SIZE: usize = 0x40000;
+pub const H1B_FLASH_SIZE: usize      = 0x80000; // Two banks
 
-const H1B_INFO_0_START: usize    = 0x20000;
-const H1B_INFO_1_START: usize    = 0x28000;
-const H1B_INFO_SIZE: usize       = 0x00800;
+pub const H1B_INFO_0_START: usize    = 0x20000;
+pub const H1B_INFO_1_START: usize    = 0x28000;
+pub const H1B_INFO_SIZE: usize       = 0x00800;
 
 register_bitfields![u32,
         TransactionParameters [
