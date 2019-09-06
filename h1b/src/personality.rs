@@ -31,6 +31,7 @@ pub struct PersonalityDriver<'a> {
 pub static mut PERSONALITY: PersonalityDriver<'static> = unsafe {PersonalityDriver::new() };
 
 const PERSONALITY_SIZE: usize = 2048;
+const PERSONALITY_ADDDRESS: usize = 0;
 
 static mut PERSO: PersonalityData = PersonalityData {
     checksum: [0; 8],

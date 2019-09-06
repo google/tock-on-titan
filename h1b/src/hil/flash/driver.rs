@@ -68,16 +68,16 @@ impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> 
         self.hw.read(word)
     }
 
-    fn write(&self, target: usize, data: &'d mut [u32]) -> ReturnCode {
-        if data.len() > 32 { return ReturnCode::ESIZE; }
-        if self.program_in_progress() { return ReturnCode::EBUSY; }
+    fn write(&self, target: usize, data: &'d mut [u32]) -> (ReturnCode, Option<&'d mut [u32]>) {
+        if data.len() > 32 { return (ReturnCode::ESIZE, Some(data)); }
+        if self.program_in_progress() { return (ReturnCode::EBUSY, Some(data)); }
         let len = data.len();
         self.hw.set_write_data(data);
         self.write_data.replace(data);
         self.smart_program(WRITE_OPCODE, /*max_attempts*/ 8, /*final_pulse_needed*/ true,
                            /*timeout_nanoseconds*/ 48734 + len as u32 * 3734,
                            target, len);
-        ReturnCode::SUCCESS
+        (ReturnCode::SUCCESS, None)
     }
 
     fn set_client(&self, client: &'d super::flash::Client<'d>) {

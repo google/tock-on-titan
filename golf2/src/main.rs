@@ -45,16 +45,16 @@ use capsules::virtual_uart::{UartDevice, UartMux};
 
 use kernel::{Chip, Platform};
 use kernel::capabilities;
-use kernel::mpu::MPU;
 use kernel::hil;
-
 use kernel::hil::entropy::Entropy32;
 use kernel::hil::rng::Rng;
+use kernel::mpu::MPU;
 
 use h1b::crypto::dcrypto::Dcrypto;
+use h1b::hil::flash::Flash;
+use h1b::timels::Timels;
 use h1b::usb::{Descriptor, StringDescriptor};
 
-use h1b::timels::Timels;
 
 // State for loading apps
 const NUM_PROCS: usize = 1;
@@ -296,11 +296,12 @@ pub unsafe fn reset_handler() {
     h1b::trng::TRNG0.set_client(entropy_to_random);
     entropy_to_random.set_client(rng);
 
-    h1b::personality::PERSONALITY.set_flash(flash_user);
     let personality = static_init!(
         personality::PersonalitySyscall<'static>,
         personality::PersonalitySyscall::new(&mut h1b::personality::PERSONALITY));
 
+    h1b::personality::PERSONALITY.set_flash(flash_user);
+    flash_user.set_client(&h1b::personality::PERSONALITY);
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
