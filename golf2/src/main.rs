@@ -38,7 +38,7 @@ pub mod personality;
 use capsules::alarm::AlarmDriver;
 use capsules::console;
 use capsules::virtual_alarm::VirtualMuxAlarm;
-use capsules::virtual_uart::{UartDevice, UartMux};
+use capsules::virtual_uart::{MuxUart, UartDevice};
 
 use kernel::{Chip, Platform};
 use kernel::capabilities;
@@ -167,8 +167,8 @@ pub unsafe fn reset_handler() {
     let kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
     let uart_mux = static_init!(
-        UartMux<'static>,
-        UartMux::new(
+        MuxUart<'static>,
+        MuxUart::new(
             &h1b::uart::UART0,
             &mut capsules::virtual_uart::RX_BUF,
             115200
