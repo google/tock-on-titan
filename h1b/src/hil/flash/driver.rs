@@ -13,6 +13,8 @@
 // limitations under the License.
 
 use core::cell::Cell;
+use core::cmp;
+
 use ::kernel::common::cells::TakeCell;
 use ::kernel::hil::time::Alarm;
 use ::kernel::ReturnCode;
@@ -26,7 +28,9 @@ pub struct FlashImpl<'d, A: Alarm + 'd, H: Hardware + 'd> {
     alarm: &'d A,
     client: Cell<Option<&'d super::flash::Client<'d>>>,
     write_data: TakeCell<'d, [u32]>,
-
+    write_pos: Cell<usize>,
+    write_len: Cell<usize>,
+    write_target: Cell<usize>,
     // Hardware interface. Uses shared references rather than mutable references
     // because the fake interface used in the unit tests is shared with the unit
     // tests.
@@ -48,6 +52,9 @@ impl<'d, A: Alarm, H: Hardware> FlashImpl<'d, A, H> {
             alarm,
             client: Cell::new(None),
             write_data: TakeCell::empty(),
+            write_pos: Cell::new(0),
+            write_len: Cell::new(0),
+            write_target: Cell::new(0),
             hw,
             smart_program_state: Cell::new(None),
             opcode: Cell::new(0)
@@ -55,9 +62,12 @@ impl<'d, A: Alarm, H: Hardware> FlashImpl<'d, A, H> {
     }
 }
 
+const MAX_WRITE_SIZE: usize = 32; // Maximum single write is 32 words
+
 impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> {
     fn erase(&self, page: usize) -> ReturnCode {
         if self.program_in_progress() { return ReturnCode::EBUSY; }
+        debug!("Starting smart program for erase.");
         self.smart_program(ERASE_OPCODE, /*max_attempts*/ 45, /*final_pulse_needed*/ false,
                            /*timeout_nanoseconds*/ 3_353_267,
                            /*target*/ page * super::WORDS_PER_PAGE, /*size*/ 1);
@@ -69,18 +79,24 @@ impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> 
     }
 
     fn write(&self, target: usize, data: &'d mut [u32]) -> (ReturnCode, Option<&'d mut [u32]>) {
-        if data.len() > 32 { return (ReturnCode::ESIZE, Some(data)); }
+        let write_len = cmp::min(data.len(), MAX_WRITE_SIZE);
+
+        //if data.len() > 32 { return (ReturnCode::ESIZE, Some(data)); }
         if self.program_in_progress() { return (ReturnCode::EBUSY, Some(data)); }
-        let len = data.len();
-        self.hw.set_write_data(data);
+        self.write_pos.set(0);
+        self.write_target.set(target);
+        self.write_len.set(write_len);
+        debug!("Writing {}..{} at {}", 0, write_len, target);
+        self.hw.set_write_data(&data[0..write_len]);
         self.write_data.replace(data);
+
         self.smart_program(WRITE_OPCODE, /*max_attempts*/ 8, /*final_pulse_needed*/ true,
-                           /*timeout_nanoseconds*/ 48734 + len as u32 * 3734,
-                           target, len);
+                           /*timeout_nanoseconds*/ 48734 + write_len as u32 * 3734,
+                           target, write_len);
         (ReturnCode::SUCCESS, None)
     }
 
-    fn set_client(&self, client: &'d super::flash::Client<'d>) {
+    fn set_client(&'d self, client: &'d super::flash::Client<'d>) {
         self.client.set(Some(client));
     }
 }
@@ -97,15 +113,35 @@ impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for FlashImpl<'d, A,
         if let Some(state) = self.smart_program_state.take() {
             let state = state.step(
                 self.alarm, self.hw, self.opcode.get());
+            debug!("{:?}", state);
             if let Some(code) = state.return_code() {
                 if let Some(client) = self.client.get() {
+                    debug!("Returning {:?} to client\n", code);
                     if self.opcode.get() == WRITE_OPCODE {
-                        client.write_done(self.write_data.take().unwrap(),
-                                          code);
+                        let subwrite_end = self.write_pos.get() + self.write_len.get();
+                        let fullwrite_end = self.write_data.map_or(0, |d| d.len());
+                        if subwrite_end >= fullwrite_end || code != ReturnCode::SUCCESS {
+                            client.write_done(self.write_data.take().unwrap(),
+                                              code);
+                        } else {
+                            let next_len = cmp::min(MAX_WRITE_SIZE, fullwrite_end - subwrite_end);
+                            let next_end = subwrite_end + next_len;
+                            let target = self.write_target.get() + subwrite_end;
+                            self.write_pos.set(subwrite_end);
+                            self.write_data.map(|d|
+                                                self.hw.set_write_data(&d[subwrite_end..next_end]));
+                            self.smart_program(WRITE_OPCODE, /*max_attempts*/ 8, /*final_pulse_needed*/ true,
+                                               /*timeout_nanoseconds*/ 48734 + next_len as u32 * 3734,
+                                               target, next_len);
+                        }
                     } else {
+                        debug!("Erase done");
                         client.erase_done(code);
                     }
+                } else {
+                    debug!("No client!!!");
                 }
+
             } else {
                 self.smart_program_state.set(Some(state));
             }

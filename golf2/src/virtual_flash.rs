@@ -36,6 +36,8 @@ enum Operation {
 pub struct FlashUser<'f> {
     mux: &'f MuxFlash<'f>,
     buffer: TakeCell<'f, [u32]>,
+    write_len: Cell<usize>,
+    write_pos: Cell<usize>,
     operation: Cell<Operation>,
     next: ListLink<'f, FlashUser<'f>>,
     client: OptionalCell<&'f Client<'f>>,
@@ -43,6 +45,7 @@ pub struct FlashUser<'f> {
 
 impl<'f> Client<'f> for MuxFlash<'f> {
     fn erase_done(&self, rcode: ReturnCode) {
+        debug!("Erase done called on MuxFlash with {:?}", rcode);
         self.in_flight.take().map(move |client| {
             client.erase_done(rcode);
         });
@@ -63,6 +66,8 @@ impl<'f> FlashUser<'f> {
         FlashUser {
             mux: mux,
             buffer: TakeCell::empty(),
+            write_len: Cell::new(0),
+            write_pos: Cell::new(0),
             operation: Cell::new(Operation::Idle),
             next: ListLink::empty(),
             client: OptionalCell::empty()
@@ -88,12 +93,17 @@ impl<'f> Flash<'f> for FlashUser<'f> {
         if self.operation.get() != Operation::Idle {
             return (ReturnCode::EBUSY, Some(data));
         }
+        self.write_pos.set(target);
+        self.write_len.set(data.len());
         self.buffer.replace(data);
         self.operation.set(Operation::Write(target));
+        debug!("Set operation to write, do next op.");
+        self.mux.do_next_op();
         (ReturnCode::SUCCESS, None)
     }
 
-    fn set_client(&self, client: &'f Client<'f>) {
+    fn set_client(&'f self, client: &'f Client<'f>) {
+        self.mux.users.push_head(self);
         self.client.set(client);
     }
 }
@@ -119,8 +129,9 @@ impl<'f> MuxFlash<'f> {
     }
 
     fn do_next_op(&self) {
-        if self.in_flight.is_some() {return;} // busy
-
+        if self.in_flight.is_some() {
+            return;
+        } // busy
         let mnode = self
             .users
             .iter()
@@ -128,11 +139,14 @@ impl<'f> MuxFlash<'f> {
         // This code is mostly borrowed from virtual_flash in
         // mainline Tock's capsule directory
         mnode.map(|node| {
+            debug!("Executing on node.");
             node.buffer.take().map_or_else(
                 || {
+                    debug!("  - no buffer");
                     // Erase doesn't require a buffer
                     match node.operation.get() {
                         Operation::Erase(page_number) => {
+                            debug!("Flash virtualization calls erase {}", page_number);
                             self.driver.erase(page_number);
                         }
                         _ => {} // Signal an error on Erase and Write?
@@ -141,6 +155,7 @@ impl<'f> MuxFlash<'f> {
                 |buf| {
                     match node.operation.get() {
                         Operation::Write(offset) => {
+                            debug!(" -  writing");
                             self.driver.write(offset, buf);
                         },
                         Operation::Erase(page_number) => {
@@ -150,6 +165,7 @@ impl<'f> MuxFlash<'f> {
                     }
                 },
             );
+            node.operation.set(Operation::Idle);
             self.in_flight.set(node);
         });
     }

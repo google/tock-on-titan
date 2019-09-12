@@ -34,5 +34,5 @@ pub trait Flash<'d> {
         fn write(&self, target: usize, data: &'d mut [u32]) -> (ReturnCode, Option<&'d mut [u32]>);
 
         /// Links this driver to its client.
-        fn set_client(&self, client: &'d Client<'d>);
+        fn set_client(&'d self, client: &'d Client<'d>);
 }

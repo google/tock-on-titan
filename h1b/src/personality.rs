@@ -16,42 +16,49 @@
 //! is per-device data that will be stored durably on the device; this
 //! implementations currently stores it in RAM.
 
+use core::cmp;
 use core::mem;
+use core::cell::Cell;
 use hil::personality::{Client, Personality, PersonalityData};
 use hil::flash;
 use kernel::ReturnCode;
-use kernel::common::cells::OptionalCell;
+use kernel::common::cells::{OptionalCell, TakeCell};
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum State {
+    Idle,
+    ErasingU8,
+    WritingU8,
+    ErasingStruct,
+    WritingStruct,
+}
 
 pub struct PersonalityDriver<'a> {
-    client: OptionalCell<&'a Client>,
+    state: Cell<State>,
+    client: OptionalCell<&'a Client<'a>>,
     flash: OptionalCell<&'a flash::Flash<'a>>,
+    write_buffer: TakeCell<'a, [u32]>,
 }
 
 pub static mut PERSONALITY: PersonalityDriver<'static> = unsafe {PersonalityDriver::new() };
 
-const PERSONALITY_SIZE: usize = 2048;
+pub static mut BUFFER: [u32; PAGE_SIZE_U32] = [0; PAGE_SIZE_U32];
+
 
 // Personality data is stored as the third-to-last (N-3) page of flash;
 // it is followed by the two pages used as a counter.
-const PERSONALITY_ADDDRESS: usize = 0;
-
-static mut PERSO: PersonalityData = PersonalityData {
-    checksum: [0; 8],
-    salt: [0; 8],
-    pub_x: [0; 8],
-    pub_y: [0; 8],
-    certificate_hash: [0; 8],
-    certificate_len: 0,
-    certificate: [0; PERSONALITY_SIZE - (4 + 5 * 32)],
-};
-
+const PERSONALITY_ADDRESS: usize = flash::h1b_hw::H1B_FLASH_SIZE - (3 * flash::h1b_hw::H1B_FLASH_PAGE_SIZE) ;
+const PERSONALITY_ADDRESS_U32: usize = PERSONALITY_ADDRESS / 4;
+const PERSONALITY_SIZE: usize = flash::h1b_hw::H1B_FLASH_PAGE_SIZE;
+const PAGE_SIZE_U32: usize    = flash::h1b_hw::H1B_FLASH_PAGE_SIZE / 4;
 
 impl<'a> PersonalityDriver<'a> {
     const unsafe fn new() -> PersonalityDriver<'a> {
         PersonalityDriver {
+            state: Cell::new(State::Idle),
             client: OptionalCell::empty(),
             flash: OptionalCell::empty(),
+            write_buffer: TakeCell::empty(),
         }
     }
 
@@ -59,59 +66,193 @@ impl<'a> PersonalityDriver<'a> {
         self.flash.set(flash);
     }
 
+    pub fn set_buffer(&self, buf: &'a mut [u32]) {
+        self.write_buffer.replace(buf);
+    }
+
+    fn start_write(&self, target: usize) -> bool {
+        debug!("Starting flash write target {}", target);
+        if self.flash.is_none() || self.write_buffer.is_none() {
+            false
+        } else {
+            let buf = self.write_buffer.take().unwrap();
+            self.flash.map(move |flash| {
+                let (_rcode, opt) = flash.write(target, buf);
+                match opt {
+                    None => true,  // Operation successful
+                    Some(buf) => { // Not successful
+                        self.write_buffer.replace(buf);
+                        false
+                    }
+                }
+            }).unwrap()
+        }
+    }
+
 }
 
 impl<'a> Personality<'a> for PersonalityDriver<'a> {
 
-    fn set_client(&self, client: &'a Client) {
+    fn set_client(&self, client: &'a Client<'a>) {
         self.client.set(client);
     }
 
-    fn get(&self, data: &mut PersonalityData) {
+    fn get(&self, data: &mut PersonalityData) -> ReturnCode {
         unsafe {
-            *data = PERSO;
+            self.flash.map_or(ReturnCode::ENOMEM, |flash| {
+                let mut personality_ptr = mem::transmute::<*mut PersonalityData, *mut u32>(data);
+                let word_count = PAGE_SIZE_U32;
+                for i in 0..word_count {
+                    *personality_ptr = flash.read(PERSONALITY_ADDRESS_U32 + i);
+                    personality_ptr = personality_ptr.offset(1);
+                }
+                ReturnCode::SUCCESS
+            })
         }
     }
 
     fn get_u8(&self, data: &mut [u8]) -> ReturnCode {
+        debug!("Getting Personality as U8");
         if data.len() < PERSONALITY_SIZE {
             ReturnCode::ESIZE
         } else {
             unsafe {
-                let ptr = data.as_mut_ptr();
-                let personality_ptr = mem::transmute::<*mut u8, *mut PersonalityData>(ptr);
-                *personality_ptr = PERSO;
+                self.flash.map_or(ReturnCode::ENOMEM, |flash| {
+                    let ptr = data.as_mut_ptr();
+                    let mut personality_ptr = mem::transmute::<*mut u8, *mut u32>(ptr);
+                    let word_count = PAGE_SIZE_U32;
+                    for i in 0..word_count {
+                        *personality_ptr = flash.read(PERSONALITY_ADDRESS_U32 + i);
+                        personality_ptr = personality_ptr.offset(1);
+                    }
+                    ReturnCode::SUCCESS
+                })
             }
-            ReturnCode::SUCCESS
         }
     }
 
-    fn set(&self, data: &PersonalityData) -> ReturnCode {
-        unsafe {
-            PERSO = *data;
+    fn set(&self, data: &mut PersonalityData) -> ReturnCode {
+        if self.state.get() != State::Idle {
+            return ReturnCode::EBUSY;
         }
-        return ReturnCode::SUCCESS;
-    }
-
-    fn set_u8(&self, data: &[u8]) -> ReturnCode {
-        if data.len() < PERSONALITY_SIZE {
-            ReturnCode::ESIZE
+        if self.flash.is_some() {
+            self.flash.map(move |flash| {
+                let offset = PERSONALITY_ADDRESS;
+                let page = offset / flash::h1b_hw::H1B_FLASH_PAGE_SIZE;
+                let rval = flash.erase(page);
+                match rval {
+                    ReturnCode::SUCCESS => {
+                        self.write_buffer.map(|buffer| {
+                            self.state.set(State::ErasingStruct);
+                            unsafe {
+                                let mut ptr = mem::transmute::<*mut PersonalityData, *mut u32>(data);
+                                let word_count = PAGE_SIZE_U32;
+                                for i in 0..word_count {
+                                    buffer[i] = *ptr;
+                                    ptr = ptr.offset(1);
+                                }
+                            }
+                        });
+                        ReturnCode::SUCCESS
+                    },
+                    _ => {
+                        rval
+                    }
+                }
+            }).unwrap()
         } else {
-            unsafe {
-                let ptr = data.as_ptr();
-                let personality_ptr = mem::transmute::<*const u8, *const PersonalityData>(ptr);
-                PERSO = *personality_ptr;
+            ReturnCode::ENOMEM
+        }
+    }
+
+    fn set_u8(&self, data: &mut [u8]) -> ReturnCode {
+        debug!("Setting Personality as U8");
+        if data.len() < PERSONALITY_SIZE {
+            debug!(" - ESIZE");
+            ReturnCode::ESIZE
+        }
+        else if self.state.get() != State::Idle {
+            debug!(" - EBUSY");
+            ReturnCode::EBUSY
+        } else {
+            if self.flash.is_some() {
+                self.flash.map(move |flash| {
+                    let offset = PERSONALITY_ADDRESS;
+                    let page = offset / flash::h1b_hw::H1B_FLASH_PAGE_SIZE;
+                    let rval = flash.erase(page);
+                    debug!("Erasing page {} with rval {:?}", page, rval);
+
+                    match rval {
+                        ReturnCode::SUCCESS => {
+                            self.write_buffer.map(|buffer| {
+                                self.state.set(State::ErasingU8);
+                                let len = cmp::min(data.len(), flash::h1b_hw::H1B_FLASH_PAGE_SIZE);
+                                unsafe {
+                                    let mut ptr = mem::transmute::<*mut u32, *mut u8>(buffer.as_mut_ptr());
+                                    for i in 0..len {
+                                        *ptr = data[i];
+                                        ptr = ptr.offset(1);
+                                    }
+                                }
+                            });
+                            debug!("Finished writing buffer");
+                            ReturnCode::SUCCESS
+                        },
+                        _ => {
+                            rval
+                        }
+                    }
+                }).unwrap()
+            } else {
+                ReturnCode::ENOMEM
             }
-            ReturnCode::SUCCESS
         }
     }
 }
 
 impl<'a> flash::Client<'a> for PersonalityDriver<'a> {
-    fn erase_done(&self, rcode: ReturnCode) {
+    fn erase_done(&self, _rcode: ReturnCode) {
+        let state = self.state.get();
+        let offset = PERSONALITY_ADDRESS;
+        let target = offset / 4; // Write offset is in words
+        match state {
+            State::ErasingStruct => {
+                if self.start_write(target) {
+                    self.state.set(State::WritingStruct);
+                } else {
+                    self.client.map(|c| c.set_done(ReturnCode::FAIL));
+                    self.state.set(State::Idle);
+                }
+            }
 
+            State::ErasingU8 => {
+                if self.start_write(target) {
+                    self.state.set(State::WritingU8);
+                } else {
+                    debug!("WriteU8 failed");
+                    self.client.map(|c| c.set_u8_done(ReturnCode::FAIL));
+                    self.state.set(State::Idle);
+                }
+            },
+            _ => { // Should never happen -pal
+                debug!("Erase done called but in state {:?}", state);
+            }
+        }
     }
-    fn write_done(&self, data: &'a mut [u32], rcode: ReturnCode) {
 
+    fn write_done(&self, _data: &'a mut [u32], _rcode: ReturnCode) {
+        let state = self.state.get();
+        match state {
+            State::WritingStruct => {
+                self.state.set(State::Idle);
+                self.client.map(|c| c.set_done(ReturnCode::SUCCESS));
+            },
+            State::WritingU8 => {
+                self.state.set(State::Idle);
+                self.client.map(|c| c.set_u8_done(ReturnCode::SUCCESS));
+            },
+            _ => { // Should never happen -pal
+            },
+        }
     }
 }

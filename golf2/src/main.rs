@@ -248,6 +248,8 @@ pub unsafe fn reset_handler() {
         virtual_flash::FlashUser<'static>,
         virtual_flash::FlashUser::new(flash_mux));
 
+    flash.set_client(flash_mux);
+
     let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
                                            VirtualMuxAlarm::new(alarm_mux));
     let timer = static_init!(
@@ -301,6 +303,7 @@ pub unsafe fn reset_handler() {
         personality::PersonalitySyscall::new(&mut h1b::personality::PERSONALITY));
 
     h1b::personality::PERSONALITY.set_flash(flash_user);
+    h1b::personality::PERSONALITY.set_buffer(&mut h1b::personality::BUFFER);
     flash_user.set_client(&h1b::personality::PERSONALITY);
 
     // ** GLOBALSEC **

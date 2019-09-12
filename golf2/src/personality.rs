@@ -107,8 +107,8 @@ impl<'a> Driver for PersonalitySyscall<'a> {
                     self.app.map_or(ReturnCode::EBUSY, |app| {
                         if app.data.is_none() {return ReturnCode::ENOMEM;}
 
-                        let data_slice = app.data.take().unwrap();
-                        self.device.set_u8(data_slice.as_ref());
+                        let mut data_slice = app.data.take().unwrap();
+                        self.device.set_u8(data_slice.as_mut());
                         app.data = Some(data_slice);
                         ReturnCode::SUCCESS
                     })
