@@ -14,7 +14,7 @@
 
 use core::ops::{BitAnd, BitOr};
 use kernel::common::cells::VolatileCell;
-use kernel::common::registers::ReadWrite;
+use kernel::common::registers::{register_bitfields, ReadWrite};
 
 register_bitfields![u32,
     AhbConfig [  // OTG Databook, Table 5-9

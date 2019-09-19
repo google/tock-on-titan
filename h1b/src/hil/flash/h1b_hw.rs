@@ -16,7 +16,7 @@
 
 use kernel::ReturnCode;
 use kernel::common::cells::VolatileCell;
-use kernel::common::registers::ReadWrite;
+use kernel::common::registers::{self, register_bitfields, ReadWrite};
 
 // The hardware flash controller. Cannot be used in userspace (accessing will
 // trigger a fault), and should only be manipulated by the flash hardware.

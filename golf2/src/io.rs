@@ -49,8 +49,7 @@ impl Write for Writer {
 
 /// Panic handler.
 #[cfg(not(test))]
-#[panic_implementation]
-#[no_mangle]
+#[panic_handler]
 pub unsafe extern "C" fn panic_fmt(pi: &PanicInfo) -> ! {
     let led = &mut led::LedLow::new(&mut h1b::gpio::PORT0.pins[0]);
     let writer = &mut WRITER;
