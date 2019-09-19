@@ -42,6 +42,7 @@ use capsules::console;
 use capsules::virtual_alarm::VirtualMuxAlarm;
 use capsules::virtual_uart::{UartMux, UartDevice};
 
+
 use kernel::{Chip, Platform};
 use kernel::capabilities;
 use kernel::hil;
