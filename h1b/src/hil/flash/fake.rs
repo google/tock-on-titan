@@ -123,23 +123,25 @@ impl super::hardware::Hardware for FakeHw {
         self.opcode.get() != 0
     }
 
-    fn read(&self, offset: usize) -> u32 {
+    fn read(&self, offset: usize) -> kernel::ReturnCode {
         // Replay the operation log in reverse to find the current value.
         for entry in self.log[0..self.log_len.get()].iter().rev() {
             let entry = entry.get();
             if entry.value == core::u32::MAX {
                 // Erase
                 if offset >= entry.offset && offset < entry.offset + 512 {
-                    return core::u32::MAX;
+                    return kernel::ReturnCode::SuccessWithValue { value: core::u32::MAX as usize };
                 }
             } else {
                 // Write
-                if offset == entry.offset { return entry.value; }
+                if offset == entry.offset {
+                    return kernel::ReturnCode::SuccessWithValue { value: entry.value as usize };
+                }
             }
         }
 
         // Pretend that flash was initialized to all ones.
-        core::u32::MAX
+        kernel::ReturnCode::SuccessWithValue { value: core::u32::MAX as usize }
     }
 
     fn read_error(&self) -> u16 {

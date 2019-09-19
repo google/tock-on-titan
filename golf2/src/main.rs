@@ -16,8 +16,6 @@
 #![no_main]
 #![feature(asm, const_fn, lang_items, compiler_builtins_lib)]
 #![feature(in_band_lifetimes)]
-#![feature(infer_outlives_requirements)]
-#![feature(panic_implementation)]
 #![feature(core_intrinsics)]
 
 extern crate capsules;
@@ -40,7 +38,7 @@ pub mod personality;
 use capsules::alarm::AlarmDriver;
 use capsules::console;
 use capsules::virtual_alarm::VirtualMuxAlarm;
-use capsules::virtual_uart::{UartDevice, UartMux};
+use capsules::virtual_uart::{MuxUart, UartDevice};
 
 use kernel::{Chip, Platform};
 use kernel::capabilities;
@@ -169,8 +167,8 @@ pub unsafe fn reset_handler() {
     let kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
     let uart_mux = static_init!(
-        UartMux<'static>,
-        UartMux::new(
+        MuxUart<'static>,
+        MuxUart::new(
             &h1b::uart::UART0,
             &mut capsules::virtual_uart::RX_BUF,
             115200
@@ -221,7 +219,7 @@ pub unsafe fn reset_handler() {
 
     let gpio = static_init!(
         capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
-        capsules::gpio::GPIO::new(gpio_pins));
+        capsules::gpio::GPIO::new(gpio_pins, kernel.create_grant(&grant_cap)));
     for pin in gpio_pins.iter() {
         pin.set_client(gpio)
     }
