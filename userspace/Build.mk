@@ -13,7 +13,8 @@
 # limitations under the License.
 
 BUILD_SUBDIRS := $(addprefix userspace/,dcrypto_test gpio_test h1b_tests \
-                   personality_test sha_test spin u2f_app u2f_test )
+		   personality_clear personality_test sha_test spin \
+		   u2f_app u2f_test )
 
 .PHONY: userspace/build
 userspace/build: $(addsuffix /build,$(BUILD_SUBDIRS))
