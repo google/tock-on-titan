@@ -12,8 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This tests the personality driver, which persistently stores some
-// U2F application state in flash.
+// This tests the personality driver by deleting the current personality
+// (setting it to all 0x87). You can use this application in concert
+// with personality_test to test that userspace can detect the need to
+// generate personality data and store it persistently. E.g.:
+//    - install personality_clear
+//    - install personality_test (should store personality data)
+//    - re-run personality_test (should detect data and not re-generate)
+//    - install personality_clear
+//    - install personality_test (should store personality data)
 
 
 #include "common.h"
