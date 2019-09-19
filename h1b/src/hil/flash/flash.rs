@@ -15,9 +15,9 @@
 use ::kernel::ReturnCode;
 
 /// Flash client -- receives callbacks when flash operations complete.
-pub trait Client {
+pub trait Client<'d> {
         fn erase_done(&self, ReturnCode);
-        fn write_done(&self, ReturnCode);
+        fn write_done(&self, data: &'d mut [u32], ReturnCode);
 }
 
 /// Flash driver API.
@@ -33,8 +33,8 @@ pub trait Flash<'d> {
         /// Writes a buffer (of up to 32 words) into the given location in flash.
         /// The target location is specified as an offset from the beginning of
         /// flash in units of words.
-        fn write(&self, target: usize, data: &[u32]) -> ReturnCode;
+        fn write(&self, target: usize, data: &'d mut [u32]) -> (ReturnCode, Option<&'d mut [u32]>);
 
         /// Links this driver to its client.
-        fn set_client(&self, client: &'d Client);
+        fn set_client(&'d self, client: &'d Client<'d>);
 }

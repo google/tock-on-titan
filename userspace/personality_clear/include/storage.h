@@ -46,32 +46,4 @@ int check_personality(const perso_st* id);
 /* draw from trng and compute all fields afresh */
 int new_personality(perso_st* id);
 
-#if defined(CONFIG_G2F)
-
-/* 10 try pin */
-int ownerpin_init(const void* data, size_t data_len);
-int ownerpin_check(const void* data, size_t data_len);
-int ownerpin_change(const void* data, size_t data_len);
-const uint32_t* ownerpin_salt(void);
-
-uint16_t cert_write(uint8_t which, uint8_t blockno, const uint8_t* data,
-                    uint16_t size);
-uint16_t cert_read(uint8_t which, uint8_t blockno, uint8_t* out,
-                   uint16_t* out_len);
-
-/*
- * Emergency credential (ecreds) storage.
- * It can store up to ECRED_BLOCK_COUNT blocks of ECRED_BLOCK_SIZE bytes.
- */
-#define ECRED_BLOCK_SIZE  1024
-#define ECRED_BLOCK_COUNT   10
-
-#define ECRED_BLOCK_WORDS (ECRED_BLOCK_SIZE / sizeof(uint32_t))
-#define ECRED_PAGE_COUNT  (ECRED_BLOCK_COUNT * ECRED_BLOCK_WORDS / PAGE_WORDS)
-
-uint16_t ecr_write_block(unsigned blockno, const uint8_t* data, uint16_t size);
-uint16_t ecr_read_block(unsigned blockno, uint8_t* out, uint16_t *out_len);
-
-#endif  // CONFIG_G2F
-
 #endif

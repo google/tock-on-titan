@@ -16,7 +16,7 @@
 
 use kernel::ReturnCode;
 use kernel::common::cells::VolatileCell;
-use kernel::common::registers::ReadWrite;
+use kernel::common::registers::{self, register_bitfields, ReadWrite};
 
 // The hardware flash controller. Cannot be used in userspace (accessing will
 // trigger a fault), and should only be manipulated by the flash hardware.
@@ -25,12 +25,13 @@ pub static mut H1B_HW: *const H1bHw = 0x40720000 as *const H1bHw;
 pub const H1B_FLASH_START: usize     = 0x40000;
 pub const H1B_FLASH_BANK_SIZE: usize = 0x40000;
 pub const H1B_FLASH_SIZE: usize      = 0x80000; // Two banks
+pub const H1B_FLASH_PAGE_SIZE: usize = 0x00800; // 2kB
 
 pub const H1B_INFO_0_START: usize    = 0x20000;
 pub const H1B_INFO_1_START: usize    = 0x28000;
 pub const H1B_INFO_SIZE: usize       = 0x00800;
 
-kernel::common::registers::register_bitfields![u32,
+register_bitfields![u32,
     TransactionParameters [
         Offset OFFSET(0) NUMBITS(16) [],
         Bank   OFFSET(16) NUMBITS(1) [],

@@ -23,7 +23,9 @@ pub struct FlashTest<F: Flash<'static> + 'static> {
     state: ::core::cell::Cell<Option<Tests>>,
 }
 
-impl<F: Flash<'static> + 'static> ::h1b::hil::flash::Client for FlashTest<F> {
+static mut BUF: [u32; 1] = [0; 1];
+
+impl<F: Flash<'static> + 'static> ::h1b::hil::flash::Client<'static> for FlashTest<F> {
     fn erase_done(&self, code: ReturnCode) {
         match self.state.take() {
             None => println!("FlashTest FAIL: erase_done() w/ state == None"),
@@ -34,7 +36,7 @@ impl<F: Flash<'static> + 'static> ::h1b::hil::flash::Client for FlashTest<F> {
         }
     }
 
-    fn write_done(&self, code: ReturnCode) {
+    fn write_done(&self, _data: &'static mut [u32], code: ReturnCode) {
         match self.state.take() {
             None => println!("FlashTest FAIL: write_done() w/ state == None"),
             Some(Tests::Erase1) => println!("FlashTest FAIL: write_done() during Erase"),
@@ -48,6 +50,7 @@ impl<F: Flash<'static> + 'static> ::h1b::hil::flash::Client for FlashTest<F> {
 impl<F: Flash<'static> + 'static> FlashTest<F> {
     const TEST_PAGE: usize = 255;
     const TEST_WORD: usize = 512 * Self::TEST_PAGE;
+
 
     pub fn new(driver: &'static F) -> Self {
         FlashTest { driver, state: ::core::cell::Cell::new(None) }
@@ -84,8 +87,11 @@ impl<F: Flash<'static> + 'static> FlashTest<F> {
     }
 
     fn write1_start(&self) {
-        println!("FlashTest: Beginning Write1. code: {:?}",
-                 self.driver.write(Self::TEST_WORD, &[0x0000FFFF]));
+        unsafe {
+            BUF[0] = 0x0000FFFF;
+            println!("FlashTest: Beginning Write1. code: {:?}",
+                     self.driver.write(Self::TEST_WORD, &mut BUF));
+        }
         self.state.set(Some(Tests::Write1));
     }
 
@@ -106,8 +112,11 @@ impl<F: Flash<'static> + 'static> FlashTest<F> {
     }
 
     fn write2_start(&self) {
-        println!("FlashTest: Beginning Write2. code: {:?}",
-                 self.driver.write(Self::TEST_WORD, &[0x00000000]));
+        unsafe {
+            BUF[0] = 0x00000000;
+            println!("FlashTest: Beginning Write2. code: {:?}",
+                     self.driver.write(Self::TEST_WORD, &mut BUF));
+        }
         self.state.set(Some(Tests::Write2));
     }
 

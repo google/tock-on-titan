@@ -33,43 +33,72 @@
 #define U2F_FRAME_SIZE 64
 
 #include "fips.h"
+#include "kl.h"
 #include "storage.h"
 #include "u2f_syscalls.h"
 #include "u2f_hid.h"
-
-static perso_st me;
-
+#include "x509.h"
 
 static void check_device_setup(void);
 static void process_frame(U2FHID_FRAME* frame);
 static void setup_personality(void);
 
 int check_personality(const perso_st* id) {
-  return id != NULL;
+  uint32_t chksum[8];
+  uint32_t err = 0;
+  size_t i;
+  if (id == NULL) {
+    return EC_ERROR_UNKNOWN;
+  }
+  err = kl_derive_attest(id->cert_hash, chksum);
+  for (i = 0; i < 8; ++i) {
+    err |= (chksum[i] ^ id->chksum[i]);
+  }
+  return err == 0 ? EC_SUCCESS : EC_ERROR_UNKNOWN;
 }
 
 int new_personality(perso_st* id) {
+   p256_int priv;
+  LITE_SHA256_CTX ctx;  // SHA256 output container
+  int err = 0;
+
   if (id == NULL) {
-    return 0;
-  } else {
-    return 1;
+    return EC_ERROR_UNKNOWN;
   }
+
+  memset(id, 0xff, sizeof(perso_st));
+
+  err |= kl_random(id->salt);
+
+  err |= individual_keypair(&priv, &id->pub_x, &id->pub_y, id->salt);
+  id->cert_len = generate_cert(&priv, &id->pub_x, &id->pub_y, 1, id->cert,
+                               sizeof(id->cert));
+  SHA256_INIT(&ctx);
+  SHA256_UPDATE(&ctx, id->cert, id->cert_len);
+  memcpy(id->cert_hash, SHA256_FINAL(&ctx), SHA256_DIGEST_SIZE);
+
+  err |= kl_derive_attest(id->cert_hash, id->chksum);
+  //printf("Setting personality\n");
+  //set_personality(id);
+  //printf("Personality set\n");
+
+  return err == 0 ? EC_SUCCESS : EC_ERROR_UNKNOWN;
 }
 
 static void setup_personality(void) {
-  if (check_personality(get_personality()) == EC_SUCCESS) return;
-  if (new_personality(&me) == EC_SUCCESS) set_personality(&me);
-  printf("    - Personality configured\n");
+  perso_st* person = get_personality();
+  if (check_personality(person) == EC_SUCCESS) return;
+  printf("Personality not found: generating and storing.\n");
+  if (new_personality(person) == EC_SUCCESS) set_personality(person);
 }
 
 
 static void check_device_setup(void) {
-  //perso_st me;
-  printf("  - Checking setup\n");
+  printf("Setting up device entropy.\n");
   ensure_factory_entropy();
-  printf("  - Setting up personality.\n");
+  printf("Setting up device personality.\n");
   setup_personality();
-  printf("  - Setup complete.\n");
+  printf("Setup complete.\n");
 }
 
 void u2fhid_process_frame(U2FHID_FRAME *f_p);
@@ -84,12 +113,19 @@ char u2f_buffer[U2F_FRAME_SIZE];
 
 int main(void) {
   int ret = 0;
-  printf("= Booting U2F Transport Application =\n");
+  printf("= Booting U2F application =\n");
   init_fips();
+
+  if (kl_init()) {
+    printf("kl_init() FAIL\n");
+  }
+
   tock_pop_enable_detection();
-  printf("= Running U2F Transport Application =\n");
+
+  printf("= Configuring device state and identity = \n");
   check_device_setup();
   u2f_init();
+  printf("= Running U2F application =\n");
 
   while (1) {
     //printf("U2F APP: receiving frame into 0x%08x.\n", (unsigned int)u2f_buffer);

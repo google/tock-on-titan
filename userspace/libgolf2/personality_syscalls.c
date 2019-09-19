@@ -79,7 +79,7 @@ int tock_set_personality(const perso_st* personality) {
     printf("Could not get H1B personality from kernel.\n");
     return ret;
   }
-  //yield_for(&set_done);
+  yield_for(&set_done);
 
   return TOCK_SUCCESS;
 }

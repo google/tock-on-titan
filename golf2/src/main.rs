@@ -34,24 +34,26 @@ pub mod dcrypto_test;
 pub mod debug_syscall;
 mod flash_test;
 pub mod personality;
+pub mod virtual_flash;
 
 use capsules::alarm::AlarmDriver;
 use capsules::console;
 use capsules::virtual_alarm::VirtualMuxAlarm;
 use capsules::virtual_uart::{MuxUart, UartDevice};
 
+
 use kernel::{Chip, Platform};
 use kernel::capabilities;
-use kernel::mpu::MPU;
 use kernel::hil;
-
 use kernel::hil::entropy::Entropy32;
 use kernel::hil::rng::Rng;
+use kernel::mpu::MPU;
 
 use h1b::crypto::dcrypto::Dcrypto;
+use h1b::hil::flash::Flash;
+use h1b::timels::Timels;
 use h1b::usb::{Descriptor, StringDescriptor};
 
-use h1b::timels::Timels;
 
 // State for loading apps
 const NUM_PROCS: usize = 1;
@@ -229,12 +231,23 @@ pub unsafe fn reset_handler() {
         capsules::virtual_alarm::MuxAlarm::new(&h1b::timels::TIMELS0));
     h1b::timels::TIMELS0.set_client(alarm_mux);
 
+    // Create flash driver and its virtualization
     let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
                                            VirtualMuxAlarm::new(alarm_mux));
     let flash = static_init!(
         h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
         h1b::hil::flash::FlashImpl::new(flash_virtual_alarm, &*h1b::hil::flash::h1b_hw::H1B_HW));
     flash_virtual_alarm.set_client(flash);
+
+    let flash_mux = static_init!(
+        virtual_flash::MuxFlash<'static>,
+        virtual_flash::MuxFlash::new(flash));
+
+    let flash_user = static_init!(
+        virtual_flash::FlashUser<'static>,
+        virtual_flash::FlashUser::new(flash_mux));
+
+    flash.set_client(flash_mux);
 
     let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
                                            VirtualMuxAlarm::new(alarm_mux));
@@ -286,8 +299,13 @@ pub unsafe fn reset_handler() {
 
     let personality = static_init!(
         personality::PersonalitySyscall<'static>,
-        personality::PersonalitySyscall::new(&mut h1b::personality::PERSONALITY));
+        personality::PersonalitySyscall::new(&mut h1b::personality::PERSONALITY,
+                                             kernel.create_grant(&grant_cap)));
 
+    h1b::personality::PERSONALITY.set_flash(flash_user);
+    h1b::personality::PERSONALITY.set_buffer(&mut h1b::personality::BUFFER);
+    h1b::personality::PERSONALITY.set_client(personality);
+    flash_user.set_client(&h1b::personality::PERSONALITY);
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
@@ -332,16 +350,16 @@ pub unsafe fn reset_handler() {
         vs(DUSB0_REGION3_CTRL as *mut u32, !0);
 
         // Flash region initialization. We initialize a single region for the
-        // last two pages of the second flash macro, used by the non-volatile
-        // counter implementation.
+        // last three pages of the second flash macro, used by Personality (n-3)
+        // and the non-volatile counter implementation (n-2, n-1).
         const FLASH_START: usize = 0x40000;
         const FLASH_SIZE: usize = 512 * 1024;
         const FLASH_PAGE_SIZE: usize = 2048;
-        vs(FLASH_REGION2_BASE as *mut u32, (FLASH_START + FLASH_SIZE - 2*FLASH_PAGE_SIZE) as u32);
+        vs(FLASH_REGION2_BASE as *mut u32, (FLASH_START + FLASH_SIZE - 3*FLASH_PAGE_SIZE) as u32);
         // The value of the SIZE register is one less than the size of the
         // region, i.e. the last address within the region is the start address
         // + the size register.
-        vs(FLASH_REGION2_SIZE as *mut u32, (2*FLASH_PAGE_SIZE - 1) as u32);
+        vs(FLASH_REGION2_SIZE as *mut u32, (3*FLASH_PAGE_SIZE - 1) as u32);
         // Enable the region for reads and writes.
         vs(FLASH_REGION2_CTRL as *mut u32, 0b111);
     }

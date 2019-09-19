@@ -30,9 +30,9 @@
 
 use core::cell::Cell;
 use h1b::personality;
-use h1b::hil::personality::Personality;
-use kernel::{AppId, Callback, Driver, ReturnCode, Shared, AppSlice};
-use kernel::common::cells::MapCell;
+use h1b::hil::personality::{Client, Personality};
+use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
+use kernel::common::cells::OptionalCell;
 
 pub const DRIVER_NUM: usize = 0x5000b;
 
@@ -44,23 +44,27 @@ const ALLOW_BUFFER: usize              = 0;
 const SUBSCRIBE_WRITE_DONE: usize      = 0;
 
 #[derive(Default)]
-pub struct App {
+pub struct AppData {
     data: Option<AppSlice<Shared, u8>>,
     callback: Option<Callback>,
 }
 
 pub struct PersonalitySyscall<'a> {
     device: &'a personality::PersonalityDriver<'a>,
-    app: MapCell<App>,
-    busy: Cell<bool>
+    apps: Grant<AppData>,
+    busy: Cell<bool>,
+    current_user: OptionalCell<AppId>
 }
 
 impl<'a> PersonalitySyscall<'a> {
-    pub fn new(device: &'a mut personality::PersonalityDriver<'a>) -> PersonalitySyscall<'a> {
+    pub fn new(device: &'a mut personality::PersonalityDriver<'a>,
+               container: Grant<AppData>) -> PersonalitySyscall<'a> {
         PersonalitySyscall {
             device: device,
-            app: MapCell::new(App::default()),
-            busy: Cell::new(false)
+            apps: container,
+            busy: Cell::new(false),
+            current_user: OptionalCell::empty()
+
         }
     }
 }
@@ -69,34 +73,36 @@ impl<'a> Driver for PersonalitySyscall<'a> {
     fn subscribe(&self,
                  subscribe_num: usize,
                  callback: Option<Callback>,
-                 _app_id: AppId,
+                 app_id: AppId,
     ) -> ReturnCode {
         match subscribe_num {
             SUBSCRIBE_WRITE_DONE => {
-                self.app.map(|app| {
-                    app.callback = callback;
+                let result = self.apps.enter(app_id, |app_data, _| {
+                    app_data.callback = callback;
                 });
-                ReturnCode::SUCCESS
+                match result {
+                    Ok(_t) => ReturnCode::SUCCESS,
+                    Err(_e) => ReturnCode::ENOMEM,
+                }
             }
             _ => ReturnCode::ENOSUPPORT
         }
     }
 
-    fn command(&self, command_num: usize, _: usize, _: usize, _: AppId) -> ReturnCode {
+    fn command(&self, command_num: usize, _: usize, _: usize, app_id: AppId) -> ReturnCode {
         match command_num {
             COMMAND_CHECK => ReturnCode::SUCCESS,
             COMMAND_READ  => {
                 if self.busy.get() {
                     ReturnCode::EBUSY
                 } else {
-                    self.app.map_or(ReturnCode::EBUSY, |app| {
-                        if app.data.is_none() {return ReturnCode::ENOMEM;}
-
-                        let mut data_slice = app.data.take().unwrap();
+                    self.apps.enter(app_id, |app_data, _| {
+                        if app_data.data.is_none() {return ReturnCode::ENOMEM;}
+                        let mut data_slice = app_data.data.take().unwrap();
                         self.device.get_u8(data_slice.as_mut());
-                        app.data = Some(data_slice);
+                        app_data.data = Some(data_slice);
                         ReturnCode::SUCCESS
-                    })
+                    }).unwrap_or(ReturnCode::ENOMEM)
 
                 }
             },
@@ -104,34 +110,57 @@ impl<'a> Driver for PersonalitySyscall<'a> {
                 if self.busy.get() {
                     ReturnCode::EBUSY
                 } else {
-                    self.app.map_or(ReturnCode::EBUSY, |app| {
-                        if app.data.is_none() {return ReturnCode::ENOMEM;}
+                    self.apps.enter(app_id, |app_data, _| {
+                        if app_data.data.is_none() {return ReturnCode::ENOMEM;}
 
-                        let data_slice = app.data.take().unwrap();
-                        self.device.set_u8(data_slice.as_ref());
-                        app.data = Some(data_slice);
+                        let mut data_slice = app_data.data.take().unwrap();
+                        self.device.set_u8(data_slice.as_mut());
+                        self.current_user.replace(app_id);
+                        app_data.data = Some(data_slice);
                         ReturnCode::SUCCESS
-                    })
+                    }).unwrap_or(ReturnCode::ENOMEM)
                 }
             },
             _ => ReturnCode::ENOSUPPORT
         }
     }
 
-    fn allow(&self, _: AppId,
+    fn allow(&self,
+             app_id: AppId,
              minor_num: usize,
              slice: Option<AppSlice<Shared, u8>>,
     ) -> ReturnCode {
         match minor_num {
             ALLOW_BUFFER => {
-                self.app.map(|app_data| {
+                self.apps.enter(app_id, |app_data, _| {
                     app_data.data = slice;
                     ReturnCode::SUCCESS
                 })
-               .unwrap_or(ReturnCode::FAIL)
+               .unwrap_or(ReturnCode::ENOMEM)
             },
             _ => ReturnCode::ENOSUPPORT,
         }
     }
 
+}
+
+impl<'a> Client<'a> for PersonalitySyscall<'a> {
+
+    fn set_done(&self, rval: ReturnCode) {
+        self.current_user.map(|current_user| {
+            let _ = self.apps.enter(*current_user, |app_data, _| {
+                self.current_user.clear();
+                app_data.callback.map(|mut cb| cb.schedule(From::from(rval), 0, 0));
+            });
+        });
+    }
+
+    fn set_u8_done(&self, rval: ReturnCode) {
+        self.current_user.map(|current_user| {
+            let _ = self.apps.enter(*current_user, |app_data, _| {
+                self.current_user.clear();
+                app_data.callback.map(|mut cb| cb.schedule(From::from(rval), 0, 0));
+            });
+        });
+    }
 }

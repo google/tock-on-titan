@@ -37,28 +37,32 @@ pub struct PersonalityData {
 /// [Client](trait.Client.html) trait.
 pub trait Personality<'a> {
     /// Set the client for callbacks on set calls.
-    fn set_client(&self, client: &'a Client);
+    fn set_client(&self, client: &'a Client<'a>);
 
     /// Fetch the device's attestation data into a typed PersonalityData
     /// structure.
-    fn get(&self, personality: &mut PersonalityData);
+    fn get(&self, personality: &mut PersonalityData) -> ReturnCode;
     /// Fetch the device's attestation data into a slice; this slice
     /// must be at least 2048 bytes long.
     fn get_u8(&self, personality: &mut [u8]) -> ReturnCode;
 
     /// Set the device's attestation data.
-    fn set(&self, personality: &PersonalityData) -> ReturnCode;
+    fn set(&self, personality: &mut PersonalityData) -> ReturnCode;
     /// Set the device's attestation data from a slice; this slice
     /// must be at least 2048 bytes long.
-    fn set_u8(&self, personality: &[u8]) -> ReturnCode;
+    fn set_u8(&self, personality: &mut [u8]) -> ReturnCode;
 }
 
 /// A [Personality](trait.Personality.html) client
 ///
 /// Clients of a [Personality](trait.Personality.html) must implement this
 /// trait.
-pub trait Client {
-    /// Called by (Personality)[trait.Personality.html] when the device's
-    /// personality has been committed to nonvolatile storage.
+pub trait Client<'a> {
+    /// Called by (Personality)[trait.Personality.html] when a call to
+    /// `set` has been committed to nonvolatile storage.
     fn set_done(&self, rval: ReturnCode);
+
+    /// Called by (Personality)[trait.Personality.html] when a call to
+    /// `set_u8` has been committed to nonvolatile storage.
+    fn set_u8_done(&self, rval: ReturnCode);
 }

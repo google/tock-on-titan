@@ -50,13 +50,21 @@ impl Write for Writer {
 /// Panic handler.
 #[cfg(not(test))]
 #[panic_handler]
-fn panic_fmt(pi: &PanicInfo) -> ! {
-    unsafe {
-        let led = &mut led::LedLow::new(&mut h1b::gpio::PORT0.pins[0]);
-        let writer = &mut WRITER;
-        debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &PROCESSES)
-    }
+pub unsafe extern "C" fn panic_fmt(pi: &PanicInfo) -> ! {
+    let led = &mut led::LedLow::new(&mut h1b::gpio::PORT0.pins[0]);
+    let writer = &mut WRITER;
+    debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &PROCESSES)
 }
+
+//#[cfg(not(test))]
+//#[panic_handler]
+//fn panic_fmt(pi: &PanicInfo) -> ! {
+//    unsafe {
+//        let led = &mut led::LedLow::new(&mut h1b::gpio::PORT0.pins[0]);
+//        let writer = &mut WRITER;
+//        debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &PROCESSES)
+//    }
+//}
 
 
 #[macro_export]
