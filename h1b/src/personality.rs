@@ -213,8 +213,7 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
 impl<'a> flash::Client<'a> for PersonalityDriver<'a> {
     fn erase_done(&self, _rcode: ReturnCode) {
         let state = self.state.get();
-        let offset = PERSONALITY_ADDRESS;
-        let target = offset / 4; // Write offset is in words
+        let target = PERSONALITY_ADDRESS_U32; // Write offset is in words
         match state {
             State::ErasingStruct => {
                 if self.start_write(target) {
