@@ -14,6 +14,7 @@
 
 #![allow(unused)]
 
+use kernel::ReturnCode;
 use kernel::common::cells::VolatileCell;
 use kernel::common::registers::ReadWrite;
 
@@ -245,13 +246,17 @@ impl super::hardware::Hardware for H1bHw {
                 self.pe_control_1.get() != 0
         }
 
-        fn read(&self, offset: usize) -> u32 {
+        fn read(&self, offset: usize) -> ReturnCode {
             // The two flash macros are in consecutive memory locations, so they can
             // be addressed as one.
             if offset > H1B_FLASH_SIZE {
-                0
+                ReturnCode::ESIZE
             } else {
-                unsafe { ::core::ptr::read_volatile((H1B_FLASH_START as *const u32).add(offset)) }
+                unsafe {
+                    ReturnCode::SuccessWithValue {
+                        value: ::core::ptr::read_volatile((H1B_FLASH_START as *const u32).add(offset)) as usize
+                    }
+                }
             }
         }
 
