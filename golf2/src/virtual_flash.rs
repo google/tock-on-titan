@@ -45,7 +45,6 @@ pub struct FlashUser<'f> {
 
 impl<'f> Client<'f> for MuxFlash<'f> {
     fn erase_done(&self, rcode: ReturnCode) {
-        debug!("Erase done called on MuxFlash with {:?}", rcode);
         self.in_flight.take().map(move |client| {
             client.erase_done(rcode);
         });
@@ -97,7 +96,6 @@ impl<'f> Flash<'f> for FlashUser<'f> {
         self.write_len.set(data.len());
         self.buffer.replace(data);
         self.operation.set(Operation::Write(target));
-        debug!("Set operation to write, do next op.");
         self.mux.do_next_op();
         (ReturnCode::SUCCESS, None)
     }
@@ -139,14 +137,11 @@ impl<'f> MuxFlash<'f> {
         // This code is mostly borrowed from virtual_flash in
         // mainline Tock's capsule directory
         mnode.map(|node| {
-            debug!("Executing on node.");
             node.buffer.take().map_or_else(
                 || {
-                    debug!("  - no buffer");
                     // Erase doesn't require a buffer
                     match node.operation.get() {
                         Operation::Erase(page_number) => {
-                            debug!("Flash virtualization calls erase {}", page_number);
                             self.driver.erase(page_number);
                         }
                         _ => {} // Signal an error on Erase and Write?
@@ -155,7 +150,6 @@ impl<'f> MuxFlash<'f> {
                 |buf| {
                     match node.operation.get() {
                         Operation::Write(offset) => {
-                            debug!(" -  writing");
                             self.driver.write(offset, buf);
                         },
                         Operation::Erase(page_number) => {

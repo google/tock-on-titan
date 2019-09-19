@@ -70,8 +70,11 @@ impl<'a> PersonalityDriver<'a> {
         self.write_buffer.replace(buf);
     }
 
+    pub fn set_client(&self, client: &'a Client<'a>) {
+        self.client.replace(client);
+    }
+
     fn start_write(&self, target: usize) -> bool {
-        debug!("Starting flash write target {}", target);
         if self.flash.is_none() || self.write_buffer.is_none() {
             false
         } else {
@@ -180,7 +183,6 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
                     let offset = PERSONALITY_ADDRESS;
                     let page = offset / flash::h1b_hw::H1B_FLASH_PAGE_SIZE;
                     let rval = flash.erase(page);
-                    debug!("Erasing page {} with rval {:?}", page, rval);
 
                     match rval {
                         ReturnCode::SUCCESS => {
@@ -195,7 +197,6 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
                                     }
                                 }
                             });
-                            debug!("Finished writing buffer");
                             ReturnCode::SUCCESS
                         },
                         _ => {
@@ -239,7 +240,7 @@ impl<'a> flash::Client<'a> for PersonalityDriver<'a> {
         }
     }
 
-    fn write_done(&self, _data: &'a mut [u32], _rcode: ReturnCode) {
+    fn write_done(&self, _data: &'a mut [u32], rcode: ReturnCode) {
         let state = self.state.get();
         match state {
             State::WritingStruct => {
@@ -248,9 +249,12 @@ impl<'a> flash::Client<'a> for PersonalityDriver<'a> {
             },
             State::WritingU8 => {
                 self.state.set(State::Idle);
-                self.client.map(|c| c.set_u8_done(ReturnCode::SUCCESS));
+                self.client.map(|c| {
+                    c.set_u8_done(ReturnCode::SUCCESS);
+                });
             },
             _ => { // Should never happen -pal
+                debug!(" -- ERROR: personality::write_done in state {:?}", state);
             },
         }
     }

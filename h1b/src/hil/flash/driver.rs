@@ -67,7 +67,6 @@ const MAX_WRITE_SIZE: usize = 32; // Maximum single write is 32 words
 impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> {
     fn erase(&self, page: usize) -> ReturnCode {
         if self.program_in_progress() { return ReturnCode::EBUSY; }
-        debug!("Starting smart program for erase.");
         self.smart_program(ERASE_OPCODE, /*max_attempts*/ 45, /*final_pulse_needed*/ false,
                            /*timeout_nanoseconds*/ 3_353_267,
                            /*target*/ page * super::WORDS_PER_PAGE, /*size*/ 1);
@@ -86,7 +85,6 @@ impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> 
         self.write_pos.set(0);
         self.write_target.set(target);
         self.write_len.set(write_len);
-        debug!("Writing {}..{} at {}", 0, write_len, target);
         self.hw.set_write_data(&data[0..write_len]);
         self.write_data.replace(data);
 
@@ -113,10 +111,8 @@ impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for FlashImpl<'d, A,
         if let Some(state) = self.smart_program_state.take() {
             let state = state.step(
                 self.alarm, self.hw, self.opcode.get());
-            debug!("{:?}", state);
             if let Some(code) = state.return_code() {
                 if let Some(client) = self.client.get() {
-                    debug!("Returning {:?} to client\n", code);
                     if self.opcode.get() == WRITE_OPCODE {
                         let subwrite_end = self.write_pos.get() + self.write_len.get();
                         let fullwrite_end = self.write_data.map_or(0, |d| d.len());
@@ -135,7 +131,6 @@ impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for FlashImpl<'d, A,
                                                target, next_len);
                         }
                     } else {
-                        debug!("Erase done");
                         client.erase_done(code);
                     }
                 } else {

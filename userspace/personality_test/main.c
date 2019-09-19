@@ -66,8 +66,9 @@ int new_personality(perso_st* id) {
   memcpy(id->cert_hash, SHA256_FINAL(&ctx), SHA256_DIGEST_SIZE);
 
   err |= kl_derive_attest(id->cert_hash, id->chksum);
-
-  set_personality(id);
+  //  printf("Setting personality\n");
+  //..set_personality(id);
+  // printf("Personality set\n");
 
   return err == 0 ? EC_SUCCESS : EC_ERROR_UNKNOWN;
 }

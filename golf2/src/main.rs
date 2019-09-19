@@ -300,10 +300,12 @@ pub unsafe fn reset_handler() {
 
     let personality = static_init!(
         personality::PersonalitySyscall<'static>,
-        personality::PersonalitySyscall::new(&mut h1b::personality::PERSONALITY));
+        personality::PersonalitySyscall::new(&mut h1b::personality::PERSONALITY,
+                                             kernel.create_grant(&grant_cap)));
 
     h1b::personality::PERSONALITY.set_flash(flash_user);
     h1b::personality::PERSONALITY.set_buffer(&mut h1b::personality::BUFFER);
+    h1b::personality::PERSONALITY.set_client(personality);
     flash_user.set_client(&h1b::personality::PERSONALITY);
 
     // ** GLOBALSEC **
@@ -349,16 +351,16 @@ pub unsafe fn reset_handler() {
         vs(DUSB0_REGION3_CTRL as *mut u32, !0);
 
         // Flash region initialization. We initialize a single region for the
-        // last two pages of the second flash macro, used by the non-volatile
-        // counter implementation.
+        // last three pages of the second flash macro, used by Personality (n-3)
+        // and the non-volatile counter implementation (n-2, n-1).
         const FLASH_START: usize = 0x40000;
         const FLASH_SIZE: usize = 512 * 1024;
         const FLASH_PAGE_SIZE: usize = 2048;
-        vs(FLASH_REGION2_BASE as *mut u32, (FLASH_START + FLASH_SIZE - 2*FLASH_PAGE_SIZE) as u32);
+        vs(FLASH_REGION2_BASE as *mut u32, (FLASH_START + FLASH_SIZE - 3*FLASH_PAGE_SIZE) as u32);
         // The value of the SIZE register is one less than the size of the
         // region, i.e. the last address within the region is the start address
         // + the size register.
-        vs(FLASH_REGION2_SIZE as *mut u32, (2*FLASH_PAGE_SIZE - 1) as u32);
+        vs(FLASH_REGION2_SIZE as *mut u32, (3*FLASH_PAGE_SIZE - 1) as u32);
         // Enable the region for reads and writes.
         vs(FLASH_REGION2_CTRL as *mut u32, 0b111);
     }
