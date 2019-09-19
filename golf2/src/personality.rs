@@ -77,10 +77,13 @@ impl<'a> Driver for PersonalitySyscall<'a> {
     ) -> ReturnCode {
         match subscribe_num {
             SUBSCRIBE_WRITE_DONE => {
-                self.apps.enter(app_id, |app_data, _| {
+                let result = self.apps.enter(app_id, |app_data, _| {
                     app_data.callback = callback;
                 });
-                ReturnCode::SUCCESS
+                match result {
+                    Ok(_t) => ReturnCode::SUCCESS,
+                    Err(_e) => ReturnCode::ENOMEM,
+                }
             }
             _ => ReturnCode::ENOSUPPORT
         }
@@ -145,7 +148,7 @@ impl<'a> Client<'a> for PersonalitySyscall<'a> {
 
     fn set_done(&self, rval: ReturnCode) {
         self.current_user.map(|current_user| {
-            self.apps.enter(*current_user, |app_data, _| {
+            let _ = self.apps.enter(*current_user, |app_data, _| {
                 self.current_user.clear();
                 app_data.callback.map(|mut cb| cb.schedule(From::from(rval), 0, 0));
             });
@@ -155,7 +158,7 @@ impl<'a> Client<'a> for PersonalitySyscall<'a> {
     fn set_u8_done(&self, rval: ReturnCode) {
         debug!("PersonalitySyscall::set_u8_done called");
         self.current_user.map(|current_user| {
-            self.apps.enter(*current_user, |app_data, _| {
+            let _ = self.apps.enter(*current_user, |app_data, _| {
                 self.current_user.clear();
                 debug!("Calling set_u8_done callback on app");
                 app_data.callback.map(|mut cb| cb.schedule(From::from(rval), 0, 0));

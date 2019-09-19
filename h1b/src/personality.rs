@@ -245,12 +245,12 @@ impl<'a> flash::Client<'a> for PersonalityDriver<'a> {
         match state {
             State::WritingStruct => {
                 self.state.set(State::Idle);
-                self.client.map(|c| c.set_done(ReturnCode::SUCCESS));
+                self.client.map(|c| c.set_done(rcode));
             },
             State::WritingU8 => {
                 self.state.set(State::Idle);
                 self.client.map(|c| {
-                    c.set_u8_done(ReturnCode::SUCCESS);
+                    c.set_u8_done(rcode);
                 });
             },
             _ => { // Should never happen -pal
