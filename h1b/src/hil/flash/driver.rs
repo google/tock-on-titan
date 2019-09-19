@@ -73,7 +73,7 @@ impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> 
         ReturnCode::SUCCESS
     }
 
-    fn read(&self, word: usize) -> u32 {
+    fn read(&self, word: usize) -> ReturnCode {
         self.hw.read(word)
     }
 

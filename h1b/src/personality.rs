@@ -106,8 +106,16 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
                 let mut personality_ptr = mem::transmute::<*mut PersonalityData, *mut u32>(data);
                 let word_count = PAGE_SIZE_U32;
                 for i in 0..word_count {
-                    *personality_ptr = flash.read(PERSONALITY_ADDRESS_U32 + i);
-                    personality_ptr = personality_ptr.offset(1);
+                    let result = flash.read(PERSONALITY_ADDRESS_U32 + i);
+                    match result {
+                        ReturnCode::SuccessWithValue{value: v} => {
+                            *personality_ptr = v as u32;
+                            personality_ptr = personality_ptr.offset(1);
+                        }
+                        _ => {
+                            return result;
+                        }
+                    }
                 }
                 ReturnCode::SUCCESS
             })
@@ -115,7 +123,6 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
     }
 
     fn get_u8(&self, data: &mut [u8]) -> ReturnCode {
-        debug!("Getting Personality as U8");
         if data.len() < PERSONALITY_SIZE {
             ReturnCode::ESIZE
         } else {
@@ -125,8 +132,16 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
                     let mut personality_ptr = mem::transmute::<*mut u8, *mut u32>(ptr);
                     let word_count = PAGE_SIZE_U32;
                     for i in 0..word_count {
-                        *personality_ptr = flash.read(PERSONALITY_ADDRESS_U32 + i);
-                        personality_ptr = personality_ptr.offset(1);
+                        let result = flash.read(PERSONALITY_ADDRESS_U32 + i);
+                        match result {
+                            ReturnCode::SuccessWithValue{value: v} => {
+                                *personality_ptr = v as u32;
+                                personality_ptr = personality_ptr.offset(1);
+                            }
+                            _ => {
+                                return result;
+                            }
+                        }
                     }
                     ReturnCode::SUCCESS
                 })
@@ -169,13 +184,12 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
     }
 
     fn set_u8(&self, data: &mut [u8]) -> ReturnCode {
-        debug!("Setting Personality as U8");
         if data.len() < PERSONALITY_SIZE {
-            debug!(" - ESIZE");
+            debug!("personality::set_u8: ESIZE");
             ReturnCode::ESIZE
         }
         else if self.state.get() != State::Idle {
-            debug!(" - EBUSY");
+            debug!("personality::set_u8 EBUSY");
             ReturnCode::EBUSY
         } else {
             if self.flash.is_some() {
@@ -229,7 +243,7 @@ impl<'a> flash::Client<'a> for PersonalityDriver<'a> {
                 if self.start_write(target) {
                     self.state.set(State::WritingU8);
                 } else {
-                    debug!("WriteU8 failed");
+                    debug!("personality::write_u8 failed");
                     self.client.map(|c| c.set_u8_done(ReturnCode::FAIL));
                     self.state.set(State::Idle);
                 }

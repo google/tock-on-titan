@@ -39,7 +39,7 @@ static void clear_personality(void);
 
 static void clear_personality(void) {
   perso_st* person = get_personality();
-  memset(person, sizeof(perso_st), 0x87);
+  memset(person, 0x87, sizeof(perso_st));
   set_personality(person);
 }
 

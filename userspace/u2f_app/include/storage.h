@@ -37,7 +37,7 @@ typedef struct {
 } perso_st;
 
 /* get ptr to data in flash */
-const perso_st* get_personality(void);
+perso_st* get_personality(void);
 /* persist to flash */
 int set_personality(const perso_st* id);
 

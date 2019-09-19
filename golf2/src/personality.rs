@@ -156,11 +156,9 @@ impl<'a> Client<'a> for PersonalitySyscall<'a> {
     }
 
     fn set_u8_done(&self, rval: ReturnCode) {
-        debug!("PersonalitySyscall::set_u8_done called");
         self.current_user.map(|current_user| {
             let _ = self.apps.enter(*current_user, |app_data, _| {
                 self.current_user.clear();
-                debug!("Calling set_u8_done callback on app");
                 app_data.callback.map(|mut cb| cb.schedule(From::from(rval), 0, 0));
             });
         });

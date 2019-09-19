@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use kernel::ReturnCode;
+
 /// Works the fake through a series of writes and erases to test its
 /// functionality. Simulates both failed operations and successful operations.
 #[test]
@@ -21,10 +23,10 @@ fn fake_hw() -> bool {
 
 	// Verify the initial state of the flash.
 	require!(fake.is_programming() == false);
-	require!(fake.read(512) == 0xFFFFFFFF);
-	require!(fake.read(1023) == 0xFFFFFFFF);
-	require!(fake.read(1300) == 0xFFFFFFFF);
-	require!(fake.read(1301) == 0xFFFFFFFF);
+	require!(fake.read(512) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1023) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1301) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
 
 	// Operation 1: successful write to two words.
 	fake.set_transaction(1300, 2 - 1);
@@ -39,10 +41,10 @@ fn fake_hw() -> bool {
 	fake.finish_operation();
 	require!(fake.read_error() == 0);
 	require!(fake.is_programming() == false);
-	require!(fake.read(512) == 0xFFFFFFFF);
-	require!(fake.read(1023) == 0xFFFFFFFF);
-	require!(fake.read(1300) == 0xFFFF0FFF);
-	require!(fake.read(1301) == 0xFFFAFFFF);
+	require!(fake.read(512) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1023) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFF0FFF });
+	require!(fake.read(1301) == ReturnCode::SuccessWithValue { value: 0xFFFAFFFF });
 
 	// Operation 2: failed write. Verifies the write doesn't change anything.
 	fake.set_transaction(1300, 2 - 1);
@@ -52,10 +54,10 @@ fn fake_hw() -> bool {
 	fake.inject_result(0x8);  // Program failed
 	require!(fake.read_error() == 0x8);
 	require!(fake.is_programming() == false);
-	require!(fake.read(512) == 0xFFFFFFFF);
-	require!(fake.read(1023) == 0xFFFFFFFF);
-	require!(fake.read(1300) == 0xFFFF0FFF);
-	require!(fake.read(1301) == 0xFFFAFFFF);
+	require!(fake.read(512) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1023) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFF0FFF });
+	require!(fake.read(1301) == ReturnCode::SuccessWithValue { value: 0xFFFAFFFF });
 
 	// Operation 3: successful write to one word. Verifies the write doesn't
 	// overlap to the next word.
@@ -71,10 +73,10 @@ fn fake_hw() -> bool {
 	fake.finish_operation();
 	require!(fake.read_error() == 0);
 	require!(fake.is_programming() == false);
-	require!(fake.read(512) == 0xFFFFFFFF);
-	require!(fake.read(1023) == 0xFFFFFFFF);
-	require!(fake.read(1300) == 0xFFFF00FF);
-	require!(fake.read(1301) == 0xFFFAFFFF);
+	require!(fake.read(512) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1023) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFF00FF });
+	require!(fake.read(1301) == ReturnCode::SuccessWithValue { value: 0xFFFAFFFF });
 
 	// Operation 4: successful erase of the second page. Confirms the erase
 	// does not affect the third page.
@@ -85,10 +87,10 @@ fn fake_hw() -> bool {
 	fake.finish_operation();
 	require!(fake.read_error() == 0);
 	require!(fake.is_programming() == false);
-	require!(fake.read(512) == 0xFFFFFFFF);
-	require!(fake.read(1023) == 0xFFFFFFFF);
-	require!(fake.read(1300) == 0xFFFF00FF);
-	require!(fake.read(1301) == 0xFFFAFFFF);
+	require!(fake.read(512) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1023) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFF00FF });
+	require!(fake.read(1301) == ReturnCode::SuccessWithValue { value: 0xFFFAFFFF });
 
 	// Operation 5: successful erase of the third page. Verifies the erase
 	// affects the values in the third page.
@@ -99,10 +101,10 @@ fn fake_hw() -> bool {
 	fake.finish_operation();
 	require!(fake.read_error() == 0);
 	require!(fake.is_programming() == false);
-	require!(fake.read(512) == 0xFFFFFFFF);
-	require!(fake.read(1023) == 0xFFFFFFFF);
-	require!(fake.read(1300) == 0xFFFFFFFF);
-	require!(fake.read(1301) == 0xFFFFFFFF);
+	require!(fake.read(512) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1023) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1301) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
 
 	// At this point, the fake flash module's log is full. Attempting another
 	// operation should result in a flash error even if the operation is
@@ -114,10 +116,10 @@ fn fake_hw() -> bool {
 	fake.finish_operation();
 	require!(fake.read_error() == 0x8);
 	require!(fake.is_programming() == false);
-	require!(fake.read(512) == 0xFFFFFFFF);
-	require!(fake.read(1023) == 0xFFFFFFFF);
-	require!(fake.read(1300) == 0xFFFFFFFF);
-	require!(fake.read(1301) == 0xFFFFFFFF);
+	require!(fake.read(512) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1023) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1301) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
 
 	true
 }
@@ -142,9 +144,9 @@ fn write_set_bit() -> bool {
 	fake.finish_operation();
 	require!(fake.read_error() == 0);
 	require!(fake.is_programming() == false);
-	require!(fake.read(512) == 0xFFFFFFFF);
-	require!(fake.read(1023) == 0xFFFFFFFF);
-	require!(fake.read(1300) == 0xFFFF0FFF);
+	require!(fake.read(512) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1023) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFF0FFF });
 
 	// Operation 2: failed write. Verifies the write doesn't change anything.
 	fake.set_transaction(1300, 1 - 1);
@@ -159,9 +161,9 @@ fn write_set_bit() -> bool {
 	fake.finish_operation();
 	require!(fake.read_error() == 0x8);
 	require!(fake.is_programming() == false);
-	require!(fake.read(512) == 0xFFFFFFFF);
-	require!(fake.read(1023) == 0xFFFFFFFF);
-	require!(fake.read(1300) == 0xFFFF0FFF);
+	require!(fake.read(512) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1023) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+	require!(fake.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFF0FFF });
 
 	true
 }

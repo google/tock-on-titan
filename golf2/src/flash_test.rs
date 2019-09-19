@@ -73,8 +73,15 @@ impl<F: Flash<'static> + 'static> FlashTest<F> {
     fn erase1_done(&self, code: ReturnCode) {
         println!("FlashTest: Erase1 done. code: {:?}", code);
         let read_value = self.driver.read(Self::TEST_WORD);
-        if read_value != 0xFFFFFFFF {
-            println!("FlashTest: Erase1 failed, value: {}", read_value);
+        match read_value {
+            ReturnCode::SuccessWithValue {value: val} => {
+                if val != 0xFFFFFFFF {
+                    println!("FlashTest: Erase1 failed, value: {}", val);
+                }
+            },
+            _ => {
+                println!("FlashTest: erase test read failed: {:?}", read_value);
+            }
         }
         self.write1_start();
     }
@@ -91,8 +98,15 @@ impl<F: Flash<'static> + 'static> FlashTest<F> {
     fn write1_done(&self, code: ReturnCode) {
         println!("FlashTest: Write1 done. code: {:?}", code);
         let read_value = self.driver.read(Self::TEST_WORD);
-        if read_value != 0x0000FFFF {
-            println!("FlashTest: Write1 failed, value: {}", read_value);
+        match read_value {
+            ReturnCode::SuccessWithValue{value: val} => {
+                if val != 0x0000FFFF {
+                    println!("FlashTest: Write1 failed, value: {}", val);
+                }
+            },
+            _ => {
+                println!("FlashTest: read failed: {:?}", read_value);
+            }
         }
         self.write2_start();
     }
@@ -109,8 +123,15 @@ impl<F: Flash<'static> + 'static> FlashTest<F> {
     fn write2_done(&self, code: ReturnCode) {
         println!("FlashTest: Write2 done. code: {:?}", code);
         let read_value = self.driver.read(Self::TEST_WORD);
-        if read_value != 0x00000000 {
-            println!("FlashTest: Write2 failed, value: {}", read_value);
+        match read_value {
+            ReturnCode::SuccessWithValue{value: val} => {
+                if val != 0x00000000 {
+                    println!("FlashTest: Write2 failed, value: {}", val);
+                }
+            },
+            _ => {
+                println!("FlashTest: read failed: {:?}", read_value);
+            }
         }
         self.erase2_start();
     }
@@ -123,8 +144,15 @@ impl<F: Flash<'static> + 'static> FlashTest<F> {
     fn erase2_done(&self, code: ReturnCode) {
         println!("FlashTest: Erase2 done. code: {:?}", code);
         let read_value = self.driver.read(Self::TEST_WORD);
-        if read_value != 0xFFFFFFFF {
-            println!("FlashTest: Erase2 failed, value: {}", read_value);
+        match read_value {
+            ReturnCode::SuccessWithValue{value: val} => {
+                if val != 0xFFFFFFFF {
+                    println!("FlashTest: Erase2 failed, value: {}", val);
+                }
+            },
+            _ => {
+                println!("FlashTest: Erase2 read failed: {:?}", read_value);
+            }
         }
     }
 }

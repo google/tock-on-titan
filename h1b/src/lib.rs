@@ -25,7 +25,7 @@ extern crate cortexm3;
     debug_gpio,
     static_init,
     register_bitfields,
-    register_bitmasks
+    register_bitmasks,
 )]
 extern crate kernel;
 

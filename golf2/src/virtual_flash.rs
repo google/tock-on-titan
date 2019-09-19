@@ -84,7 +84,7 @@ impl<'f> Flash<'f> for FlashUser<'f> {
         ReturnCode::SUCCESS
     }
 
-    fn read(&self, word: usize) -> u32 {
+    fn read(&self, word: usize) -> ReturnCode {
         self.mux.read(word)
     }
 
@@ -164,7 +164,7 @@ impl<'f> MuxFlash<'f> {
         });
     }
 
-    fn read(&self, word: usize) -> u32 {
+    fn read(&self, word: usize) -> ReturnCode {
         self.driver.read(word)
     }
 }

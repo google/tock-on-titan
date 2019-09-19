@@ -244,9 +244,8 @@ int kl_init(void) {
   uint32_t salt[8];
   int error = 0;
   size_t i;
-  printf("tock_shims.c: kl_init()\n");
+  printf("Initializing keyladder.\n");
   // salt rsr some
-  printf("kl_init(): generating salt\n");
   rand_bytes(salt, sizeof(salt));
   //error = error || kl_step(40, salt, NULL);
   rand_bytes(salt, sizeof(salt));
@@ -262,7 +261,6 @@ int kl_init(void) {
   error = error || kl_step(20, NULL, NULL);
   for (i = 0; i < 254 + 1; ++i) error = error || kl_step(25, NULL, NULL);
   error = error || kl_step(34, ISR2_SEED, NULL);
-  printf("kl_init(): salted!\n");
   return error;
 
 }
@@ -313,7 +311,7 @@ int kl_derive_ssh(const uint32_t input[8] ,
 
 static perso_st personality;
 
-const perso_st* get_personality(void) {
+perso_st* get_personality(void) {
   tock_get_personality(&personality);
   return &personality;
 }

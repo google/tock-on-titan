@@ -15,9 +15,8 @@
 #![no_std]
 #![no_main]
 #![feature(asm, const_fn, lang_items, compiler_builtins_lib)]
-#![feature(in_band_lifetimes)]
-#![feature(infer_outlives_requirements)]
 #![feature(panic_implementation)]
+#![feature(in_band_lifetimes)]
 #![feature(core_intrinsics)]
 
 extern crate capsules;
@@ -41,7 +40,7 @@ pub mod virtual_flash;
 use capsules::alarm::AlarmDriver;
 use capsules::console;
 use capsules::virtual_alarm::VirtualMuxAlarm;
-use capsules::virtual_uart::{UartDevice, UartMux};
+use capsules::virtual_uart::{UartMux, UartDevice};
 
 use kernel::{Chip, Platform};
 use kernel::capabilities;
