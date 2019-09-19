@@ -16,23 +16,25 @@ use ::kernel::ReturnCode;
 
 /// Flash client -- receives callbacks when flash operations complete.
 pub trait Client {
-	fn erase_done(&self, ReturnCode);
-	fn write_done(&self, ReturnCode);
+        fn erase_done(&self, ReturnCode);
+        fn write_done(&self, ReturnCode);
 }
 
 /// Flash driver API.
 pub trait Flash<'d> {
-	/// Erases the specified flash page, setting it to all ones.
-	fn erase(&self, page: usize) -> ReturnCode;
+        /// Erases the specified flash page, setting it to all ones.
+        fn erase(&self, page: usize) -> ReturnCode;
 
-	/// Reads the given word from flash.
-	fn read(&self, word: usize) -> u32;
+        /// Reads the given word from flash. Successful read returns
+        /// ReturnCode::SuccessWithValue with the value read; if the
+        /// offset is out of bounds, returns ReturnCode::ESIZE.
+        fn read(&self, offset: usize) -> ReturnCode;
 
-	/// Writes a buffer (of up to 32 words) into the given location in flash.
-	/// The target location is specified as an offset from the beginning of
-	/// flash in units of words.
-	fn write(&self, target: usize, data: &[u32]) -> ReturnCode;
+        /// Writes a buffer (of up to 32 words) into the given location in flash.
+        /// The target location is specified as an offset from the beginning of
+        /// flash in units of words.
+        fn write(&self, target: usize, data: &[u32]) -> ReturnCode;
 
-	/// Links this driver to its client.
-	fn set_client(&self, client: &'d Client);
+        /// Links this driver to its client.
+        fn set_client(&self, client: &'d Client);
 }
