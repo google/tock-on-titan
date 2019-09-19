@@ -23,249 +23,267 @@ const ERASE_TIME: u32 = 53653;
 #[cfg(test)]
 const WRITE_WORD_TIME: u32 = 840;
 
+static mut WRITE_BUF: [u32; 1] = [0; 1];
+
 #[cfg(test)]
 #[derive(Clone,Copy,PartialEq)]
 enum MockClientState {
-	EraseDone(kernel::ReturnCode),
-	WriteDone(kernel::ReturnCode),
+        EraseDone(kernel::ReturnCode),
+        WriteDone(kernel::ReturnCode),
 }
 
 #[cfg(test)]
 struct MockClient {
-	state: core::cell::Cell<Option<MockClientState>>,
+    state: core::cell::Cell<Option<MockClientState>>,
 }
 
 #[cfg(test)]
-impl MockClient {
-	pub fn new() -> Self {
-		MockClient { state: core::cell::Cell::new(None) }
-	}
+impl<'a> MockClient {
+        pub fn new() -> Self {
+                MockClient { state: core::cell::Cell::new(None) }
+        }
 
-	pub fn state(&self) -> Option<MockClientState> { self.state.get() }
+        pub fn state(&self) -> Option<MockClientState> { self.state.get() }
 }
 
 #[cfg(test)]
-impl h1b::hil::flash::Client for MockClient {
-	fn erase_done(&self, code: kernel::ReturnCode) {
-		self.state.set(Some(MockClientState::EraseDone(code)));
-	}
+impl<'a> h1b::hil::flash::Client<'a> for MockClient {
+        fn erase_done(&self, code: kernel::ReturnCode) {
+                self.state.set(Some(MockClientState::EraseDone(code)));
+        }
 
-	fn write_done(&self, code: kernel::ReturnCode) {
-		self.state.set(Some(MockClientState::WriteDone(code)));
-	}
+        fn write_done(&self, _data: &'a mut [u32], code: kernel::ReturnCode) {
+                self.state.set(Some(MockClientState::WriteDone(code)));
+        }
 }
 
 #[test]
 fn erase() -> bool {
-	use kernel::hil::time::Client;
-	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
-	let client = MockClient::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
+        use kernel::hil::time::Client;
+        let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+        let client = MockClient::new();
+        let hw = h1b::hil::flash::fake::FakeHw::new();
 
-	// First attempt.
-	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
-	driver.set_client(&client);
-	require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
-	require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
-	require!(client.state() == None);
-	require!(hw.is_programming() == true);
+        // First attempt.
+        let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+        driver.set_client(&client);
+        require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
+        require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
+        require!(client.state() == None);
+        require!(hw.is_programming() == true);
 
-	// Indicate an error, let the driver retry.
-	alarm.set_time(ERASE_TIME);
-	hw.inject_result(0b100);
-	driver.fired();
-	require!(alarm.get_alarm() == 2 * ERASE_TIME);
-	require!(hw.is_programming() == true);
-	require!(client.state() == None);
+        // Indicate an error, let the driver retry.
+        alarm.set_time(ERASE_TIME);
+        hw.inject_result(0b100);
+        driver.fired();
+        require!(alarm.get_alarm() == 2 * ERASE_TIME);
+        require!(hw.is_programming() == true);
+        require!(client.state() == None);
 
-	// Let the operation finish successfully.
-	alarm.set_time(2 * ERASE_TIME);
-	hw.finish_operation();
-	driver.fired();
-	require!(alarm.get_alarm() == 0);
-	require!(hw.is_programming() == false);
-	require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
-	require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::SUCCESS)));
-	require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+        // Let the operation finish successfully.
+        alarm.set_time(2 * ERASE_TIME);
+        hw.finish_operation();
+        driver.fired();
+        require!(alarm.get_alarm() == 0);
+        require!(hw.is_programming() == false);
+        require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+        require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::SUCCESS)));
+        require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
 
-	true
+        true
 }
 
 #[test]
 fn erase_max_retries() -> bool {
-	use kernel::hil::time::Client;
-	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
-	let client = MockClient::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
-	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
-	driver.set_client(&client);
-	require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
-	require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
-	require!(client.state() == None);
-	require!(hw.is_programming() == true);
+        use kernel::hil::time::Client;
+        let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+        let client = MockClient::new();
+        let hw = h1b::hil::flash::fake::FakeHw::new();
+        let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+        driver.set_client(&client);
+        require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
+        require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
+        require!(client.state() == None);
+        require!(hw.is_programming() == true);
 
-	for i in 1..45 {
-		// Indicate an error, let the driver retry.
-		alarm.set_time(ERASE_TIME * i);
-		hw.inject_result(0b100);
-		driver.fired();
-		require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
-		require!(hw.is_programming() == true);
-		require!(client.state() == None);
-	}
+        for i in 1..45 {
+                // Indicate an error, let the driver retry.
+                alarm.set_time(ERASE_TIME * i);
+                hw.inject_result(0b100);
+                driver.fired();
+                require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
+                require!(hw.is_programming() == true);
+                require!(client.state() == None);
+        }
 
-	// Last try.
-	hw.inject_result(0b100);
-	driver.fired();
-	require!(alarm.get_alarm() == 0);
-	require!(hw.is_programming() == false);
-	require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::FAIL)));
-	require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
-	require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+        // Last try.
+        hw.inject_result(0b100);
+        driver.fired();
+        require!(alarm.get_alarm() == 0);
+        require!(hw.is_programming() == false);
+        require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::FAIL)));
+        require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+        require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
 
-	true
+        true
 }
 
 #[test]
 fn write_then_erase() -> bool {
-	use kernel::hil::time::Client;
-	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
-	let client = MockClient::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
+        use kernel::hil::time::Client;
+        let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+        let client = MockClient::new();
+        let hw = h1b::hil::flash::fake::FakeHw::new();
 
-	// Write
-	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
-	driver.set_client(&client);
-	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
-	require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
-	require!(client.state() == None);
-	require!(hw.is_programming() == true);
-	alarm.set_time(WRITE_WORD_TIME);
-	hw.inject_result(0);
-	driver.fired();
-	require!(hw.is_programming() == true);
-	require!(client.state() == None);
-	hw.finish_operation();
-	driver.fired();
-	require!(alarm.get_alarm() == 0);
-	require!(hw.is_programming() == false);
-	require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFABCD });
-	require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::SUCCESS)));
-	require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFABCD });
+        // Write
+        let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+        driver.set_client(&client);
 
-	// Erase
-	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
-	driver.set_client(&client);
-	require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
-	require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
-	require!(hw.is_programming() == true);
-	alarm.set_time(WRITE_WORD_TIME + ERASE_TIME);
-	hw.finish_operation();
-	driver.fired();
-	require!(alarm.get_alarm() == 0);
-	require!(hw.is_programming() == false);
-	require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
-	require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::SUCCESS)));
-	require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+        unsafe {
+            WRITE_BUF[0] = 0xFFFFABCD;
+            require!(driver.write(1300, &mut WRITE_BUF) == (kernel::ReturnCode::SUCCESS, None));
+        }
+        require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
+        require!(client.state() == None);
+        require!(hw.is_programming() == true);
+        alarm.set_time(WRITE_WORD_TIME);
+        hw.inject_result(0);
+        driver.fired();
+        require!(hw.is_programming() == true);
+        require!(client.state() == None);
+        hw.finish_operation();
+        driver.fired();
+        require!(alarm.get_alarm() == 0);
+        require!(hw.is_programming() == false);
+        require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFABCD });
+        require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::SUCCESS)));
+        require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFABCD });
 
-	true
+        // Erase
+        let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+        driver.set_client(&client);
+        require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
+        require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
+        require!(hw.is_programming() == true);
+        alarm.set_time(WRITE_WORD_TIME + ERASE_TIME);
+        hw.finish_operation();
+        driver.fired();
+        require!(alarm.get_alarm() == 0);
+        require!(hw.is_programming() == false);
+        require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+        require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::SUCCESS)));
+        require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
+
+        true
 }
 
 #[test]
 fn successful_program() -> bool {
-	use kernel::hil::time::Client;
-	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
-	let client = MockClient::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
+        use kernel::hil::time::Client;
+        let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+        let client = MockClient::new();
+        let hw = h1b::hil::flash::fake::FakeHw::new();
 
-	// First attempt.
-	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
-	driver.set_client(&client);
-	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
-	require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
-	require!(client.state() == None);
-	require!(hw.is_programming() == true);
+        // First attempt.
+        let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+        driver.set_client(&client);
 
-	// Indicate an error, let the driver retry.
-	alarm.set_time(WRITE_WORD_TIME);
-	hw.inject_result(0b100);
-	driver.fired();
-	require!(alarm.get_alarm() == 2 * WRITE_WORD_TIME);
-	require!(hw.is_programming() == true);
-	require!(client.state() == None);
+        unsafe {
+            WRITE_BUF[0] = 0xFFFFABCD;
+            require!(driver.write(1300, &mut WRITE_BUF) == (kernel::ReturnCode::SUCCESS, None));
+        }
+        require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
+        require!(client.state() == None);
+        require!(hw.is_programming() == true);
 
-	// Let the operation finish successfully (including the final pulse).
-	alarm.set_time(2 * WRITE_WORD_TIME);
-	hw.inject_result(0);
-	driver.fired();
-	require!(alarm.get_alarm() == 3 * WRITE_WORD_TIME);
-	require!(hw.is_programming() == true);
-	require!(client.state() == None);
-	hw.finish_operation();
-	driver.fired();
-	require!(alarm.get_alarm() == 0);
-	require!(hw.is_programming() == false);
-	require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::SUCCESS)));
-	require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFABCD });
+        // Indicate an error, let the driver retry.
+        alarm.set_time(WRITE_WORD_TIME);
+        hw.inject_result(0b100);
+        driver.fired();
+        require!(alarm.get_alarm() == 2 * WRITE_WORD_TIME);
+        require!(hw.is_programming() == true);
+        require!(client.state() == None);
 
-	true
+        // Let the operation finish successfully (including the final pulse).
+        alarm.set_time(2 * WRITE_WORD_TIME);
+        hw.inject_result(0);
+        driver.fired();
+        require!(alarm.get_alarm() == 3 * WRITE_WORD_TIME);
+        require!(hw.is_programming() == true);
+        require!(client.state() == None);
+        hw.finish_operation();
+        driver.fired();
+        require!(alarm.get_alarm() == 0);
+        require!(hw.is_programming() == false);
+        require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::SUCCESS)));
+        require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFABCD });
+
+        true
 }
 
 #[test]
 fn timeout() -> bool {
-	use kernel::hil::time::Client;
-	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
-	let client = MockClient::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
-	hw.set_transaction(1300, 1);
-	hw.set_write_data(&[0xFFFF0FFF]);
+        use kernel::hil::time::Client;
+        let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+        let client = MockClient::new();
+        let hw = h1b::hil::flash::fake::FakeHw::new();
+        hw.set_transaction(1300, 1);
+        hw.set_write_data(&[0xFFFF0FFF]);
 
-	// First attempt.
-	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
-	driver.set_client(&client);
-	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
-	require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
-	require!(client.state() == None);
-	require!(hw.is_programming() == true);
+        // First attempt.
+        let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+        driver.set_client(&client);
 
-	// Indicate a timeout.
-	alarm.set_time(WRITE_WORD_TIME);
-	driver.fired();
-	require!(alarm.get_alarm() == 0);
-	require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::FAIL)));
+        unsafe {
+            WRITE_BUF[0] = 0xFFFFABCD;
+            require!(driver.write(1300, &mut WRITE_BUF) == (kernel::ReturnCode::SUCCESS, None));
+        }
+        require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
+        require!(client.state() == None);
+        require!(hw.is_programming() == true);
 
-	true
+        // Indicate a timeout.
+        alarm.set_time(WRITE_WORD_TIME);
+        driver.fired();
+        require!(alarm.get_alarm() == 0);
+        require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::FAIL)));
+
+        true
 }
 
 #[test]
 fn write_max_retries() -> bool {
-	use kernel::hil::time::Client;
-	let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
-	let client = MockClient::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
-	let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
-	driver.set_client(&client);
-	require!(driver.write(1300, &[0xFFFFABCD]) == kernel::ReturnCode::SUCCESS);
-	require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
-	require!(client.state() == None);
-	require!(hw.is_programming() == true);
+        use kernel::hil::time::Client;
+        let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+        let client = MockClient::new();
+        let hw = h1b::hil::flash::fake::FakeHw::new();
+        let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+        driver.set_client(&client);
 
-	for _ in 1..8 {
-		// Indicate an error, let the driver retry.
-		alarm.set_time(100 * WRITE_WORD_TIME);
-		hw.inject_result(0b100);
-		driver.fired();
-		require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
-		require!(hw.is_programming() == true);
-		require!(client.state() == None);
-	}
+        unsafe {
+            WRITE_BUF[0] = 0xFFFFABCD;
+            require!(driver.write(1300, &mut WRITE_BUF) == (kernel::ReturnCode::SUCCESS, None));
+        }
+        require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
+        require!(client.state() == None);
+        require!(hw.is_programming() == true);
 
-	// Last try.
-	hw.inject_result(0b100);
-	driver.fired();
-	require!(alarm.get_alarm() == 0);
-	require!(hw.is_programming() == false);
-	require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::FAIL)));
+        for _ in 1..8 {
+                // Indicate an error, let the driver retry.
+                alarm.set_time(100 * WRITE_WORD_TIME);
+                hw.inject_result(0b100);
+                driver.fired();
+                require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
+                require!(hw.is_programming() == true);
+                require!(client.state() == None);
+        }
 
-	true
+        // Last try.
+        hw.inject_result(0b100);
+        driver.fired();
+        require!(alarm.get_alarm() == 0);
+        require!(hw.is_programming() == false);
+        require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::FAIL)));
+
+        true
 }
