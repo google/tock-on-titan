@@ -17,10 +17,10 @@
 
 #[macro_export]
 macro_rules! require {
-	($expr:expr) => (if !$expr {
-		use core::fmt::Write;
-		let _ = writeln!(libtock::console::Console::new(), "FAILED: {}", stringify!($expr));
-		return false;
-	});
-	($expr:expr,) => (require!($expr));
+    ($expr:expr) => (if !$expr {
+        use core::fmt::Write;
+        let _ = writeln!(libtock::console::Console::new(), "FAILED: {}", stringify!($expr));
+        return false;
+    });
+    ($expr:expr,) => (require!($expr));
 }
