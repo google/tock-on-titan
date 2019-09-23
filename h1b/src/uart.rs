@@ -48,8 +48,7 @@
 //!
 
 use core::cell::Cell;
-use kernel::common::cells::TakeCell;
-use kernel::common::cells::VolatileCell;
+use kernel::common::cells::{OptionalCell, TakeCell, VolatileCell};
 use kernel::hil;
 use kernel::ReturnCode;
 use pmu::{Clock, PeripheralClock, PeripheralClock1};
@@ -78,34 +77,31 @@ pub static mut UART1: UART = unsafe { UART::new(UART1_BASE, PeripheralClock1::Ua
 
 pub static mut UART2: UART = unsafe { UART::new(UART2_BASE, PeripheralClock1::Uart2Timer) };
 
-// A resumable buffer that tracks the last written index
-//struct Buffer {
-//    bytes: &'static mut [u8],
-//    cursor: usize,
-//    limit: usize,
-//}
-
 /// A UART channel
 ///
 /// Each UART manages its own clock and NVIC interrupt internally.
-pub struct UART {
+pub struct UART<'a> {
     regs: *mut Registers,
     clock: Clock,
     tx_buffer: TakeCell<'static, [u8]>,
     tx_limit: Cell<usize>,
     tx_cursor: Cell<usize>,
-    client: Cell<Option<&'static hil::uart::Client>>,
+    tx_client: OptionalCell<&'a hil::uart::TransmitClient>,
+    rx_client: OptionalCell<&'a hil::uart::ReceiveClient>,
 }
 
-impl UART {
-    const unsafe fn new(uart: *mut Registers, clock: PeripheralClock1) -> UART {
+impl<'a> hil::uart::Uart<'a> for UART<'a> {}
+
+impl<'a> UART<'a> {
+    const unsafe fn new(uart: *mut Registers, clock: PeripheralClock1) -> UART<'a> {
         UART {
             regs: uart,
             clock: Clock::new(PeripheralClock::Bank1(clock)),
             tx_buffer: TakeCell::empty(),
             tx_limit: Cell::new(0),
             tx_cursor: Cell::new(0),
-            client: Cell::new(None),
+            tx_client: OptionalCell::empty(),
+            rx_client: OptionalCell::empty(),
         }
     }
 
@@ -267,14 +263,12 @@ impl UART {
 
         regs.clear_interrupt_state.set(1);
         if self.send_remaining_bytes() == -1 {
-            self.client.get().map(|client| {
+            self.tx_client.map(|client| {
                 if self.tx_buffer.is_some() {
-                    client.transmit_complete(self.tx_buffer.take().unwrap(), hil::uart::Error::CommandComplete);
+                    client.transmitted_buffer(self.tx_buffer.take().unwrap(),
+                                              self.tx_limit.get(),
+                                              ReturnCode::SUCCESS);
                 }
-//                }
-//                self.tx_buffer.map(|buffer| {
-//                    client.transmit_complete(buffer, hil::uart::Error::CommandComplete);
-//                });
             });
         }
     }
@@ -296,7 +290,7 @@ impl UART {
         let regs = unsafe { &*self.regs };
         // Currently discards bytes: need to read into buffer. -pal 4/11/18
         regs.clear_interrupt_state.set(2);
-        self.client.get().map(|_client| {
+        self.rx_client.map(|_client| {
             while regs.state.get() & 1 << 7 == 0 {
                 // While RX FIFO not empty
                 let _b = regs.read_data.get() as u8;
@@ -306,27 +300,56 @@ impl UART {
     }
 }
 
-impl hil::uart::UART for UART {
-    fn set_client(&self, client: &'static hil::uart::Client) {
-        self.client.set(Some(client));
+impl<'a> hil::uart::Transmit<'a> for UART<'a> {
+    fn set_transmit_client(&self, client: &'a hil::uart::TransmitClient) {
+        self.tx_client.replace(client);
     }
 
-    fn transmit(&self, tx_buffer: &'static mut [u8], tx_len: usize) {
+    fn transmit_buffer(&self, tx_buffer: &'static mut [u8], tx_len: usize) -> (ReturnCode, Option<&'static mut [u8]>) {
+        if self.tx_buffer.is_some() {
+            return (ReturnCode::EBUSY, Some(tx_buffer));
+        }
         self.tx_buffer.replace(tx_buffer);
         self.tx_cursor.set(0);
         self.tx_limit.set(tx_len);
         self.send_remaining_bytes();
+        return (ReturnCode::SUCCESS, None);
     }
 
-    fn receive(&self, _rx_buffer: &'static mut[u8], _rx_len: usize) {
-        unimplemented!();
+    fn transmit_word(&self, _word: u32) -> ReturnCode {
+        ReturnCode::FAIL
     }
 
-    fn abort_receive(&self) {
-        unimplemented!();
+    fn transmit_abort(&self) -> ReturnCode {
+        if self.tx_buffer.is_some() {
+            ReturnCode::FAIL
+        } else {
+            ReturnCode::SUCCESS
+        }
+    }
+}
+
+impl<'a> hil::uart::Receive<'a> for UART<'a> {
+    fn set_receive_client(&self, client: &'a hil::uart::ReceiveClient) {
+        self.rx_client.replace(client);
     }
 
-    fn configure(&self, params: hil::uart::UARTParameters) -> ReturnCode {
+    fn receive_buffer(&self, rx_buffer: &'static mut[u8], _rx_len: usize) -> (ReturnCode, Option<&'static mut [u8]>) {
+        (ReturnCode::FAIL, Some(rx_buffer))
+    }
+
+    fn receive_word(&self) -> ReturnCode {
+        ReturnCode::FAIL
+    }
+
+    // SUCCESS indicates there will be no callback
+    fn receive_abort(&self) -> ReturnCode {
+        ReturnCode::SUCCESS
+    }
+}
+
+impl<'a> hil::uart::Configure for UART<'a> {
+    fn configure(&self, params: hil::uart::Parameters) -> ReturnCode {
         self.config(params.baud_rate);
         ReturnCode::SUCCESS
     }

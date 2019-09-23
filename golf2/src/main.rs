@@ -72,7 +72,7 @@ static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; NUM_PROCS] =
 pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 
 pub struct Golf {
-    console: &'static capsules::console::Console<'static, UartDevice<'static>>,
+    console: &'static capsules::console::Console<'static>,
     gpio: &'static capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
     timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
     ipc: kernel::ipc::IPC,
@@ -176,24 +176,22 @@ pub unsafe fn reset_handler() {
             115200
         )
     );
-    hil::uart::UART::set_client(&h1b::uart::UART0, uart_mux);
+    hil::uart::Transmit::set_transmit_client(&h1b::uart::UART0, uart_mux);
 
     // Create virtual device for console.
     let console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
     console_uart.setup();
 
     let console = static_init!(
-        console::Console<UartDevice>,
+        console::Console<'static>,
         console::Console::new(
             console_uart,
-            115200,
             &mut console::WRITE_BUF,
             &mut console::READ_BUF,
             kernel.create_grant(&grant_cap)
         )
     );
-    hil::uart::UART::set_client(console_uart, console);
-    console.initialize();
+    hil::uart::Transmit::set_transmit_client(console_uart, console);
 
     // Create virtual device for kernel debug.
     let debugger_uart = static_init!(UartDevice, UartDevice::new(uart_mux, false));
@@ -206,7 +204,7 @@ pub unsafe fn reset_handler() {
             &mut kernel::debug::INTERNAL_BUF,
         )
     );
-    hil::uart::UART::set_client(debugger_uart, debugger);
+    hil::uart::Transmit::set_transmit_client(debugger_uart, debugger);
 
     let debug_wrapper = static_init!(
         kernel::debug::DebugWriterWrapper,
