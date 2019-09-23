@@ -56,7 +56,7 @@ impl Chip for Hotel {
                     5 => crypto::dcrypto::DCRYPTO.handle_receive_interrupt(),
 
                     //54 => (), // KEYMGR HKEY ALERT, ignored
-                    104...109 => crypto::aes::KEYMGR0_AES.handle_interrupt(nvic_num),
+                    104..=109 => crypto::aes::KEYMGR0_AES.handle_interrupt(nvic_num),
 
                     110 => crypto::sha::KEYMGR0_SHA.handle_interrupt(nvic_num),
                     111 => (), // KEYMGR0_SHA_WFIFO_FULL
@@ -77,13 +77,13 @@ impl Chip for Hotel {
                         usb::USB0.handle_interrupt()
                     },
 
-                    pin @ 65...80 => {
+                    pin @ 65..=80 => {
                         gpio::PORT0.pins[(pin - 65) as usize].handle_interrupt();
                     }
                     81 => {
                         // GPIO Combined interrupt... why does this remain asserted?
                     }
-                    pin @ 82...97 => {
+                    pin @ 82..=97 => {
                         gpio::PORT1.pins[(pin - 82) as usize].handle_interrupt();
                     }
                     98 => {

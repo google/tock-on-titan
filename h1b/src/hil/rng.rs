@@ -87,7 +87,7 @@ pub enum Continue {
 pub trait RNG<'a> {
     /// Set the client for this random number generator.
     /// THe client will be called in response to requests for randomness.
-    fn set_client(&self, client: &'a Client);
+    fn set_client(&self, client: &'a dyn Client);
 
     /// Initiate acquiring a random number.
     ///
@@ -111,5 +111,5 @@ pub trait Client {
     /// The client returns either `Continue::More` if the iterator did not have
     /// enough random values and the client would like to be called again when
     /// more is available, or `Continue::Done`.
-    fn randomness_available(&self, randomness: &mut Iterator<Item = u32>) -> Continue;
+    fn randomness_available(&self, randomness: &mut dyn Iterator<Item = u32>) -> Continue;
 }

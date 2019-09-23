@@ -26,7 +26,7 @@ use super::smart_program::SmartProgramState;
 /// globalsec flash regions -- that must be done independently.
 pub struct FlashImpl<'d, A: Alarm + 'd, H: Hardware + 'd> {
     alarm: &'d A,
-    client: Cell<Option<&'d super::flash::Client<'d>>>,
+    client: Cell<Option<&'d dyn super::flash::Client<'d>>>,
     write_data: TakeCell<'d, [u32]>,
     write_pos: Cell<usize>,
     write_len: Cell<usize>,
@@ -94,7 +94,7 @@ impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> 
         (ReturnCode::SUCCESS, None)
     }
 
-    fn set_client(&'d self, client: &'d super::flash::Client<'d>) {
+    fn set_client(&'d self, client: &'d dyn super::flash::Client<'d>) {
         self.client.set(Some(client));
     }
 }

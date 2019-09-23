@@ -38,7 +38,7 @@ struct Registers {
 
 pub struct Timels<'a> {
     registers: *const Registers,
-    client: Cell<Option<&'a time::Client>>,
+    client: Cell<Option<&'a dyn time::Client>>,
     now: Cell<u32>,
 }
 
@@ -51,7 +51,7 @@ impl<'a> Timels<'a> {
         }
     }
 
-    pub fn set_client(&'static self, client: &'static time::Client) {
+    pub fn set_client(&'static self, client: &'static dyn time::Client) {
         self.client.set(Some(client));
     }
 

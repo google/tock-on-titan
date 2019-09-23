@@ -21,7 +21,7 @@ use usb::constants::EP_BUFFER_SIZE_WORDS;
 /// Trait a USB peripheral stack must implement to support the U2F syscall
 /// capsule.
 pub trait UsbHidU2f<'a> {
-    fn set_u2f_client(&self, client: &'a UsbHidU2fClient<'a>);
+    fn set_u2f_client(&self, client: &'a dyn UsbHidU2fClient<'a>);
 
     /// Reset the device and endpoints
     fn setup_u2f_descriptors(&self);

@@ -35,8 +35,8 @@ enum State {
 
 pub struct PersonalityDriver<'a> {
     state: Cell<State>,
-    client: OptionalCell<&'a Client<'a>>,
-    flash: OptionalCell<&'a flash::Flash<'a>>,
+    client: OptionalCell<&'a dyn Client<'a>>,
+    flash: OptionalCell<&'a dyn flash::Flash<'a>>,
     write_buffer: TakeCell<'a, [u32]>,
 }
 
@@ -62,7 +62,7 @@ impl<'a> PersonalityDriver<'a> {
         }
     }
 
-    pub fn set_flash(&self, flash: &'a flash::Flash<'a>) {
+    pub fn set_flash(&self, flash: &'a dyn flash::Flash<'a>) {
         self.flash.set(flash);
     }
 
@@ -70,7 +70,7 @@ impl<'a> PersonalityDriver<'a> {
         self.write_buffer.replace(buf);
     }
 
-    pub fn set_client(&self, client: &'a Client<'a>) {
+    pub fn set_client(&self, client: &'a dyn Client<'a>) {
         self.client.replace(client);
     }
 
@@ -95,8 +95,7 @@ impl<'a> PersonalityDriver<'a> {
 }
 
 impl<'a> Personality<'a> for PersonalityDriver<'a> {
-
-    fn set_client(&self, client: &'a Client<'a>) {
+    fn set_client(&self, client: &'a dyn Client<'a>) {
         self.client.set(client);
     }
 

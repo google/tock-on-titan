@@ -104,7 +104,7 @@ pub struct GPIOPin {
     pin: Pin,
     client_data: Cell<u32>,
     change: Cell<bool>,
-    client: Cell<Option<&'static hil::gpio::ClientWithValue>>,
+    client: Cell<Option<&'static dyn hil::gpio::ClientWithValue>>,
 }
 
 impl GPIOPin {
@@ -314,7 +314,7 @@ impl hil::gpio::Output for GPIOPin {
 }
 
 impl hil::gpio::InterruptWithValue for GPIOPin {
-    fn set_client(&self, client: &'static hil::gpio::ClientWithValue) {
+    fn set_client(&self, client: &'static dyn hil::gpio::ClientWithValue) {
         self.client.set(Some(client));
     }
 

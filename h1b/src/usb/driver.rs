@@ -43,13 +43,13 @@ pub struct App {
 }
 
 pub struct U2fSyscallDriver<'a> {
-    u2f_endpoints: &'a UsbHidU2f<'a>,
+    u2f_endpoints: &'a dyn UsbHidU2f<'a>,
     apps: Grant<App>,
     busy: Cell<bool>,
 }
 
 impl<'a> U2fSyscallDriver<'a> {
-    pub fn new(u2f: &'a UsbHidU2f<'a>, grant: Grant<App>) -> U2fSyscallDriver<'a> {
+    pub fn new(u2f: &'a dyn UsbHidU2f<'a>, grant: Grant<App>) -> U2fSyscallDriver<'a> {
         U2fSyscallDriver {
             u2f_endpoints: u2f,
             apps: grant,
