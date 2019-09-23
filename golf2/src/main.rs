@@ -73,7 +73,7 @@ pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 
 pub struct Golf {
     console: &'static capsules::console::Console<'static>,
-    gpio: &'static capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
+    gpio: &'static capsules::gpio::GPIO<'static>,
     timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
     ipc: kernel::ipc::IPC,
     digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
@@ -214,11 +214,11 @@ pub unsafe fn reset_handler() {
 
     //debug!("Booting.");
     let gpio_pins = static_init!(
-        [&'static h1b::gpio::GPIOPin; 2],
+        [&'static kernel::hil::gpio::InterruptValuePin; 2],
         [&h1b::gpio::PORT0.pins[0], &h1b::gpio::PORT0.pins[1]]);
 
     let gpio = static_init!(
-        capsules::gpio::GPIO<'static, h1b::gpio::GPIOPin>,
+        capsules::gpio::GPIO<'static>,
         capsules::gpio::GPIO::new(gpio_pins, kernel.create_grant(&grant_cap)));
     for pin in gpio_pins.iter() {
         pin.set_client(gpio)
