@@ -63,12 +63,21 @@ build/userspace/h1b_tests/h1b_tests:
 		'build/userspace/cargo/thumbv7m-none-eabi/release/h1b_tests-[^.]+' \
 		-exec cp '{}' build/userspace/h1b_tests/h1b_tests ';'
 
+# Due to b/139156455, we want to detect the case where an application's size is
+# rounded up to 64 KiB.
 build/userspace/h1b_tests/h1b_tests.tbf: \
 		build/cargo-host/release/elf2tab build/userspace/h1b_tests/h1b_tests
 	build/cargo-host/release/elf2tab -n "h1b_tests" \
 		-o build/userspace/h1b_tests/h1b_tests_tab \
 		build/userspace/h1b_tests/h1b_tests --stack=2048 --app-heap=1024 \
 		--kernel-heap=1024 --protected-region-size=64
+	if [ "$$(wc -c <build/userspace/h1b_tests/h1b_tests.tbf)" -ge 65536 ]; \
+		then echo "#########################################################"; \
+		     echo "# Application h1b_tests is too large.                   #"; \
+		     echo "# Check size of build/userspace/h1b_tests/h1b_tests.tbf #"; \
+		     echo "#########################################################"; \
+		     false ; \
+		fi
 
 build/userspace/h1b_tests/full_image: \
 		build/userspace/h1b_tests/h1b_tests.tbf \
