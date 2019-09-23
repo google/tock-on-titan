@@ -18,7 +18,7 @@ userspace/h1b_tests/build: build/userspace/h1b_tests/full_image
 .PHONY: userspace/h1b_tests/check
 userspace/h1b_tests/check:
 	cd userspace/h1b_tests && TOCK_KERNEL_VERSION=h1b_tests cargo check \
-		--release -Z offline
+		--offline --release
 
 .PHONY: userspace/h1b_tests/devicetests
 userspace/h1b_tests/devicetests: build/cargo-host/release/runner \
@@ -33,7 +33,7 @@ userspace/h1b_tests/devicetests: build/cargo-host/release/runner \
 .PHONY: userspace/h1b_tests/doc
 userspace/h1b_tests/doc:
 	cd userspace/h1b_tests && TOCK_KERNEL_VERSION=h1b_tests cargo doc \
-		--release -Z offline
+		--offline --release
 
 .PHONY: userspace/h1b_tests/localtests
 userspace/h1b_tests/localtests:
@@ -57,7 +57,7 @@ userspace/h1b_tests/run: build/cargo-host/release/runner \
 build/userspace/h1b_tests/h1b_tests:
 	rm -f build/userspace/cargo/thumbv7m-none-eabi/release/h1b_tests-*
 	cd userspace/h1b_tests && TOCK_KERNEL_VERSION=h1b_tests \
-		cargo test --no-run --release -Z offline
+		cargo test --no-run --offline --release
 	mkdir -p build/userspace/h1b_tests/
 	find build/userspace/cargo/thumbv7m-none-eabi/release/ -maxdepth 1 -regex \
 		'build/userspace/cargo/thumbv7m-none-eabi/release/h1b_tests-[^.]+' \
