@@ -24,7 +24,7 @@ use super::smart_program::SmartProgramState;
 /// The H1B flash driver. The hardware interface (either the real flash modules
 /// or the fake) is injected to support testing. This will not configure the
 /// globalsec flash regions -- that must be done independently.
-pub struct FlashImpl<'d, A: Alarm + 'd, H: Hardware + 'd> {
+pub struct FlashImpl<'d, A: Alarm<'d> + 'd, H: Hardware + 'd> {
     alarm: &'d A,
     client: Cell<Option<&'d dyn super::flash::Client<'d>>>,
     write_data: TakeCell<'d, [u32]>,
@@ -42,7 +42,7 @@ pub struct FlashImpl<'d, A: Alarm + 'd, H: Hardware + 'd> {
 }
 
 // Public API for FlashImpl.
-impl<'d, A: Alarm, H: Hardware> FlashImpl<'d, A, H> {
+impl<'d, A: Alarm<'d>, H: Hardware> FlashImpl<'d, A, H> {
     /// Constructs a driver for the given hardware interface. Unsafe because
     /// constructing multiple drivers for the same hardware seems like a bad
     /// idea. The caller must set the driver as the hardware's client before
@@ -64,7 +64,7 @@ impl<'d, A: Alarm, H: Hardware> FlashImpl<'d, A, H> {
 
 const MAX_WRITE_SIZE: usize = 32; // Maximum single write is 32 words
 
-impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> {
+impl<'d, A: Alarm<'d>, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> {
     fn erase(&self, page: usize) -> ReturnCode {
         if self.program_in_progress() { return ReturnCode::EBUSY; }
         self.smart_program(ERASE_OPCODE, /*max_attempts*/ 45, /*final_pulse_needed*/ false,
@@ -106,7 +106,7 @@ impl<'d, A: Alarm, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> 
 pub const ERASE_OPCODE: u32 = 0x31415927;
 pub const WRITE_OPCODE: u32 = 0x27182818;
 
-impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for FlashImpl<'d, A, H> {
+impl<'d, A: Alarm<'d>, H: Hardware> ::kernel::hil::time::AlarmClient for FlashImpl<'d, A, H> {
     fn fired(&self) {
         if let Some(state) = self.smart_program_state.take() {
             let state = state.step(
@@ -144,7 +144,7 @@ impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for FlashImpl<'d, A,
     }
 }
 
-impl<'d, A: Alarm, H: Hardware> FlashImpl<'d, A, H> {
+impl<'d, A: Alarm<'d>, H: Hardware> FlashImpl<'d, A, H> {
     /// Returns true if an operation is in progress and false otherwise.
     fn program_in_progress(&self) -> bool {
         // SmartProgramState is not Copy, so we can't use Cell::get() or

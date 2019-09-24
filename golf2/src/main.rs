@@ -74,7 +74,7 @@ pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 pub struct Golf {
     console: &'static capsules::console::Console<'static>,
     gpio: &'static capsules::gpio::GPIO<'static>,
-    timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
+    timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, Timels>>,
     ipc: kernel::ipc::IPC,
     digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
@@ -128,6 +128,7 @@ static mut STRINGS: [StringDescriptor; 7] = [
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
+    use kernel::hil::time::Alarm;
 
     h1b::init();
 
@@ -225,15 +226,15 @@ pub unsafe fn reset_handler() {
     }
 
     let alarm_mux = static_init!(
-        capsules::virtual_alarm::MuxAlarm<'static, Timels<'static>>,
+        capsules::virtual_alarm::MuxAlarm<'static, Timels>,
         capsules::virtual_alarm::MuxAlarm::new(&h1b::timels::TIMELS0));
     h1b::timels::TIMELS0.set_client(alarm_mux);
 
     // Create flash driver and its virtualization
-    let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
+    let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels>,
                                            VirtualMuxAlarm::new(alarm_mux));
     let flash = static_init!(
-        h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
+        h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>,
         h1b::hil::flash::FlashImpl::new(flash_virtual_alarm, &*h1b::hil::flash::h1b_hw::H1B_HW));
     flash_virtual_alarm.set_client(flash);
 
@@ -247,10 +248,10 @@ pub unsafe fn reset_handler() {
 
     flash.set_client(flash_mux);
 
-    let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels<'static>>,
+    let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels>,
                                            VirtualMuxAlarm::new(alarm_mux));
     let timer = static_init!(
-        AlarmDriver<'static, VirtualMuxAlarm<'static, Timels<'static>>>,
+        AlarmDriver<'static, VirtualMuxAlarm<'static, Timels>>,
         AlarmDriver::new(timer_virtual_alarm, kernel.create_grant(&grant_cap)));
     timer_virtual_alarm.set_client(timer);
 
@@ -401,10 +402,10 @@ pub unsafe fn reset_handler() {
     #[allow(unused)]
     let flash_test = static_init!(
         flash_test::FlashTest<
-            h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels<'static>>>>,
+            h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>>,
         flash_test::FlashTest::<
             h1b::hil::flash::FlashImpl<'static,
-                                       VirtualMuxAlarm<'static, Timels<'static>>>>::new(flash));
+                                       VirtualMuxAlarm<'static, Timels>>>::new(flash));
 
     // dcrypto_test::run_dcrypto();
     //    rng_test::run_rng();
