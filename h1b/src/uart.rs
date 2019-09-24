@@ -51,7 +51,7 @@ use core::cell::Cell;
 use kernel::common::cells::{OptionalCell, TakeCell, VolatileCell};
 use kernel::hil;
 use kernel::ReturnCode;
-use pmu::{Clock, PeripheralClock, PeripheralClock1};
+use crate::pmu::{Clock, PeripheralClock, PeripheralClock1};
 
 /// Registers for the UART controller
 #[allow(dead_code)]

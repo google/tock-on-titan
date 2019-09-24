@@ -36,13 +36,13 @@ impl Default for App {
 }
 
 pub struct DcryptoDriver<'a> {
-    device: &'a Dcrypto<'a>,
+    device: &'a dyn Dcrypto<'a>,
     app: MapCell<App>,
     busy: Cell<bool>,
 }
 
 impl<'a> DcryptoDriver<'a> {
-    pub fn new(device: &'a mut Dcrypto<'a>) -> DcryptoDriver<'a> {
+    pub fn new(device: &'a mut dyn Dcrypto<'a>) -> DcryptoDriver<'a> {
         DcryptoDriver {
             device: device,
             app: MapCell::new(App::default()),

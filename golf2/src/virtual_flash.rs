@@ -21,7 +21,7 @@ use ::h1b::hil::flash::Client;
 
 /// Virtualizes the H1B flash abstraction to support multiple clients.
 pub struct MuxFlash<'f> {
-    driver: &'f Flash<'f>,
+    driver: &'f dyn Flash<'f>,
     users: List<'f, FlashUser<'f>>,
     in_flight: OptionalCell<&'f FlashUser<'f>>,
 }
@@ -40,7 +40,7 @@ pub struct FlashUser<'f> {
     write_pos: Cell<usize>,
     operation: Cell<Operation>,
     next: ListLink<'f, FlashUser<'f>>,
-    client: OptionalCell<&'f Client<'f>>,
+    client: OptionalCell<&'f dyn Client<'f>>,
 }
 
 impl<'f> Client<'f> for MuxFlash<'f> {
@@ -100,7 +100,7 @@ impl<'f> Flash<'f> for FlashUser<'f> {
         (ReturnCode::SUCCESS, None)
     }
 
-    fn set_client(&'f self, client: &'f Client<'f>) {
+    fn set_client(&'f self, client: &'f dyn Client<'f>) {
         self.mux.users.push_head(self);
         self.client.set(client);
     }
@@ -118,7 +118,7 @@ impl Client<'f> for FlashUser<'f> {
 }
 
 impl<'f> MuxFlash<'f> {
-    pub fn new(driver: &'static Flash<'f>) -> Self {
+    pub fn new(driver: &'static dyn Flash<'f>) -> Self {
         MuxFlash {
             driver: driver,
             users: List::new(),

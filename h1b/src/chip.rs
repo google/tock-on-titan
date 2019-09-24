@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use cortexm3;
-use crypto;
-use gpio;
+use crate::crypto;
+use crate::gpio;
 use kernel::Chip;
-use timels;
-use trng;
-use uart;
-use usb;
+use crate::timels;
+use crate::trng;
+use crate::uart;
+use crate::usb;
 
 pub struct Hotel {
     mpu: cortexm3::mpu::MPU,

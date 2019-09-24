@@ -16,9 +16,9 @@
 
 use core::ops::Deref;
 use super::serialize::Serialize;
-use usb::constants::Descriptor;
-use usb::constants::MAX_PACKET_SIZE;
-use usb::constants::U2F_REPORT_SIZE;
+use crate::usb::constants::Descriptor;
+use crate::usb::constants::MAX_PACKET_SIZE;
+use crate::usb::constants::U2F_REPORT_SIZE;
 
 /// A StaticRef is a pointer to statically allocated mutable data such
 /// as memory mapped I/O registers.

@@ -16,6 +16,7 @@
 name = "h1b"
 version = "0.1.0"
 authors = ["Amit Levy <amit@amitlevy.com>"]
+edition = "2018"
 
 build = "build.rs"
 

@@ -15,7 +15,7 @@
 //! Test DCRYPTO hardware
 
 use core::cell::Cell;
-use crypto::dcrypto::{Dcrypto, DcryptoClient, DcryptoEngine, ProgramFault};
+use crate::crypto::dcrypto::{Dcrypto, DcryptoClient, DcryptoEngine, ProgramFault};
 use kernel::ReturnCode;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -19,8 +19,8 @@
 use core::cmp;
 use core::mem;
 use core::cell::Cell;
-use hil::personality::{Client, Personality, PersonalityData};
-use hil::flash;
+use crate::hil::personality::{Client, Personality, PersonalityData};
+use crate::hil::flash;
 use kernel::ReturnCode;
 use kernel::common::cells::{OptionalCell, TakeCell};
 
