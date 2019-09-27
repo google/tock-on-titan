@@ -23,6 +23,7 @@ pub struct Peripheral {
     pub select: VolatileCell<SelectablePin>,
 }
 
+#[repr(C)]
 pub struct Registers {
     pub diom0: Pin,
     pub diom1: Pin,
@@ -166,6 +167,7 @@ pub const PINMUX: *mut Registers = 0x40060000 as *mut Registers;
 
 #[repr(u32)]
 pub enum SelectablePin {
+    Disconnected = 0,
     Vio1 = 1,
     Vio0 = 2,
     Diob7 = 3,

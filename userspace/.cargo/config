@@ -20,4 +20,4 @@ target-dir = "../build/userspace/cargo"
 linker = "rust-lld"
 rustflags = ["-C", "link-arg=-T./layout.ld",
              "-C", "relocation-model=static",
-             "-Z", "linker-flavor=ld.lld"]
+             "-C", "linker-flavor=ld.lld"]

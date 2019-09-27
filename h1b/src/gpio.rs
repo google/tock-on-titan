@@ -18,13 +18,13 @@ use core::mem::transmute;
 use kernel::common::cells::VolatileCell;
 use kernel::hil;
 
+#[repr(C)]
 pub struct PortRegisters {
     pub data_in: VolatileCell<u32>,
     pub data_out: VolatileCell<u32>,
-    _reserved: [u32; 2],
     pub output_enable: VolatileCell<u32>,
     pub output_disable: VolatileCell<u32>,
-    _reserved2: [u32; 2],
+    _reserved: [u32; 2],
     pub interrupt_enable: VolatileCell<u32>,
     pub interrupt_disable: VolatileCell<u32>,
     pub interrupt_type_set: VolatileCell<u32>,
@@ -102,9 +102,9 @@ pub enum Pin {
 pub struct GPIOPin {
     port: *mut PortRegisters,
     pin: Pin,
-    client_data: Cell<usize>,
+    client_data: Cell<u32>,
     change: Cell<bool>,
-    client: Cell<Option<&'static hil::gpio::Client>>,
+    client: Cell<Option<&'static hil::gpio::ClientWithValue>>,
 }
 
 impl GPIOPin {
@@ -135,30 +135,162 @@ impl GPIOPin {
         }
 
         self.client.get().map(|client| {
-            client.fired(self.client_data.get());
+            client.fired(self.client_data.get())
         });
     }
 
-    pub fn set_client(&self, client: &'static hil::gpio::Client) {
-        self.client.set(Some(client));
+    // Returns the pinmux::Pin corresponding to this GPIO pin.
+    fn get_pinmux_pin(&self) -> Option<&'static crate::pinmux::Pin> {
+        let pinmux = unsafe { &*crate::pinmux::PINMUX };
+        let peripheral = match (self.port, self.pin) {
+            (GPIO0_BASE, Pin::P0 ) => &pinmux.gpio0_gpio0,
+            (GPIO0_BASE, Pin::P1 ) => &pinmux.gpio0_gpio1,
+            (GPIO0_BASE, Pin::P2 ) => &pinmux.gpio0_gpio2,
+            (GPIO0_BASE, Pin::P3 ) => &pinmux.gpio0_gpio3,
+            (GPIO0_BASE, Pin::P4 ) => &pinmux.gpio0_gpio4,
+            (GPIO0_BASE, Pin::P5 ) => &pinmux.gpio0_gpio5,
+            (GPIO0_BASE, Pin::P6 ) => &pinmux.gpio0_gpio6,
+            (GPIO0_BASE, Pin::P7 ) => &pinmux.gpio0_gpio7,
+            (GPIO0_BASE, Pin::P8 ) => &pinmux.gpio0_gpio8,
+            (GPIO0_BASE, Pin::P9 ) => &pinmux.gpio0_gpio9,
+            (GPIO0_BASE, Pin::P10) => &pinmux.gpio0_gpio10,
+            (GPIO0_BASE, Pin::P11) => &pinmux.gpio0_gpio11,
+            (GPIO0_BASE, Pin::P12) => &pinmux.gpio0_gpio12,
+            (GPIO0_BASE, Pin::P13) => &pinmux.gpio0_gpio13,
+            (GPIO0_BASE, Pin::P14) => &pinmux.gpio0_gpio14,
+            (GPIO0_BASE, Pin::P15) => &pinmux.gpio0_gpio15,
+            (_         , Pin::P0 ) => &pinmux.gpio1_gpio0,
+            (_         , Pin::P1 ) => &pinmux.gpio1_gpio1,
+            (_         , Pin::P2 ) => &pinmux.gpio1_gpio2,
+            (_         , Pin::P3 ) => &pinmux.gpio1_gpio3,
+            (_         , Pin::P4 ) => &pinmux.gpio1_gpio4,
+            (_         , Pin::P5 ) => &pinmux.gpio1_gpio5,
+            (_         , Pin::P6 ) => &pinmux.gpio1_gpio6,
+            (_         , Pin::P7 ) => &pinmux.gpio1_gpio7,
+            (_         , Pin::P8 ) => &pinmux.gpio1_gpio8,
+            (_         , Pin::P9 ) => &pinmux.gpio1_gpio9,
+            (_         , Pin::P10) => &pinmux.gpio1_gpio10,
+            (_         , Pin::P11) => &pinmux.gpio1_gpio11,
+            (_         , Pin::P12) => &pinmux.gpio1_gpio12,
+            (_         , Pin::P13) => &pinmux.gpio1_gpio13,
+            (_         , Pin::P14) => &pinmux.gpio1_gpio14,
+            (_         , Pin::P15) => &pinmux.gpio1_gpio15,
+        };
+        let pinmux_pin = match peripheral.select.get() {
+            crate::pinmux::SelectablePin::Diob7  => &pinmux.diob7,
+            crate::pinmux::SelectablePin::Diob6  => &pinmux.diob6,
+            crate::pinmux::SelectablePin::Diob5  => &pinmux.diob5,
+            crate::pinmux::SelectablePin::Diob4  => &pinmux.diob4,
+            crate::pinmux::SelectablePin::Diob3  => &pinmux.diob3,
+            crate::pinmux::SelectablePin::Diob2  => &pinmux.diob2,
+            crate::pinmux::SelectablePin::Diob1  => &pinmux.diob1,
+            crate::pinmux::SelectablePin::Diob0  => &pinmux.diob0,
+            crate::pinmux::SelectablePin::Dioa14 => &pinmux.dioa14,
+            crate::pinmux::SelectablePin::Dioa13 => &pinmux.dioa13,
+            crate::pinmux::SelectablePin::Dioa12 => &pinmux.dioa12,
+            crate::pinmux::SelectablePin::Dioa11 => &pinmux.dioa11,
+            crate::pinmux::SelectablePin::Dioa10 => &pinmux.dioa10,
+            crate::pinmux::SelectablePin::Dioa9  => &pinmux.dioa9,
+            crate::pinmux::SelectablePin::Dioa8  => &pinmux.dioa8,
+            crate::pinmux::SelectablePin::Dioa7  => &pinmux.dioa7,
+            crate::pinmux::SelectablePin::Dioa6  => &pinmux.dioa6,
+            crate::pinmux::SelectablePin::Dioa5  => &pinmux.dioa5,
+            crate::pinmux::SelectablePin::Dioa4  => &pinmux.dioa4,
+            crate::pinmux::SelectablePin::Dioa3  => &pinmux.dioa3,
+            crate::pinmux::SelectablePin::Dioa2  => &pinmux.dioa2,
+            crate::pinmux::SelectablePin::Dioa1  => &pinmux.dioa1,
+            crate::pinmux::SelectablePin::Dioa0  => &pinmux.dioa0,
+            crate::pinmux::SelectablePin::Diom4  => &pinmux.diom4,
+            crate::pinmux::SelectablePin::Diom3  => &pinmux.diom3,
+            crate::pinmux::SelectablePin::Diom2  => &pinmux.diom2,
+            crate::pinmux::SelectablePin::Diom1  => &pinmux.diom1,
+            crate::pinmux::SelectablePin::Diom0  => &pinmux.diom0,
+            _ => return None,
+        };
+        Some(pinmux_pin)
     }
 }
 
-impl hil::gpio::Pin for GPIOPin {
-    fn make_output(&self) {
+impl hil::gpio::Configure for GPIOPin {
+    fn configuration(&self) -> hil::gpio::Configuration {
+        if self.is_output() {
+            hil::gpio::Configuration::InputOutput
+        } else {
+            hil::gpio::Configuration::Input
+        }
+    }
+
+    fn make_output(&self) -> hil::gpio::Configuration {
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         port.output_enable.set(1 << (self.pin as u32));
+        hil::gpio::Configuration::InputOutput
     }
 
-    fn make_input(&self) {
-        // Noop, input is always enabled on this chip
-    }
-
-    fn disable(&self) {
+    fn disable_output(&self) -> hil::gpio::Configuration {
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
-        port.output_disable.set(1 << (self.pin as u32));
+        port.output_enable.set(1 << (self.pin as u32));
+        hil::gpio::Configuration::Input
     }
 
+    fn make_input(&self) -> hil::gpio::Configuration {
+        // Noop, input is always enabled on this chip
+        self.configuration()
+    }
+
+    fn disable_input(&self) -> hil::gpio::Configuration {
+        // Noop, input is always enabled on this chip
+        self.configuration()
+    }
+
+    fn deactivate_to_low_power(&self) {
+        self.disable_output();
+        self.set_floating_state(hil::gpio::FloatingState::PullNone);
+    }
+
+    fn set_floating_state(&self, state: hil::gpio::FloatingState) {
+        use kernel::hil::gpio::FloatingState::{PullUp, PullDown, PullNone};
+        if let Some(pin) = self.get_pinmux_pin() {
+            // Flip the pulldown (3) and pullup (4) enable bits.
+            match state {
+                PullUp   => pin.control.set(pin.control.get() & !(1 << 3) | 1 << 4),
+                PullDown => pin.control.set(pin.control.get() & !(1 << 4) | 1 << 3),
+                PullNone => pin.control.set(pin.control.get() & !(1 << 3 | 1 << 4)),
+            }
+        }
+    }
+
+    fn floating_state(&self) -> hil::gpio::FloatingState {
+        if let Some(pin) = self.get_pinmux_pin() {
+            // Read the pulldown (3) and pullup (4) enable bits.
+            let pulldown = pin.control.get() & 1 << 3 != 0;
+            let pullup   = pin.control.get() & 1 << 4 != 0;
+            return match (pullup, pulldown) {
+                (true, false) => hil::gpio::FloatingState::PullUp,
+                (false, true) => hil::gpio::FloatingState::PullDown,
+                _             => hil::gpio::FloatingState::PullNone,
+            };
+        }
+        hil::gpio::FloatingState::PullNone
+    }
+
+    fn is_input(&self) -> bool { true }
+
+    fn is_output(&self) -> bool {
+        let port: &mut PortRegisters = unsafe { transmute(self.port) };
+        // Assumes that reading the output_enable registers indicates which
+        // outputs are enabled -- this may or may not be tested.
+        port.output_enable.get() & (1 << (self.pin as u32)) != 0
+    }
+}
+
+impl hil::gpio::Input for GPIOPin {
+    fn read(&self) -> bool {
+        let port: &mut PortRegisters = unsafe { transmute(self.port) };
+        port.data_in.get() & (1 << (self.pin as u32)) != 0
+    }
+}
+
+impl hil::gpio::Output for GPIOPin {
     fn set(&self) {
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         let data_out = port.data_out.get();
@@ -171,35 +303,38 @@ impl hil::gpio::Pin for GPIOPin {
         port.data_out.set(data_out & !(1 << (self.pin as u32)));
     }
 
-    fn toggle(&self) {
+    fn toggle(&self) -> bool {
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         let data_out = port.data_out.get();
-        port.data_out.set(data_out ^ 1 << (self.pin as u32));
+        let bit_to_flip = 1 << (self.pin as u32);
+        let new_value = data_out ^ bit_to_flip;
+        port.data_out.set(new_value);
+        new_value & bit_to_flip != 0
     }
+}
 
-    fn read(&self) -> bool {
-        let port: &mut PortRegisters = unsafe { transmute(self.port) };
-        port.data_in.get() & (1 << (self.pin as u32)) != 0
+impl hil::gpio::InterruptWithValue for GPIOPin {
+    fn set_client(&self, client: &'static hil::gpio::ClientWithValue) {
+        self.client.set(Some(client));
     }
 
     // `InterruptMode::Change` is not implemented in hardware, so we simulate it
     // in software. This could lead to missing events if a toggle happens before
     // we install the new events.
-    fn enable_interrupt(&self, identifier: usize, mode: hil::gpio::InterruptMode) {
-        self.client_data.set(identifier);
-
+    fn enable_interrupts(&self, mode: hil::gpio::InterruptEdge) -> kernel::ReturnCode {
+        use kernel::hil::gpio::Input;
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         let mask = 1 << (self.pin as u32);
         match mode {
-            hil::gpio::InterruptMode::RisingEdge => {
+            hil::gpio::InterruptEdge::RisingEdge => {
                 port.interrupt_pol_set.set(mask);
                 self.change.set(false);
             }
-            hil::gpio::InterruptMode::FallingEdge => {
+            hil::gpio::InterruptEdge::FallingEdge => {
                 port.interrupt_pol_clear.set(mask);
                 self.change.set(false);
             }
-            hil::gpio::InterruptMode::EitherEdge => {
+            hil::gpio::InterruptEdge::EitherEdge => {
                 self.change.set(true);
                 // Set the interrupt polarity based on whatever the current
                 // state of the pin is.
@@ -212,25 +347,28 @@ impl hil::gpio::Pin for GPIOPin {
         }
         port.interrupt_type_set.set(mask);
         port.interrupt_enable.set(mask);
+        kernel::ReturnCode::SUCCESS
     }
 
-    fn disable_interrupt(&self) {
+    fn disable_interrupts(&self) {
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         let mask = 1 << (self.pin as u32);
         port.interrupt_disable.set(mask);
     }
-}
 
-impl hil::gpio::PinCtl for GPIOPin {
-    // InputMode equivilent is set in the Pinmux.
-    fn set_input_mode(&self, mode: hil::gpio::InputMode) {
-        match mode {
-            hil::gpio::InputMode::PullUp => {
-            }
-            hil::gpio::InputMode::PullDown => {
-            }
-            hil::gpio::InputMode::PullNone => {
-            }
-        }
+    fn is_pending(&self) -> bool {
+        let port: &mut PortRegisters = unsafe { transmute(self.port) };
+        port.interrupt_status.get() & (1 << (self.pin as u32)) != 0
+    }
+
+    fn set_value(&self, value: u32) {
+        self.client_data.set(value);
+    }
+
+    fn value(&self) -> u32 {
+        self.client_data.get()
     }
 }
+
+impl hil::gpio::Pin for GPIOPin {}
+impl hil::gpio::InterruptValuePin for GPIOPin {}

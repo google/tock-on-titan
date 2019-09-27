@@ -21,7 +21,7 @@ userspace/build: $(addsuffix /build,$(BUILD_SUBDIRS))
 
 .PHONY: userspace/check
 userspace/check:
-	cd userspace && cargo check --release
+	cd userspace && TOCK_KERNEL_VERSION=h1b_tests cargo check --release
 
 .PHONY: userspace/clean
 userspace/clean:
