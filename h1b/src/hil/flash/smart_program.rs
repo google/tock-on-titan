@@ -42,7 +42,7 @@ impl SmartProgramState {
 
     /// Performs a state machine update during smart programming. This should be
     /// done during initialization and when a wait finishes.
-    pub fn step<A: Alarm, H: super::hardware::Hardware>(
+    pub fn step<'a, A: Alarm<'a>, H: super::hardware::Hardware>(
         self, alarm: &A, hw: &H, opcode: u32) -> Self
     {
         match self {
@@ -109,7 +109,7 @@ pub fn div_round_up(numerator: u64, denominator: u64) -> u64 {
     numerator / denominator + if numerator % denominator == 0 { 0 } else { 1 }
 }
 
-fn set_program_timeout<A: Alarm>(alarm: &A, timeout_nanoseconds: u32) {
+fn set_program_timeout<'a, A: Alarm<'a>>(alarm: &A, timeout_nanoseconds: u32) {
     alarm.set_alarm(alarm.now().wrapping_add(
         div_round_up(A::Frequency::frequency() as u64 * timeout_nanoseconds as u64,
                      1_000_000_000) as u32));

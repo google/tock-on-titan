@@ -36,23 +36,19 @@ struct Registers {
     pub interrupt_wakeup_ack: VolatileCell<u32>,
 }
 
-pub struct Timels<'a> {
+pub struct Timels {
     registers: *const Registers,
-    client: Cell<Option<&'a dyn time::Client>>,
+    client: Cell<Option<&'static dyn time::AlarmClient>>,
     now: Cell<u32>,
 }
 
-impl<'a> Timels<'a> {
-    const fn new(regs: *const Registers) -> Timels<'a> {
+impl Timels {
+    const fn new(regs: *const Registers) -> Timels {
         Timels {
             registers: regs,
             client: Cell::new(None),
             now: Cell::new(0),
         }
-    }
-
-    pub fn set_client(&'static self, client: &'static dyn time::Client) {
-        self.client.set(Some(client));
     }
 
     pub fn handle_interrupt(&self) {
@@ -66,18 +62,6 @@ impl<'a> Timels<'a> {
             client.fired();
         });
     }
-
-    fn disable_alarm(&self) {
-        let regs = unsafe { &*self.registers };
-        regs.control.set(0);
-    }
-
-    fn is_enabled(&self) -> bool {
-        let regs = unsafe { &*self.registers };
-        regs.control.get() & 1 == 1 && regs.value.get() != 0
-    }
-
-    
 }
 
 pub struct Freq256Khz;
@@ -88,19 +72,8 @@ impl Frequency for Freq256Khz {
     }
 }
 
-impl<'a> time::Time for Timels<'a> {
+impl time::Time for Timels {
     type Frequency = Freq256Khz;
-
-    fn disable(&self) {
-        self.disable_alarm();
-    }
-
-    fn is_armed(&self) -> bool {
-        self.is_enabled()
-    }
-}
-    
-impl<'a> Alarm for Timels<'a> {
 
     fn now(&self) -> u32 {
         let regs = unsafe { &*self.registers };
@@ -110,6 +83,12 @@ impl<'a> Alarm for Timels<'a> {
         self.now.get().wrapping_add(elapsed)
     }
 
+    fn max_tics(&self) -> u32 {
+        u32::max_value()
+    }
+}
+    
+impl Alarm<'static> for Timels {
     fn set_alarm(&self, tics: u32) {
         let distance = tics.wrapping_sub(self.now.get());
         let regs = unsafe { &*self.registers };
@@ -122,5 +101,19 @@ impl<'a> Alarm for Timels<'a> {
     fn get_alarm(&self) -> u32 {
         let regs = unsafe { &*self.registers };
         regs.reload.get()
+    }
+
+    fn set_client(&'static self, client: &'static dyn time::AlarmClient) {
+        self.client.set(Some(client));
+    }
+
+    fn is_enabled(&self) -> bool {
+        let regs = unsafe { &*self.registers };
+        regs.control.get() & 1 == 1 && regs.value.get() != 0
+    }
+
+    fn disable(&self) {
+        let regs = unsafe { &*self.registers };
+        regs.control.set(0);
     }
 }

@@ -30,13 +30,18 @@ impl MockAlarm {
 #[cfg(test)]
 impl kernel::hil::time::Time for MockAlarm {
     type Frequency = kernel::hil::time::Freq16MHz;
-    fn disable(&self) { self.setpoint.set(None); }
-    fn is_armed(&self) -> bool { self.setpoint.get().is_some() }
+    fn now(&self) -> u32 { self.now.get() }
+    fn max_tics(&self) -> u32 { u32::max_value() }
 }
 
 #[cfg(test)]
-impl kernel::hil::time::Alarm for MockAlarm {
-    fn now(&self) -> u32 { self.now.get() }
+impl<'a> kernel::hil::time::Alarm<'a> for MockAlarm {
     fn set_alarm(&self, tics: u32) { self.setpoint.set(Some(tics)); }
     fn get_alarm(&self) -> u32 { self.setpoint.get().unwrap_or(0) }
+
+    // Ignored -- the test should manually trigger the client.
+    fn set_client(&'a self, _client: &'a dyn kernel::hil::time::AlarmClient) {}
+
+    fn is_enabled(&self) -> bool { self.setpoint.get().is_some() }
+    fn disable(&self) { self.setpoint.set(None); }
 }
