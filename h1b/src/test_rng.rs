@@ -14,7 +14,7 @@
 
 //! Test RNG hardware
 
-use hil::rng::{Client, Continue, RNG};
+use crate::hil::rng::{Client, Continue, RNG};
 
 pub struct TestRng<'a> {
     rng: &'a dyn RNG<'a>,

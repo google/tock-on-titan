@@ -19,7 +19,7 @@ use kernel::debug;
 use kernel::hil::led;
 use h1b;
 
-use PROCESSES;
+use crate::PROCESSES;
 
 pub struct Writer;
 

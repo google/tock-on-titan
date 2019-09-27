@@ -16,8 +16,8 @@ use ::kernel::ReturnCode;
 
 /// Flash client -- receives callbacks when flash operations complete.
 pub trait Client<'d> {
-    fn erase_done(&self, ReturnCode);
-    fn write_done(&self, data: &'d mut [u32], ReturnCode);
+    fn erase_done(&self, _: ReturnCode);
+    fn write_done(&self, data: &'d mut [u32], _: ReturnCode);
 }
 
 /// Flash driver API.

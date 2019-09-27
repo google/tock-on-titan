@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use core::fmt::*;
-use pinmux;
+use crate::pinmux;
 
-use uart;
+use crate::uart;
 
 pub struct Writer;
 

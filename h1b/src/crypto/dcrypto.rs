@@ -56,7 +56,7 @@ use kernel::common::cells::TakeCell;
 use kernel::common::cells::VolatileCell;
 use kernel::ReturnCode;
 
-use pmu::{Clock, PeripheralClock, PeripheralClock0, reset_dcrypto};
+use crate::pmu::{Clock, PeripheralClock, PeripheralClock0, reset_dcrypto};
 
 
 

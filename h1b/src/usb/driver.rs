@@ -18,7 +18,7 @@
 
 use core::cell::Cell;
 use kernel::{AppId, AppSlice, Callback, Driver, Grant, ReturnCode, Shared};
-use usb::{UsbHidU2f, UsbHidU2fClient};
+use crate::usb::{UsbHidU2f, UsbHidU2fClient};
 
 pub const DRIVER_NUM: usize = 0x20008;
 

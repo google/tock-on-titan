@@ -16,7 +16,7 @@
 
 use kernel::ReturnCode;
 
-use usb::constants::EP_BUFFER_SIZE_WORDS;
+use crate::usb::constants::EP_BUFFER_SIZE_WORDS;
 
 /// Trait a USB peripheral stack must implement to support the U2F syscall
 /// capsule.
