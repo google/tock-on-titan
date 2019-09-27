@@ -186,7 +186,7 @@ pub struct USB<'a> {
     strings: TakeCell<'static, [StringDescriptor]>,
 
     // Client to give callbacks to.
-    u2f_client: OptionalCell<&'a UsbHidU2fClient<'a>>,
+    u2f_client: OptionalCell<&'a dyn UsbHidU2fClient<'a>>,
 }
 
 // Hardware base address of the singleton USB controller
@@ -1352,7 +1352,7 @@ impl<'a> USB<'a> {
 /// Implementation of the HID U2F API for the USB device. It assumes
 /// that U2F is over endpoint 1.
 impl<'a> UsbHidU2f<'a> for USB<'a> {
-    fn set_u2f_client(&self, client: &'a UsbHidU2fClient<'a>) {
+    fn set_u2f_client(&self, client: &'a dyn UsbHidU2fClient<'a>) {
         self.u2f_client.set(client);
     }
 

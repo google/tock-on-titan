@@ -172,7 +172,7 @@ pub trait DcryptoClient<'a> {
 pub trait Dcrypto<'a> {
 
     /// Set the client to receive callbacks from the engine.
-    fn set_client(&self, client: &'a DcryptoClient<'a>);
+    fn set_client(&self, client: &'a dyn DcryptoClient<'a>);
 
     /// Read the Dcrypto dmem. length is the number of bytes: it must
     /// be <= data.len. Offset is the offset at which to
@@ -254,7 +254,7 @@ struct Registers {
 
 pub struct DcryptoEngine<'a> {
     registers: *mut Registers,
-    client: Cell<Option<&'a DcryptoClient<'a>>>,
+    client: Cell<Option<&'a dyn DcryptoClient<'a>>>,
     state: Cell<State>,
     drom: TakeCell<'static, [u32; DROM_SIZE]>,
     dmem: TakeCell<'static, [u32; DMEM_SIZE]>,
@@ -468,7 +468,7 @@ impl<'a> DcryptoEngine<'a> {
 }
 
 impl<'a> Dcrypto<'a> for DcryptoEngine<'a> {
-    fn set_client(&self, client: &'a DcryptoClient<'a>) {
+    fn set_client(&self, client: &'a dyn DcryptoClient<'a>) {
         self.client.set(Some(client));
     }
 

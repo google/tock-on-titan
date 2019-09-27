@@ -137,7 +137,7 @@ pub static mut TRNG0: Trng<'static> = unsafe { Trng::new(TRNG0_BASE) };
 
 pub struct Trng<'a> {
     regs: *mut Registers,
-    client: Cell<Option<&'a Client32>>,
+    client: Cell<Option<&'a dyn Client32>>,
 }
 
 impl<'a> Trng<'a> {
@@ -180,7 +180,7 @@ impl<'a> Trng<'a> {
 
 impl<'a> Entropy32<'a> for Trng<'a> {
 
-    fn set_client(&self, client: &'a Client32) {
+    fn set_client(&self, client: &'a dyn Client32) {
         self.client.set(Some(client));
     }
 

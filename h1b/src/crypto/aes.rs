@@ -100,7 +100,7 @@ impl From<u32> for ParsedInterrupt {
 
 pub struct AesEngine<'a>{
     regs: *mut Registers,
-    client: OptionalCell<&'a Client<'a>>,
+    client: OptionalCell<&'a dyn Client<'a>>,
     output: TakeCell<'a, [u8]>, // If output is None, put result into input buffer
     input: TakeCell<'a, [u8]>,
     read_index: Cell<usize>,
@@ -115,7 +115,7 @@ impl<'a> AES128<'a> for AesEngine<'a> {
 
     fn disable(&self) {}
 
-    fn set_client(&'a self, client: &'a Client<'a>) {
+    fn set_client(&'a self, client: &'a dyn Client<'a>) {
         self.set_client(client);
     }
 
@@ -259,7 +259,7 @@ impl<'a> AesEngine<'a> {
         })
     }
 
-    pub fn set_client(&self, client: &'a Client<'a>) {
+    pub fn set_client(&self, client: &'a dyn Client<'a>) {
         self.client.set(client);
     }
 

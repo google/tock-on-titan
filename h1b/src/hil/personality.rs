@@ -37,7 +37,7 @@ pub struct PersonalityData {
 /// [Client](trait.Client.html) trait.
 pub trait Personality<'a> {
     /// Set the client for callbacks on set calls.
-    fn set_client(&self, client: &'a Client<'a>);
+    fn set_client(&self, client: &'a dyn Client<'a>);
 
     /// Fetch the device's attestation data into a typed PersonalityData
     /// structure.
