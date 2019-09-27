@@ -133,10 +133,7 @@ impl<'d, A: Alarm, H: Hardware> ::kernel::hil::time::Client for FlashImpl<'d, A,
                     } else {
                         client.erase_done(code);
                     }
-                } else {
-                    debug!("No client!!!");
                 }
-
             } else {
                 self.smart_program_state.set(Some(state));
             }
