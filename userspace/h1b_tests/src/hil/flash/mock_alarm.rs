@@ -14,29 +14,29 @@
 
 #[cfg(test)]
 pub struct MockAlarm {
-	now: core::cell::Cell<u32>,
-	setpoint: core::cell::Cell<Option<u32>>,
+    now: core::cell::Cell<u32>,
+    setpoint: core::cell::Cell<Option<u32>>,
 }
 
 #[cfg(test)]
 impl MockAlarm {
-	pub fn new() -> MockAlarm {
-		MockAlarm { now: Default::default(), setpoint: Default::default() }
-	}
+    pub fn new() -> MockAlarm {
+        MockAlarm { now: Default::default(), setpoint: Default::default() }
+    }
 
-	pub fn set_time(&self, new_time: u32) { self.now.set(new_time); }
+    pub fn set_time(&self, new_time: u32) { self.now.set(new_time); }
 }
 
 #[cfg(test)]
 impl kernel::hil::time::Time for MockAlarm {
-	type Frequency = kernel::hil::time::Freq16MHz;
-	fn disable(&self) { self.setpoint.set(None); }
-	fn is_armed(&self) -> bool { self.setpoint.get().is_some() }
+    type Frequency = kernel::hil::time::Freq16MHz;
+    fn disable(&self) { self.setpoint.set(None); }
+    fn is_armed(&self) -> bool { self.setpoint.get().is_some() }
 }
 
 #[cfg(test)]
 impl kernel::hil::time::Alarm for MockAlarm {
-	fn now(&self) -> u32 { self.now.get() }
-	fn set_alarm(&self, tics: u32) { self.setpoint.set(Some(tics)); }
-	fn get_alarm(&self) -> u32 { self.setpoint.get().unwrap_or(0) }
+    fn now(&self) -> u32 { self.now.get() }
+    fn set_alarm(&self, tics: u32) { self.setpoint.set(Some(tics)); }
+    fn get_alarm(&self) -> u32 { self.setpoint.get().unwrap_or(0) }
 }

@@ -20,138 +20,138 @@ use test::require;
 
 #[test]
 fn decode_error() -> bool {
-	require!(smart_program::decode_error(0b100000000101001) == kernel::ReturnCode::FAIL);
-	require!(smart_program::decode_error(0b100000000000010) == kernel::ReturnCode::ESIZE);
-	require!(smart_program::decode_error(0b000000000001000) == kernel::ReturnCode::FAIL);
-	true
+    require!(smart_program::decode_error(0b100000000101001) == kernel::ReturnCode::FAIL);
+    require!(smart_program::decode_error(0b100000000000010) == kernel::ReturnCode::ESIZE);
+    require!(smart_program::decode_error(0b000000000001000) == kernel::ReturnCode::FAIL);
+    true
 }
 
 #[test]
 fn div_round_up() -> bool {
-	require!(smart_program::div_round_up(0, 1) == 0);
-	require!(smart_program::div_round_up(1, 1) == 1);
-	require!(smart_program::div_round_up(3, 2) == 2);
-	require!(smart_program::div_round_up(4, 2) == 2);
-	require!(smart_program::div_round_up(0, core::u64::MAX) == 0);
-	require!(smart_program::div_round_up(core::u64::MAX, core::u64::MAX) == 1);
-	require!(smart_program::div_round_up(core::u64::MAX - 5, core::u64::MAX) == 1);
-	require!(smart_program::div_round_up(core::u64::MAX, core::u64::MAX) == 1);
-	true
+    require!(smart_program::div_round_up(0, 1) == 0);
+    require!(smart_program::div_round_up(1, 1) == 1);
+    require!(smart_program::div_round_up(3, 2) == 2);
+    require!(smart_program::div_round_up(4, 2) == 2);
+    require!(smart_program::div_round_up(0, core::u64::MAX) == 0);
+    require!(smart_program::div_round_up(core::u64::MAX, core::u64::MAX) == 1);
+    require!(smart_program::div_round_up(core::u64::MAX - 5, core::u64::MAX) == 1);
+    require!(smart_program::div_round_up(core::u64::MAX, core::u64::MAX) == 1);
+    true
 }
 
 #[test]
 fn successful_program() -> bool {
-	let alarm = MockAlarm::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
-	hw.set_transaction(1300, 1);
-	hw.set_write_data(&[0xFFFF0FFF]);
+    let alarm = MockAlarm::new();
+    let hw = h1b::hil::flash::fake::FakeHw::new();
+    hw.set_transaction(1300, 1);
+    hw.set_write_data(&[0xFFFF0FFF]);
 
-	// First attempt.
-	let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
-	require!(hw.is_programming() == true);
-	require!(state.return_code() == None);
+    // First attempt.
+    let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+    require!(hw.is_programming() == true);
+    require!(state.return_code() == None);
 
-	// Finish.
-	alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/10);
-	hw.inject_result(0);
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == <MockAlarm as Time>::Frequency::frequency()/5);
-	require!(hw.is_programming() == true);
-	require!(state.return_code() == None);
-	alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/5);
-	hw.finish_operation();
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == 0);
-	require!(hw.is_programming() == false);
-	require!(state.return_code() == Some(kernel::ReturnCode::SUCCESS));
-	true
+    // Finish.
+    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/10);
+    hw.inject_result(0);
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == <MockAlarm as Time>::Frequency::frequency()/5);
+    require!(hw.is_programming() == true);
+    require!(state.return_code() == None);
+    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/5);
+    hw.finish_operation();
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == 0);
+    require!(hw.is_programming() == false);
+    require!(state.return_code() == Some(kernel::ReturnCode::SUCCESS));
+    true
 }
 
 #[test]
 fn retries() -> bool {
-	let alarm = MockAlarm::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
-	hw.set_transaction(1300, 1);
-	hw.set_write_data(&[0xFFFF0FFF]);
+    let alarm = MockAlarm::new();
+    let hw = h1b::hil::flash::fake::FakeHw::new();
+    hw.set_transaction(1300, 1);
+    hw.set_write_data(&[0xFFFF0FFF]);
 
-	// First programming attempt.
-	let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
-	require!(hw.is_programming() == true);
-	require!(state.return_code() == None);
-	alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/10);
-	hw.inject_result(0b100);
+    // First programming attempt.
+    let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+    require!(hw.is_programming() == true);
+    require!(state.return_code() == None);
+    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/10);
+    hw.inject_result(0b100);
 
-	// Second attempt.
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
-	require!(hw.is_programming() == true);
-	require!(state.return_code() == None);
-	alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/5);
-	hw.inject_result(0);
+    // Second attempt.
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+    require!(hw.is_programming() == true);
+    require!(state.return_code() == None);
+    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/5);
+    hw.inject_result(0);
 
-	// Finish.
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == 3*<MockAlarm as Time>::Frequency::frequency()/10);
-	require!(hw.is_programming() == true);
-	require!(state.return_code() == None);
-	alarm.set_time(3*<MockAlarm as Time>::Frequency::frequency()/10);
-	hw.finish_operation();
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == 0);
-	require!(hw.is_programming() == false);
-	require!(state.return_code() == Some(kernel::ReturnCode::SUCCESS));
-	true
+    // Finish.
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == 3*<MockAlarm as Time>::Frequency::frequency()/10);
+    require!(hw.is_programming() == true);
+    require!(state.return_code() == None);
+    alarm.set_time(3*<MockAlarm as Time>::Frequency::frequency()/10);
+    hw.finish_operation();
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == 0);
+    require!(hw.is_programming() == false);
+    require!(state.return_code() == Some(kernel::ReturnCode::SUCCESS));
+    true
 }
 
 /// Keep throwing errors until the max retry count.
 #[test]
 fn failed() -> bool {
-	let alarm = MockAlarm::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
-	hw.set_transaction(1300, 1);
-	hw.set_write_data(&[0xFFFF0FFF]);
-	let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
+    let alarm = MockAlarm::new();
+    let hw = h1b::hil::flash::fake::FakeHw::new();
+    hw.set_transaction(1300, 1);
+    hw.set_write_data(&[0xFFFF0FFF]);
+    let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
 
-	for i in 0..8 {
-		alarm.set_time(i * <MockAlarm as Time>::Frequency::frequency()/10);
-		state = state.step(&alarm, &hw, WRITE_OPCODE);
-		require!(alarm.get_alarm() ==
-		         alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
-		require!(hw.is_programming() == true);
-		require!(state.return_code() == None);
-		hw.inject_result(0b100);
-	}
+    for i in 0..8 {
+        alarm.set_time(i * <MockAlarm as Time>::Frequency::frequency()/10);
+        state = state.step(&alarm, &hw, WRITE_OPCODE);
+        require!(alarm.get_alarm() ==
+                 alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+        require!(hw.is_programming() == true);
+        require!(state.return_code() == None);
+        hw.inject_result(0b100);
+    }
 
-	// Finish.
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == 0);
-	require!(hw.is_programming() == false);
-	require!(state.return_code() == Some(kernel::ReturnCode::FAIL));
-	true
+    // Finish.
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == 0);
+    require!(hw.is_programming() == false);
+    require!(state.return_code() == Some(kernel::ReturnCode::FAIL));
+    true
 }
 
 #[test]
 fn timeout() -> bool {
-	let alarm = MockAlarm::new();
-	let hw = h1b::hil::flash::fake::FakeHw::new();
-	hw.set_transaction(1300, 1);
-	hw.set_write_data(&[0xFFFF0FFF]);
+    let alarm = MockAlarm::new();
+    let hw = h1b::hil::flash::fake::FakeHw::new();
+    hw.set_transaction(1300, 1);
+    hw.set_write_data(&[0xFFFF0FFF]);
 
-	// First programming attempt.
-	let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
-	require!(hw.is_programming() == true);
-	require!(state.return_code() == None);
+    // First programming attempt.
+    let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+    require!(hw.is_programming() == true);
+    require!(state.return_code() == None);
 
-	// Alarm trigger.
-	alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/10);
-	state = state.step(&alarm, &hw, WRITE_OPCODE);
-	require!(alarm.get_alarm() == 0);
-	require!(state.return_code() == Some(kernel::ReturnCode::FAIL));
-	true
+    // Alarm trigger.
+    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/10);
+    state = state.step(&alarm, &hw, WRITE_OPCODE);
+    require!(alarm.get_alarm() == 0);
+    require!(state.return_code() == Some(kernel::ReturnCode::FAIL));
+    true
 }
