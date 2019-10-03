@@ -115,18 +115,22 @@ impl <'c, F: hil::flash::Flash<'c> + 'c> NvCounter<'c> for FlashCounter<'c, F> {
             (1, 0) => {
                 // High is odd and low was erased, so we are either running
                 // Rollover3 or need to run Rollover3.
-                let (code, buffer) = start_increment(
-                    Page::High,
-                    high_count,
-                    self.flash,
-                    self.write_buffer.take().unwrap(),
-                );
-                self.write_buffer.set(buffer);
-                match code {
-                    // If the flash is busy return true; the increment will
-                    // begin later.
-                    ReturnCode::SUCCESS | ReturnCode::EBUSY => return success(),
-                    error_code => return error_code,
+                if let Some(buffer) = self.write_buffer.take() {
+                    // Rollover3 is not running.
+                    let (code, buffer) = start_increment(
+                        Page::High,
+                        high_count,
+                        self.flash,
+                        buffer,
+                    );
+                    self.write_buffer.set(buffer);
+                    return match code {
+                        ReturnCode::SUCCESS | ReturnCode::EBUSY => success(),
+                        code => code,
+                    };
+                } else {
+                    // Rollover3 is running.
+                    return success();
                 }
             },
             (1, _) => {

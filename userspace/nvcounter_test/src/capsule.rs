@@ -249,5 +249,32 @@ fn test_capsule() -> bool {
     nvcounter.write_done(&mut buffer, SUCCESS);
     require!(client.take_last() == IncrementDone(SUCCESS));
 
+    // Advance to the next rollover again, and perform an error-free rollover
+    // increment with no delay before the next increment.
+    let mut buffer = [0];
+    flash.write(Page::Low as usize * WORDS_PER_PAGE + 511, &mut buffer);
+    require_eq!("rollover3", nvcounter.read_and_increment(),
+                SuccessWithValue { value: 3 * COUNTS_PER_PAGE as usize + 2 });
+    require!(client.take_last() == Uncalled);
+    let mut buffer = [0];
+    nvcounter.write_done(&mut buffer, SUCCESS);
+    require!(client.take_last() == IncrementDone(SUCCESS));
+    // Note: The erase should still be going on, so make FakeFlash return EBUSY.
+    flash.set_busy(true);
+    require_eq!("post-rollover3", nvcounter.read_and_increment(),
+                SuccessWithValue { value: 3 * COUNTS_PER_PAGE as usize + 3 });
+    flash.set_busy(false);
+    // Finish C2
+    nvcounter.erase_done(SUCCESS);
+    require!(client.take_last() == Uncalled);
+    // Finish C3
+    let mut buffer = [0];
+    nvcounter.write_done(&mut buffer, SUCCESS);
+    require!(client.take_last() == Uncalled);
+    // Finish B1
+    let mut buffer = [0];
+    nvcounter.write_done(&mut buffer, SUCCESS);
+    require!(client.take_last() == IncrementDone(SUCCESS));
+
     true
 }
