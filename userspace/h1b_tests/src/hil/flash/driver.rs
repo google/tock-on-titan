@@ -59,7 +59,7 @@ impl<'a> h1b::hil::flash::Client<'a> for MockClient {
 
 #[test]
 fn erase() -> bool {
-    use kernel::hil::time::Client;
+    use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
@@ -95,7 +95,7 @@ fn erase() -> bool {
 
 #[test]
 fn erase_max_retries() -> bool {
-    use kernel::hil::time::Client;
+    use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
@@ -130,7 +130,7 @@ fn erase_max_retries() -> bool {
 
 #[test]
 fn write_then_erase() -> bool {
-    use kernel::hil::time::Client;
+    use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
@@ -179,7 +179,7 @@ fn write_then_erase() -> bool {
 
 #[test]
 fn successful_program() -> bool {
-    use kernel::hil::time::Client;
+    use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
@@ -223,7 +223,7 @@ fn successful_program() -> bool {
 
 #[test]
 fn timeout() -> bool {
-    use kernel::hil::time::Client;
+    use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
@@ -253,7 +253,7 @@ fn timeout() -> bool {
 
 #[test]
 fn write_max_retries() -> bool {
-    use kernel::hil::time::Client;
+    use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
