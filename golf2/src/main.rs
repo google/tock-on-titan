@@ -40,6 +40,8 @@ pub mod virtual_flash;
 
 use capsules::alarm::AlarmDriver;
 use capsules::console;
+use capsules::low_level_debug;
+use capsules::low_level_debug::LowLevelDebug;
 use capsules::virtual_alarm::VirtualMuxAlarm;
 use capsules::virtual_uart::{MuxUart, UartDevice};
 
@@ -89,6 +91,7 @@ pub struct Golf {
         FlashCounter<'static, FlashUser<'static>>>,
     u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
     uint_printer: debug_syscall::UintPrinter,
+    low_level_debug: &'static LowLevelDebug<'static, UartDevice<'static>>,
     personality: &'static personality::PersonalitySyscall<'static>,
 }
 
@@ -219,6 +222,19 @@ pub unsafe fn reset_handler() {
         kernel::debug::DebugWriterWrapper::new(debugger)
     );
     kernel::debug::set_debug_writer_wrapper(debug_wrapper);
+
+    // Instantiate the low-level debug driver.
+    let low_level_debug_uart = static_init!(
+        UartDevice, UartDevice::new(uart_mux, false));
+    low_level_debug_uart.setup();
+    let low_level_debug_buffer = static_init!([u8; low_level_debug::BUF_LEN],
+                                              [0; low_level_debug::BUF_LEN]);
+    let low_level_debug = static_init!(
+        LowLevelDebug<UartDevice>,
+        LowLevelDebug::new(low_level_debug_buffer, low_level_debug_uart,
+                           kernel.create_grant(&grant_cap)));
+    crate::kernel::hil::uart::Transmit::set_transmit_client(
+        low_level_debug_uart, low_level_debug);
 
     //debug!("Booting.");
     let gpio_pins = static_init!(
@@ -420,6 +436,7 @@ pub unsafe fn reset_handler() {
         u2f_usb: u2f,
         personality: personality,
         uint_printer: debug_syscall::UintPrinter::new(),
+        low_level_debug,
     };
 
     #[allow(unused)]
@@ -480,6 +497,7 @@ impl Platform for Golf {
             h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
             personality::DRIVER_NUM       => f(Some(self.personality)),
             debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
+            low_level_debug::DRIVER_NUM   => f(Some(self.low_level_debug)),
             _ =>  f(None),
         }
     }
