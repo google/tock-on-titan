@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-BUILD_SUBDIRS := $(addprefix userspace/,dcrypto_test gpio_test h1b_tests \
-		   personality_clear personality_test sha_test spin \
-		   u2f_app u2f_test )
+BUILD_SUBDIRS := $(addprefix userspace/,dcrypto_test flash_test gpio_test \
+		personality_clear personality_test sha_test spin \
+		u2f_app u2f_test )
 
 .PHONY: userspace/build
 userspace/build: $(addsuffix /build,$(BUILD_SUBDIRS))
@@ -102,6 +102,99 @@ $(foreach APP,$(C_APPS),build/userspace/$(APP)/full_image): \
 		build/userspace/$*/unsigned_image
 	arm-none-eabi-objcopy --update-section \
 		.apps=build/userspace/$*/cortex-m3/cortex-m3.tbf \
+		build/userspace/$*/unsigned_image
+	$(TANGO_CODESIGNER) --b --input build/userspace/$*/unsigned_image \
+		--key=$(TANGO_CODESIGNER_KEY) \
+		--output=build/userspace/$*/signed_image
+	cat $(TANGO_BOOTLOADER) build/userspace/$*/signed_image \
+		> build/userspace/$*/full_image
+
+# ------------------------------------------------------------------------------
+# Build rules shared between Rust test app targets.
+# ------------------------------------------------------------------------------
+
+# These are static pattern rules, see above (the C apps rules) section for an
+# explanation.
+
+.PHONY: $(foreach APP,$(RUST_TESTS),userspace/$(APP)/build)
+$(foreach APP,$(RUST_TESTS),userspace/$(APP)/build): userspace/%/build: \
+		build/userspace/%/full_image
+
+.PHONY: $(foreach APP,$(RUST_TESTS),userspace/$(APP)/check)
+$(foreach APP,$(RUST_TESTS),userspace/$(APP)/check): userspace/%/check:
+	cd userspace/$* && TOCK_KERNEL_VERSION=$* cargo check \
+		--offline --release
+
+.PHONY: $(foreach APP,$(RUST_TESTS),userspace/$(APP)/devicetests)
+$(foreach APP,$(RUST_TESTS),userspace/$(APP)/devicetests): \
+	userspace/%/devicetests: \
+		build/cargo-host/release/runner build/userspace/%/full_image
+	flock build/device_lock -c ' \
+		$(TANGO_SPIFLASH) --verbose \
+		                  --input=build/userspace/$*/full_image ; \
+		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
+		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
+		build/cargo-host/release/runner --test'
+
+.PHONY: $(foreach APP,$(RUST_TESTS),userspace/$(APP)/doc)
+$(foreach APP,$(RUST_TESTS),userspace/$(APP)/doc): userspace/%/doc:
+	cd userspace/$* && TOCK_KERNEL_VERSION=$* cargo doc --offline --release
+
+.PHONY: $(foreach APP,$(RUST_TESTS),userspace/$(APP)/localtests)
+$(foreach APP,$(RUST_TESTS),userspace/$(APP)/localtests):
+
+.PHONY: $(foreach APP,$(RUST_TESTS),userspace/$(APP)/program)
+$(foreach APP,$(RUST_TESTS),userspace/$(APP)/program): userspace/%/program: \
+		build/userspace/%/full_image
+	flock build/device_lock -c '$(TANGO_SPIFLASH) --verbose \
+		--input=build/userspace/$*/full_image'
+
+.PHONY: $(foreach APP,$(RUST_TESTS),userspace/$(APP)/run)
+$(foreach APP,$(RUST_TESTS),userspace/$(APP)/run): userspace/%/run: \
+		build/cargo-host/release/runner build/userspace/%/full_image
+	flock build/device_lock -c ' \
+		$(TANGO_SPIFLASH) --verbose \
+		                  --input=build/userspace/$*/full_image ; \
+		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
+		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
+		build/cargo-host/release/runner'
+
+.PHONY: $(foreach APP,$(RUST_TESTS),build/userspace/$(APP)/app)
+$(foreach APP,$(RUST_TESTS),build/userspace/$(APP)/app): build/userspace/%/app:
+	rm -f build/userspace/cargo/thumbv7m-none-eabi/release/$*-*
+	cd userspace/$* && TOCK_KERNEL_VERSION=$* \
+		cargo test --no-run --offline --release
+	mkdir -p build/userspace/$*/
+	find build/userspace/cargo/thumbv7m-none-eabi/release/ -maxdepth 1 -regex \
+		'build/userspace/cargo/thumbv7m-none-eabi/release/$*-[^.]+' \
+		-exec cp '{}' build/userspace/$*/app ';'
+
+# Due to b/139156455, we want to detect the case where an application's size is
+# rounded up to 64 KiB.
+$(foreach APP,$(RUST_TESTS),build/userspace/$(APP)/app.tbf): \
+		build/userspace/%/app.tbf: \
+		build/cargo-host/release/elf2tab build/userspace/%/app
+	build/cargo-host/release/elf2tab -n "$(notdir $*)" \
+		-o build/userspace/$*/app_tab \
+		build/userspace/$*/app --stack=2048 --app-heap=1024 \
+		--kernel-heap=1024 --protected-region-size=64
+	if [ "$$(wc -c <build/userspace/$*/app.tbf)" -ge 65536 ]; \
+		then echo "#########################################################"; \
+		     echo "# Application $(notdir $*) is too large."; \
+		     echo "# Check size of build/userspace/$*/app.tbf"; \
+		     echo "#########################################################"; \
+		     false ; \
+		fi
+
+$(foreach APP,$(RUST_TESTS),build/userspace/$(APP)/full_image): \
+		build/userspace/%/full_image: build/userspace/%/app.tbf \
+		golf2/target/thumbv7m-none-eabi/release/golf2 ;
+	cp golf2/target/thumbv7m-none-eabi/release/golf2 \
+		build/userspace/$*/unsigned_image
+	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
+		build/userspace/$*/unsigned_image
+	arm-none-eabi-objcopy --update-section \
+		.apps=build/userspace/$*/app.tbf \
 		build/userspace/$*/unsigned_image
 	$(TANGO_CODESIGNER) --b --input build/userspace/$*/unsigned_image \
 		--key=$(TANGO_CODESIGNER_KEY) \

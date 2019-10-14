@@ -60,7 +60,7 @@ impl<'a> h1b::hil::flash::Client<'a> for MockClient {
 #[test]
 fn erase() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
-    let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+    let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
 
@@ -96,7 +96,7 @@ fn erase() -> bool {
 #[test]
 fn erase_max_retries() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
-    let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+    let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
     let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
@@ -131,7 +131,7 @@ fn erase_max_retries() -> bool {
 #[test]
 fn write_then_erase() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
-    let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+    let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
 
@@ -180,7 +180,7 @@ fn write_then_erase() -> bool {
 #[test]
 fn successful_program() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
-    let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+    let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
 
@@ -224,7 +224,7 @@ fn successful_program() -> bool {
 #[test]
 fn timeout() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
-    let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+    let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
     hw.set_transaction(1300, 1);
@@ -254,7 +254,7 @@ fn timeout() -> bool {
 #[test]
 fn write_max_retries() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
-    let alarm = crate::hil::flash::mock_alarm::MockAlarm::new();
+    let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1b::hil::flash::fake::FakeHw::new();
     let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
