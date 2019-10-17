@@ -109,10 +109,12 @@ impl<'f> Flash<'f> for FlashUser<'f> {
 
 impl Client<'f> for FlashUser<'f> {
     fn erase_done(&self, rcode: ReturnCode) {
+        self.operation.set(Operation::Idle);
         self.client.map(|client| client.erase_done(rcode));
     }
 
     fn write_done(&self, data: &'f mut [u32], rcode: ReturnCode) {
+        self.operation.set(Operation::Idle);
         self.client.map(move |client| client.write_done(data, rcode));
     }
 }
@@ -159,7 +161,6 @@ impl<'f> MuxFlash<'f> {
                     }
                 },
             );
-            node.operation.set(Operation::Idle);
             self.in_flight.set(node);
         });
     }

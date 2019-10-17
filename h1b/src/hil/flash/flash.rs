@@ -22,7 +22,8 @@ pub trait Client<'d> {
 
 /// Flash driver API.
 pub trait Flash<'d> {
-    /// Erases the specified flash page, setting it to all ones.
+    /// Erases the specified flash page, setting it to all ones. Will return
+    /// EBUSY if an existing write or erase is ongoing.
     fn erase(&self, page: usize) -> ReturnCode;
 
     /// Reads the given word from flash. Successful read returns
@@ -32,7 +33,8 @@ pub trait Flash<'d> {
 
     /// Writes a buffer (of up to 32 words) into the given location in flash.
     /// The target location is specified as an offset from the beginning of
-    /// flash in units of words.
+    /// flash in units of words. Will return EBUSY if an existing write or erase
+    /// is ongoing.
     fn write(&self, target: usize, data: &'d mut [u32]) -> (ReturnCode, Option<&'d mut [u32]>);
 
     /// Links this driver to its client.

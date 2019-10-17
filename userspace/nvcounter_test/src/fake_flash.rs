@@ -20,6 +20,7 @@
 
 pub struct FakeFlash<'c> {
     buffer: core::cell::Cell<Option<&'c mut [u32]>>,
+    busy: core::cell::Cell<bool>,
     high_page: FakePage,
     low_page: FakePage,
     error_time: core::cell::Cell<Option<ErrorTime>>,
@@ -29,6 +30,7 @@ impl<'c> FakeFlash<'c> {
     pub fn new() -> FakeFlash<'c> {
         FakeFlash {
             buffer: Default::default(),
+            busy: Default::default(),
             high_page: FakePage::new(),
             low_page: FakePage::new(),
             error_time: Default::default(),
@@ -42,6 +44,11 @@ impl<'c> FakeFlash<'c> {
     pub fn retrieve_buffer(&self) -> Option<&'c mut [u32]> {
         self.buffer.take()
     }
+
+    // Indicate whether FakeFlash should indicate it is busy.
+    pub fn set_busy(&self, busy: bool) {
+        self.busy.set(busy);
+    }
 }
 
 impl<'c> h1b::hil::flash::Flash<'c> for FakeFlash<'c> {
@@ -49,6 +56,7 @@ impl<'c> h1b::hil::flash::Flash<'c> for FakeFlash<'c> {
         if let Some(error_time) = self.error_time.get() {
             return start_return_code(error_time);
         }
+        if self.busy.get() { return ReturnCode::EBUSY; }
         match page {
             254 => self.high_page.erase(),
             255 => self.low_page.erase(),
@@ -81,6 +89,7 @@ impl<'c> h1b::hil::flash::Flash<'c> for FakeFlash<'c> {
                 },
             };
         }
+        if self.busy.get() { return (ReturnCode::EBUSY, Some(data)); }
         // Note: this will fail if the write crosses pages, which is fine for
         // this use case. That may be true of the real flash anyway.
         match offset_to_page(target) {
