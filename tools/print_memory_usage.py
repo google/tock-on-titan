@@ -121,16 +121,23 @@ def print_section_information():
   print("  " + "{:>6}".format(sram_size) + "\tuninitialized variables")
   print("  " + "{:>6}".format(relocate_size) + "\tinitialized variables")
   print("  " + "{:>6}".format(sram_size + relocate_size) + "\tvariables total")
-  print("Kernel sets aside " + str(app_size) + " bytes of RAM for applications")
+  print("Applications allocated " + str(app_size) + " bytes of RAM")
 
-def group_symbols(groups, symbols, waste):
+def group_symbols(groups, symbols, waste, section):
   sum = 0
   expected_addr = 0
   waste_sum = 0
+  prev_symbol = ""
+
   for (symbol, addr, size, total_size) in symbols:
+    if size == 0:
+      continue
     sum = sum + size
-    if addr != expected_addr and expected_addr != 0 and (waste or verbose):
-       print("  ! " + str(addr - expected_addr) + " bytes wasted before " + symbol)
+    # If we find a gap between symbol+size and the next symbol, we might
+    # have waste. But this is only true if it's not the first symbol and
+    # this is actually a variable and just just a symbol
+    if addr != expected_addr and expected_addr != 0 and size != 0 and (waste or verbose):
+       print("  ! " + str(addr - expected_addr) + " bytes wasted after " + prev_symbol)
        waste_sum = waste_sum + (addr - expected_addr)
     tokens = symbol.split("::")
     key = symbol[0] # Default to first character (_) if not a proper symbol
@@ -147,7 +154,7 @@ def group_symbols(groups, symbols, waste):
       elif symbol[0:3] == "_ZN":
         key = "Unidentified auto-generated"
       else:
-        key = "Unmangled global (C-like code)"
+        key = "Unmangled globals (C-like code)"
       name = symbol
     else:
       # Packages have a trailing :: while other categories don't;
@@ -161,23 +168,34 @@ def group_symbols(groups, symbols, waste):
     else:
       groups[key] = [(name, size)]
 
-  if waste:
-    print("Total of " + str(waste_sum) + " bytes wasted")
+    prev_symbol = symbol
 
-def string_for_group(key, group_size, num_elements):
+  if waste and waste_sum > 0:
+    print("Total of " + str(waste_sum) + " bytes wasted in " + section)
+    print()
+
+def string_for_group(key, padding_size, group_size, num_elements):
   #key = trim_hash_from_symbol(key)
+
   if num_elements == 1: # If there's a single symbol (a variable), print it.
       key = key[:-2]
-      return ("  " + key + ": " + str(group_size) + " bytes\n")
+      key = key + ":"
+      key = key.ljust(padding_size + 2, ' ')
+      return ("  " + key + str(group_size) + " bytes\n")
   else: # If there's more than one, print the key as a namespace
       if key[-2:] == "::":
-        return ("  " + key + "* " + str(group_size) + " bytes\n")
+        key = key + "*"
+        key = key.ljust(padding_size + 2, ' ')
+        return ("  " + key + str(group_size) + " bytes\n")
       else:
-        return ("  " + key + ": " + str(group_size) + " bytes\n")
+        key = key + ":"
+        key = key.ljust(padding_size + 2, ' ')
+        return ("  " + key + str(group_size) + " bytes\n")
 
 def print_groups(title, groups):
   sum = 0
   output = ""
+  max_string_len = len(max(groups.keys(), key=len))
   for key in sorted(groups.keys()):
     symbols = groups[key]
     group_size = 0
@@ -185,7 +203,7 @@ def print_groups(title, groups):
     for (varname, size) in symbols:
       group_size = group_size + size
 
-    output = output + string_for_group(key, group_size, len(symbols))
+    output = output + string_for_group(key, max_string_len, group_size, len(symbols))
     sum = sum + group_size
 
   print(title + ": " + str(sum) + " bytes")
@@ -193,21 +211,22 @@ def print_groups(title, groups):
 
 def print_symbol_information():
   variable_groups = {}
-  group_symbols(variable_groups, kernel_initialized, show_waste)
-  group_symbols(variable_groups, kernel_uninitialized, show_waste)
+  group_symbols(variable_groups, kernel_initialized, show_waste, "RAM")
+  group_symbols(variable_groups, kernel_uninitialized, show_waste, "Flash+RAM")
   print_groups("Variable groups (RAM)", variable_groups)
   allocated_variable_ram = sections["relocate"] + sections["sram"]
-  if show_waste:
-    print("  - " + str(allocated_variable_ram - total) + " bytes wasted.")
+  #if show_waste:
+  #  print("  - " + str(allocated_variable_ram - total) + " bytes wasted.")
 
+  print()
+  print("Embedded data (in flash): " + str(padding_text) + " bytes")
   print()
   function_groups = {}
   # Embedded constants in code (e.g., after functions) aren't counted
   # in the symbol's size, so detecting waste in code has too many false
   # positives.
-  group_symbols(function_groups, kernel_functions, False)
-  print_groups("Function groups (in Flash)", function_groups)
-  print("  - " + str(padding_text) + " in embedded data")
+  group_symbols(function_groups, kernel_functions, False, "Flash")
+  print_groups("Function groups (in flash)", function_groups)
   print()
 
 def compute_padding(symbols):
@@ -253,6 +272,7 @@ parse_options(options)
 
 header_lines = os.popen('arm-none-eabi-objdump -f ' + elf_name).readlines()
 
+print("Tock memory usage report for " + elf_name)
 arch = "UNKNOWN"
 
 for line in header_lines:
