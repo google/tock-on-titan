@@ -30,6 +30,10 @@ show_waste = False
 symbol_depth = 1
 
 sections = {}
+# Stores 4-tuples: (name, start address, length of function, total size)
+# The length of the function is the size of the symbol as reported in
+# objdump, which is the executable code. Total size includes any constants
+# embedded, including constant strings, or padding.
 kernel_uninitialized = []
 kernel_initialized = []
 kernel_functions = []
@@ -62,8 +66,9 @@ def parse_mangled_name(name):
   return corrected_name
 
 def process_symbol_line(line):
-  match = re.search('^(\S+)\s+\w+\s+\w+\s+\.(text|relocate|sram|stack|app_memory)\s+(\S+)\s+(.+)', line)
+  match = re.search('^(\S+)\s+\w+\s+\w*\s+\.(text|relocate|sram|stack|app_memory)\s+(\S+)\s+(.+)', line)
   if match != None:
+#    print(line)
     addr = int(match.group(1), 16)
     segment = match.group(2)
     size = int(match.group(3), 16)
@@ -72,16 +77,16 @@ def process_symbol_line(line):
     if segment == "relocate":
       try:
         demangled = parse_mangled_name(name)
-        kernel_initialized.append((demangled, addr, size))
+        kernel_initialized.append((demangled, addr, size, 0))
       except cxxfilt.InvalidName as e:
-        kernel_initialized.append((name, addr, size))
+        kernel_initialized.append((name, addr, size, 0))
 
     elif segment == "sram":
       try:
         demangled = parse_mangled_name(name)
-        kernel_uninitialized.append((demangled, addr, size))
+        kernel_uninitialized.append((demangled, addr, size, 0))
       except cxxfilt.InvalidName as e:
-        kernel_uninitialized.append((name, addr, size))
+        kernel_uninitialized.append((name, addr, size, 0))
 
     elif segment == "text":
       match = re.search('\$(((\w+\.\.)+)(\w+))\$', name)
@@ -90,13 +95,13 @@ def process_symbol_line(line):
         symbol = symbol.replace('..', '::')
         symbol = trim_hash_from_symbol(symbol)
 
-        kernel_functions.append((symbol, addr, size))
+        kernel_functions.append((symbol, addr, size, 0))
       else:
         try:
           symbol = parse_mangled_name(name)
-          kernel_functions.append((symbol, addr, size))
+          kernel_functions.append((symbol, addr, size, 0))
         except cxxfilt.InvalidName as e:
-          kernel_functions.append((name, addr, size))
+          kernel_functions.append((name, addr, size, 0))
 
 def print_section_information():
   text_size = sections["text"]
@@ -122,7 +127,7 @@ def group_symbols(groups, symbols, waste):
   sum = 0
   expected_addr = 0
   waste_sum = 0
-  for (symbol, addr, size) in symbols:
+  for (symbol, addr, size, total_size) in symbols:
     sum = sum + size
     if addr != expected_addr and expected_addr != 0 and (waste or verbose):
        print("  ! " + str(addr - expected_addr) + " bytes wasted before " + symbol)
@@ -138,14 +143,17 @@ def group_symbols(groups, symbols, waste):
       if symbol[0:6] == '.Lanon' or symbol[0:5] == "anon." or symbol[0:4] == 'str.':
         key = "Constant strings"
       elif symbol[0:8] == ".hidden ":
-        key = "aeabi support"
+        key = "ARM aeabi support"
       elif symbol[0:3] == "_ZN":
         key = "Unidentified auto-generated"
       else:
         key = "Unmangled global (C-like code)"
       name = symbol
     else:
-      key = "::".join(tokens[0:symbol_depth])
+      # Packages have a trailing :: while other categories don't;
+      # this allows us to disambiguate when * is relevant or not
+      # in printing.
+      key = "::".join(tokens[0:symbol_depth]) + "::"
       name = "::".join(tokens[symbol_depth:])
 
     if key in groups.keys():
@@ -156,24 +164,32 @@ def group_symbols(groups, symbols, waste):
   if waste:
     print("Total of " + str(waste_sum) + " bytes wasted")
 
+def string_for_group(key, group_size, num_elements):
+  #key = trim_hash_from_symbol(key)
+  if num_elements == 1: # If there's a single symbol (a variable), print it.
+      key = key[:-2]
+      return ("  " + key + ": " + str(group_size) + " bytes\n")
+  else: # If there's more than one, print the key as a namespace
+      if key[-2:] == "::":
+        return ("  " + key + "* " + str(group_size) + " bytes\n")
+      else:
+        return ("  " + key + ": " + str(group_size) + " bytes\n")
+
 def print_groups(title, groups):
   sum = 0
   output = ""
-  for key in groups.keys():
+  for key in sorted(groups.keys()):
     symbols = groups[key]
     group_size = 0
 
     for (varname, size) in symbols:
       group_size = group_size + size
 
-    if len(symbols) == 1: # If there's a single symbol (a variable), print it.
-      output = output + ("  " + key + ": " + str(group_size) + " bytes\n")
-    else: # If there's more than one, print the key as a namespace
-      output = output + ("  " + key + "::*: " + str(group_size) + " bytes\n")
+    output = output + string_for_group(key, group_size, len(symbols))
     sum = sum + group_size
 
   print(title + ": " + str(sum) + " bytes")
-  print(output)
+  print(output, end="")
 
 def print_symbol_information():
   variable_groups = {}
@@ -184,12 +200,28 @@ def print_symbol_information():
   if show_waste:
     print("  - " + str(allocated_variable_ram - total) + " bytes wasted.")
 
+  print()
   function_groups = {}
   # Embedded constants in code (e.g., after functions) aren't counted
   # in the symbol's size, so detecting waste in code has too many false
   # positives.
   group_symbols(function_groups, kernel_functions, False)
   print_groups("Function groups (in Flash)", function_groups)
+  print("  - " + str(padding_text) + " in embedded data")
+  print()
+
+def compute_padding(symbols):
+  func_count = len(symbols)
+  diff = 0
+  for i in range(1, func_count):
+    (esymbol, eaddr, esize, etotal) = symbols[i - 1]
+    (lsymbol, laddr, lsize, ltotal) = symbols[i]
+    total_size = laddr - eaddr
+    symbols[i - 1] = (esymbol, eaddr, esize, total_size)
+    if total_size != esize:
+      diff = diff + (total_size - esize)
+
+  return diff
 
 def get_addr(tuple):
   return tuple[1]
@@ -258,6 +290,11 @@ for line in objdump_lines:
 kernel_initialized.sort(key=get_addr)
 kernel_uninitialized.sort(key=get_addr)
 kernel_functions.sort(key=get_addr)
+
+padding_init = compute_padding(kernel_initialized)
+padding_uninit = compute_padding(kernel_uninitialized)
+padding_text = compute_padding(kernel_functions)
+
 print_section_information()
 print()
 print_symbol_information()
