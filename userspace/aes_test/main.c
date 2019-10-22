@@ -37,13 +37,13 @@ int main(void) {
   //  printf("Expecting [%d]: 0x", sizeof(expected));
   // print_buffer(expected, sizeof(expected), "%02x");
   printf("Setting up key.\n");
-  tock_aes128_set_key(key, strlen((const char*)key));
+  tock_aes_set_key(key, strlen((const char*)key));
   printf("Encrypting %i bytes.\n", strlen((const char*)data));
   memcpy(buffer, data, strlen((const char*)data) + 1);
-  int len = tock_aes128_encrypt_ecb_sync(buffer, sizeof(buffer));
+  int len = tock_aes_encrypt_ecb_sync(16, buffer, sizeof(buffer));
 
   if (len >= 0) {
-    printf("Result    [%d]: 0x", len);
+    printf("Result    [%i]: ", len);
     print_buffer(buffer, sizeof(buffer));
   } else {
     printf("Got error while encrypting: %d\n", -len);
@@ -53,17 +53,17 @@ int main(void) {
   printf("\n");
   printf("==== Starting Decryption ====\n");
 
-  printf("Expecting [%d]: ", sizeof(data));
+  printf("Expecting [%d]: ", strlen((const char*)data));
   print_buffer(data, strlen((const char*)data));
 
   int res;
   printf("Setting up key.\n");
-  res = tock_aes128_set_key(key, strlen((const char*)key));
+  res = tock_aes_set_key(key, strlen((const char*)key));
   if (res < 0) {
     printf("Got error while setup: %d\n", res);
   }
   printf("Decrypting.\n");
-  int dec_len = tock_aes128_decrypt_ecb_sync(buffer, sizeof(buffer));
+  int dec_len = tock_aes_decrypt_ecb_sync(16, buffer, sizeof(buffer));
 
   printf("Result    [%d]: ", dec_len);
   print_buffer(buffer, sizeof(buffer));

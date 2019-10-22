@@ -12,6 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INVOKE_DIR    := userspace/aes_test
-TOCK_ON_TITAN := ../..
-include $(TOCK_ON_TITAN)/DirShim.mk
+C_APPS += aes_test
