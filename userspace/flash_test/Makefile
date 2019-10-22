@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INVOKE_DIR    := userspace/h1b_tests
+INVOKE_DIR    := userspace/flash_test
 TOCK_ON_TITAN := ../..
 include $(TOCK_ON_TITAN)/DirShim.mk

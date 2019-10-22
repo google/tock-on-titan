@@ -1,4 +1,4 @@
-# Copyright 2018 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[package]
-name = "h1b_tests"
-version = "0.1.0"
-authors = ["jrvanwhy <jrvanwhy@google.com>"]
-edition = "2018"
-publish = false
-
-[dependencies]
-h1b = { features = ["test"], path = "../../h1b" }
-kernel = { path = "../../third_party/tock/kernel" }
-libtock = { path = "../../third_party/libtock-rs" }
-
-[dev-dependencies]
-test = { path = "../test_harness" }
+RUST_TESTS += nvcounter_test

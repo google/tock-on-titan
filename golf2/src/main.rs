@@ -33,6 +33,8 @@ pub mod dcrypto;
 pub mod dcrypto_test;
 pub mod debug_syscall;
 mod flash_test;
+mod nvcounter_syscall;
+mod nvcounter_test;
 pub mod personality;
 pub mod virtual_flash;
 
@@ -51,9 +53,12 @@ use kernel::mpu::MPU;
 
 use h1b::crypto::dcrypto::Dcrypto;
 use h1b::hil::flash::Flash;
+use h1b::nvcounter::{FlashCounter,NvCounter};
 use h1b::timels::Timels;
 use h1b::usb::{Descriptor, StringDescriptor};
 
+use nvcounter_syscall::NvCounterSyscall;
+use virtual_flash::FlashUser;
 
 // State for loading apps
 const NUM_PROCS: usize = 1;
@@ -80,6 +85,8 @@ pub struct Golf {
     aes: &'static aes::AesDriver<'static>,
     rng: &'static capsules::rng::RngDriver<'static>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
+    nvcounter: &'static NvCounterSyscall<'static,
+        FlashCounter<'static, FlashUser<'static>>>,
     u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
     uint_printer: debug_syscall::UintPrinter,
     personality: &'static personality::PersonalitySyscall<'static>,
@@ -246,6 +253,9 @@ pub unsafe fn reset_handler() {
         virtual_flash::FlashUser<'static>,
         virtual_flash::FlashUser::new(flash_mux));
 
+    let nvcounter_flash = static_init!(virtual_flash::FlashUser<'static>,
+                                       virtual_flash::FlashUser::new(flash_mux));
+
     flash.set_client(flash_mux);
 
     let timer_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels>,
@@ -273,6 +283,18 @@ pub unsafe fn reset_handler() {
         dcrypto::DcryptoDriver::new(&mut h1b::crypto::dcrypto::DCRYPTO));
 
     h1b::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
+
+    let nvcounter_buffer = static_init!([u32; 1], [0]);
+    let nvcounter = static_init!(
+        FlashCounter<'static, virtual_flash::FlashUser<'static>>,
+        FlashCounter::new(nvcounter_buffer, nvcounter_flash));
+    nvcounter_flash.set_client(nvcounter);
+
+    let nvcounter_syscall = static_init!(
+        NvCounterSyscall<'static,
+            FlashCounter<'static, virtual_flash::FlashUser<'static>>>,
+        NvCounterSyscall::new(nvcounter, kernel.create_grant(&grant_cap)));
+    nvcounter.set_client(nvcounter_syscall);
 
     let u2f = static_init!(
         h1b::usb::driver::U2fSyscallDriver<'static>,
@@ -393,6 +415,7 @@ pub unsafe fn reset_handler() {
         digest: digest,
         aes: aes,
         dcrypto: dcrypto,
+        nvcounter: nvcounter_syscall,
         rng: rng,
         u2f_usb: u2f,
         personality: personality,
@@ -407,9 +430,20 @@ pub unsafe fn reset_handler() {
             h1b::hil::flash::FlashImpl<'static,
                                        VirtualMuxAlarm<'static, Timels>>>::new(flash));
 
+    #[allow(unused)]
+    let nvcounter_test = static_init!(
+        nvcounter_test::NvCounterTest<'static, FlashCounter<'static,
+            virtual_flash::FlashUser<'static>>>,
+        nvcounter_test::NvCounterTest::new(nvcounter));
+    nvcounter.set_client(nvcounter_test);
+
     // dcrypto_test::run_dcrypto();
     //    rng_test::run_rng();
     //flash_test.run();
+    //nvcounter_test.run();
+
+    // Uncomment to initialize NvCounter
+    //nvcounter_syscall.initialize();
 
     extern "C" {
         /// Beginning of the ROM region containing app images.
@@ -442,6 +476,7 @@ impl Platform for Golf {
             capsules::rng::DRIVER_NUM     => f(Some(self.rng)),
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
+            nvcounter_syscall::DRIVER_NUM => f(Some(self.nvcounter)),
             h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
             personality::DRIVER_NUM       => f(Some(self.personality)),
             debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),

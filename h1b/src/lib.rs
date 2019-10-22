@@ -34,6 +34,7 @@ pub mod chip;
 pub mod crypto;
 pub mod gpio;
 pub mod hil;
+pub mod nvcounter;
 pub mod personality;
 pub mod pinmux;
 pub mod pmu;
