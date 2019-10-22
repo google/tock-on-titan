@@ -22,9 +22,10 @@ use kernel::hil;
 pub struct PortRegisters {
     pub data_in: VolatileCell<u32>,
     pub data_out: VolatileCell<u32>,
+    _reserved: [u32; 2],
     pub output_enable: VolatileCell<u32>,
     pub output_disable: VolatileCell<u32>,
-    _reserved: [u32; 2],
+    _reserved2: [u32; 2],
     pub interrupt_enable: VolatileCell<u32>,
     pub interrupt_disable: VolatileCell<u32>,
     pub interrupt_type_set: VolatileCell<u32>,
