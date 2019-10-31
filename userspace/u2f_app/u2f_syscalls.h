@@ -30,7 +30,7 @@ uint32_t tock_chip_dev_id1(void);
 int tock_chip_category(void);
 
 // Robust counter
-int increment_counter(void);
+unsigned int increment_counter(void);
 
 enum touch_state {
   POP_TOUCH_NO  = 0,

@@ -24,7 +24,7 @@ $(LIBNAME)_SRCS := $($(LIBNAME)_DIR)/dcrypto_syscalls.c  \
 		   $($(LIBNAME)_DIR)/digest_syscalls.c   \
 		   $($(LIBNAME)_DIR)/h1b_aes_syscalls.c  \
 		   $($(LIBNAME)_DIR)/nvcounter_syscalls.c  \
-		   $($(LIBNAME)_DIR)/personality_syscalls.c  \
-		   $($(LIBNAME)_DIR)/u2f_syscalls.c
+		   $($(LIBNAME)_DIR)/personality_syscalls.c
+#		   $($(LIBNAME)_DIR)/u2f_syscalls.c
 
 include $(TOCK_USERLAND_BASE_DIR)/TockLibrary.mk

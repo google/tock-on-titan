@@ -22,6 +22,7 @@
 #include "h1b_aes_syscalls.h"
 #include "personality_syscalls.h"
 #include "u2f_syscalls.h"
+#include "nvcounter_syscalls.h"
 
 #include "tock.h"
 #include "rng.h"
@@ -131,11 +132,9 @@ int fips_aes_block(const uint8_t *in, uint8_t *out) {
   return 1;
 }
 
-static int counter = 0;
-
-int increment_counter(void) {
-  counter++;
-  return counter;
+unsigned int increment_counter(void) {
+  unsigned int counter;
+  return tock_nvcounter_increment(&counter);
 }
 
 int usbu2f_put_frame(const U2FHID_FRAME* frame_p) {
