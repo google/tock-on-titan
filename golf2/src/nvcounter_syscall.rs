@@ -55,9 +55,8 @@ impl<'c, C: NvCounter<'c>> NvCounterSyscall<'c, C> {
     /// value between 0 and the previous value.
     #[allow(unused)]
     pub fn initialize(&self) {
-        debug!("Initializing NvCounterSyscall.");
         if self.nvcounter.initialize() != ReturnCode::SUCCESS {
-            debug!("NvCounterSyscall initialziation failed.");
+            debug!("NvCounterSyscall initialization failed.");
             self.handle_failed_init();
         }
     }
