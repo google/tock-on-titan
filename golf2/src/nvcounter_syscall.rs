@@ -55,7 +55,9 @@ impl<'c, C: NvCounter<'c>> NvCounterSyscall<'c, C> {
     /// value between 0 and the previous value.
     #[allow(unused)]
     pub fn initialize(&self) {
+        debug!("Initializing NvCounterSyscall.");
         if self.nvcounter.initialize() != ReturnCode::SUCCESS {
+            debug!("NvCounterSyscall initialziation failed.");
             self.handle_failed_init();
         }
     }
@@ -107,20 +109,38 @@ impl<'c, C: NvCounter<'c>> NvCounterSyscall<'c, C> {
     }
 
     fn read_and_increment(&self, app: AppId) -> ReturnCode {
-        if self.init_failed.get() { return ReturnCode::FAIL; }
+        if self.init_failed.get() {
+            debug!("Trying to increment an uninitialized NV Counter.");
+            return ReturnCode::FAIL;
+        }
         let result = self.grant.enter(app, |app_data, _| {
             if app_data.wants_increment { return ReturnCode::EBUSY; }
-            app_data.wants_increment = true;
             ReturnCode::SUCCESS
         }).unwrap_or(ReturnCode::ENOMEM);
-        if result != ReturnCode::SUCCESS { return result; }
+        if result != ReturnCode::SUCCESS {
+            debug!("Failed to start system call for NV Counter increment.");
+            return result;
+        }
+        // Currently, idle, so just increment
         if self.current_app.get() == usize::max_value() {
-            if self.nvcounter.read_and_increment() != ReturnCode::SUCCESS {
-                return ReturnCode::FAIL;
+            let increment_result = self.nvcounter.read_and_increment();
+            match increment_result {
+                ReturnCode::SuccessWithValue{value} => {
+                    self.value.set(value);
+                },
+                _ => {
+                    debug!("Failed to read and increment NV Counter: {:?}", increment_result);
+                    return ReturnCode::FAIL;
+                }
             }
             self.current_app.set(app.idx());
+            ReturnCode::SUCCESS
+        } else { // Busy, so mark wants_increment, perform op later
+            self.grant.enter(app, |app_data, _| {
+                app_data.wants_increment = true;
+                ReturnCode::SUCCESS
+            }).unwrap_or(ReturnCode::ENOMEM)
         }
-        ReturnCode::SUCCESS
     }
 
     fn set_increment_callback(&self, callback: Option<Callback>, app: AppId) -> ReturnCode {

@@ -431,11 +431,11 @@ pub unsafe fn reset_handler() {
                                        VirtualMuxAlarm<'static, Timels>>>::new(flash));
 
     #[allow(unused)]
-    let nvcounter_test = static_init!(
+    /*let nvcounter_test = static_init!(
         nvcounter_test::NvCounterTest<'static, FlashCounter<'static,
             virtual_flash::FlashUser<'static>>>,
         nvcounter_test::NvCounterTest::new(nvcounter));
-    nvcounter.set_client(nvcounter_test);
+    nvcounter.set_client(nvcounter_test); */
 
     // dcrypto_test::run_dcrypto();
     //    rng_test::run_rng();
@@ -443,7 +443,9 @@ pub unsafe fn reset_handler() {
     //nvcounter_test.run();
 
     // Uncomment to initialize NvCounter
+    nvcounter.set_client(nvcounter_syscall);
     //nvcounter_syscall.initialize();
+
 
     extern "C" {
         /// Beginning of the ROM region containing app images.

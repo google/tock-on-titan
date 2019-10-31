@@ -29,12 +29,13 @@
 // after a callback it's reset to NULL.
 static unsigned int* counter_global = NULL;
 
-static void tock_nvcounter_increment_done(int counter,
-                                          int unused1 __attribute__((unused)),
+static void tock_nvcounter_increment_done(int code,
+                                          int counter,
                                           int unused2 __attribute__((unused)),
                                           void *callback_args) {
   *(bool*)callback_args = true;
   if (counter_global != NULL) {
+
     *counter_global = (unsigned int)counter;
     counter_global = NULL;
   }
@@ -58,7 +59,7 @@ int tock_nvcounter_increment(unsigned int* counter) {
   ret = command(H1B_DRIVER_NVCOUNTER, TOCK_NVCOUNTER_CMD_INCREMENT,
                 0, 0);
   if (ret < 0) {
-    printf("Could not increment NV counter.\n");
+    printf("Could not increment NV counter: %s (%i).\n", tock_strerror(ret), ret);
     return ret;
   }
 
