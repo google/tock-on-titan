@@ -53,4 +53,17 @@ prtest: build devicetests localtests
 	@echo '```'
 
 
+# A target that prints an error message and fails the build if the cargo version
+# is not sufficiently up-to-date.
+.PHONY: cargo_version_check
+cargo_version_check:
+	min_version="1.37.0" ; \
+	cargo_version="$$(cargo -V | awk '{ print $$2 }')" ; \
+	if [ "$$(third_party/tock/tools/semver.sh $${cargo_version} \< $${min_version})" != "false" ] ; \
+		then echo "#######################################################################"; \
+		     echo "# Please update your stable toolchain. Minimum version: $${min_version}"; \
+		     echo "#######################################################################"; \
+		     exit 1; \
+		fi
+
 include $(addsuffix /Build.mk,$(BUILD_SUBDIRS))
