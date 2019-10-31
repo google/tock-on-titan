@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@
 #include "h1b_aes_syscalls.h"
 #include "personality_syscalls.h"
 #include "u2f_syscalls.h"
+#include "nvcounter_syscalls.h"
 
 #include "tock.h"
 #include "rng.h"
 #include "gpio.h"
 
 #include "kl.h"
-#include "storage.h"
 
 static uint32_t current_key[SHA256_DIGEST_WORDS];
 static uint32_t current_digest[SHA256_DIGEST_WORDS];
@@ -132,11 +132,20 @@ int fips_aes_block(const uint8_t *in, uint8_t *out) {
   return 1;
 }
 
-static int counter = 0;
+unsigned int increment_counter(void) {
+  unsigned int counter;
+  return tock_nvcounter_increment(&counter);
+}
 
-int increment_counter(void) {
-  counter++;
-  return counter;
+int usbu2f_put_frame(const U2FHID_FRAME* frame_p) {
+  //printf("calling tock_u2f_transmit\n");
+  tock_u2f_transmit((void*)frame_p, sizeof(U2FHID_FRAME));
+  //printf("returned from tock_u2f_transmit\n");
+  return 0;
+}
+
+void usbu2f_get_frame(U2FHID_FRAME *frame_p) {
+  tock_u2f_receive((void*)frame_p, sizeof(U2FHID_FRAME));
 }
 
 uint32_t tock_chip_dev_id0(void) {
@@ -150,6 +159,9 @@ uint32_t tock_chip_dev_id1(void) {
 int tock_chip_category(void) {
   return 0x0702;
 }
+
+
+
 
 void pop_falling_callback(int __attribute__((unused)) arg1,
                           int __attribute__((unused)) arg2,
@@ -231,10 +243,10 @@ int kl_init(void) {
   uint32_t salt[8];
   int error = 0;
   size_t i;
+  printf("Initializing keyladder.\n");
   // salt rsr some
-  printf("Initializing key ladder.\n");
   rand_bytes(salt, sizeof(salt));
-  error = error || kl_step(40, salt, NULL);
+  //error = error || kl_step(40, salt, NULL);
   rand_bytes(salt, sizeof(salt));
   error = error || kl_step(28, salt, NULL);
 
