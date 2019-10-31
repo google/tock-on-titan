@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Subdirectories containing Build.mk files.
-BUILD_SUBDIRS := golf2 runner third_party userspace
+BUILD_SUBDIRS := golf2 runner third_party tools userspace
 
 .PHONY: all
 all: build

@@ -12,6 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INVOKE_DIR    := userspace/aes_test
-TOCK_ON_TITAN := ../..
-include $(TOCK_ON_TITAN)/DirShim.mk
+.PHONY: tools/build
+tools/build:
+	cd tools && cargo build --offline --release
+
+.PHONY: tools/check
+tools/check:
+	cd tools && cargo check --offline --release
+
+.PHONY: tools/devicetests
+tools/devicetests:
+
+.PHONY: tools/doc
+tools/doc:
+	cd tools && cargo doc --offline --release
+
+.PHONY: tools/localtests
+tools/localtests:
+	cd tools && cargo test --offline --release

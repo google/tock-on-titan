@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INVOKE_DIR    := userspace/aes_test
-TOCK_ON_TITAN := ../..
-include $(TOCK_ON_TITAN)/DirShim.mk
+[package]
+name = "size_graph"
+version = "0.1.0"
+authors = ["jrvanwhy <jrvanwhy@google.com>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+elf = { path = "../../third_party/elf" }
+rustc-demangle = { path = "../../third_party/rustc-demangle" }

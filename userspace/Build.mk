@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-BUILD_SUBDIRS := $(addprefix userspace/,dcrypto_test flash_test gpio_test \
+BUILD_SUBDIRS := $(addprefix userspace/,aes_test dcrypto_test flash_test gpio_test \
 		nvcounter_test nvcounter_ctest personality_clear personality_test sha_test \
 		spin u2f_app u2f_test )
 
