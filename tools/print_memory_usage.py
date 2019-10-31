@@ -103,6 +103,20 @@ def parse_mangled_name(name):
        if it is not a mangled symbol."""
     demangled = cxxfilt.demangle(name, external_only=False)
     corrected_name = trim_hash_from_symbol(demangled)
+    # Rust-specific mangled names triggered by Tock Components, e.g.
+    # ZN100_$LT$capsules..ieee802154..driver..RadioDriver$u20$as$u20$capsules..ieee802154..device..RxClient$GT$7receive
+    # This name has two parts: the structure, then the trait method it is
+    # implementing. This code parses only the structure name, so all
+    # methods that are trait implementations are just clumped under the
+    # name of the structure. -pal
+    if corrected_name[0:5] == "_$LT$":
+        # Trim off the _$LT$, then truncate at next $, this will extract
+        # capsules..ieee802154..driver..RadioDriver
+        corrected_name = corrected_name[5:]
+        endpos = corrected_name.find("$")
+        if endpos > 0:
+            corrected_name = corrected_name[0:endpos]
+
     return corrected_name
 
 def process_symbol_line(line):
@@ -158,7 +172,13 @@ def print_section_information():
     stack_size = sections["stack"]
     relocate_size = sections["relocate"]
     sram_size = sections["sram"]
-    app_size = sections["app_memory"]
+    app_size = 0
+    if "app_memory" in sections:  # H1B-style linker file, static app section
+        app_size = sections["app_memory"]
+    else: # Mainline Tock-style linker file, using APP_MEMORY
+        for (name, addr, size, tsize) in kernel_uninitialized:
+            if name.find("APP_MEMORY") >= 0:
+                app_size = size
 
     flash_size = text_size + relocate_size
     ram_size = stack_size + sram_size + relocate_size
@@ -271,7 +291,7 @@ def print_groups(title, groups):
         group_sum = group_sum + group_size
 
     print(title + ": " + str(group_sum) + " bytes")
-#    print(output, end = ' ')
+    print(output, end = ' ')
 
 def print_symbol_information():
     """Print out all of the variable and function groups with their flash/RAM
