@@ -443,7 +443,6 @@ pub unsafe fn reset_handler() {
     //nvcounter_test.run();
 
     // Uncomment to initialize NvCounter
-    nvcounter.set_client(nvcounter_syscall);
     //nvcounter_syscall.initialize();
 
 
