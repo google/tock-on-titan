@@ -23,7 +23,9 @@
 
 use kernel::{AppId, Driver, ReturnCode};
 
-pub const DRIVER_NUM: usize = 0x80000001;
+// Matched to LowLevelDebug until Tock 1.5 is released.
+// TODO: When we update to Tock 1.5, replace UintPrinter with LowLevelDebug.
+pub const DRIVER_NUM: usize = 0x00008;
 pub struct UintPrinter {}
 
 impl UintPrinter {

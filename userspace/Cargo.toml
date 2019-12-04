@@ -42,6 +42,7 @@ panic = "unwind"
 [workspace]
 members = [
 	"flash_test",
+	"low_level_debug",
 	"nvcounter_test",
 	"test_harness",
 ]
