@@ -55,6 +55,9 @@ third_party/localtests: cargo_version_check
 	cd third_party/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
 		cargo test --frozen --release
+	cd third_party/libtock-rs && \
+		CARGO_TARGET_DIR="../../build/cargo-host" \
+		cargo test --lib --offline --release
 	cd third_party/rustc-demangle && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
 		cargo test --offline --release
