@@ -17,9 +17,9 @@
 
 pub fn print_failure(expr: &str) {
     let mut console = libtock::console::Console::new();
-    console.write("FAILED: ");
-    console.write(expr);
-    console.write("\n");
+    let _ = console.write("FAILED: ");
+    let _ = console.write(expr);
+    let _ = console.write("\n");
 }
 
 #[macro_export]

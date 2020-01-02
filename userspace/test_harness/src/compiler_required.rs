@@ -59,12 +59,15 @@ pub struct TestDesc {
     pub ignore: bool,
     pub name: StaticTestName,
     pub should_panic: ShouldPanic,
+    pub test_type: TestType,
 }
 
 pub struct TestDescAndFn {
     pub desc: TestDesc,
     pub testfn: StaticTestFn,
 }
+
+pub enum TestType { UnitTest }
 
 // The test harness's equivalent of main() (it is called by a compiler-generated
 // shim).

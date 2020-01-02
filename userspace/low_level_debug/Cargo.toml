@@ -19,5 +19,9 @@ authors = ["jrvanwhy <jrvanwhy@google.com>"]
 edition = "2018"
 publish = false
 
+[dependencies.core]
+package = "async-support"
+path = "../../third_party/libtock-rs/async-support"
+
 [dependencies]
 libtock = { path = "../../third_party/libtock-rs" }

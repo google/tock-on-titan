@@ -17,8 +17,9 @@
 // Note: this currently calls into UintPrinter, not LowLevelDebug. When Tock 1.5
 // is released, we should replace UintPrinter with LowLevelDebug in golf2, at
 // which point this app will work correctly.
-
 fn main() {
+    use libtock::timer::{DriverContext, Duration};
+
     // LowLevelDebug: App 0x0 prints 0x123
     libtock::debug::low_level_print1(0x123);
 
@@ -33,7 +34,13 @@ fn main() {
     }
 
     // Wait for the above to print then output a few more messages.
-    libtock::timer::sleep(libtock::timer::Duration::from_ms(100));
+    let timer_context = DriverContext::create().ok().expect("DriverContext::create");
+    let mut timer_driver = timer_context.create_timer_driver().ok().expect("create_timer_driver");
+    let timer_driver = timer_driver.activate().ok().expect("timer activate");
+    unsafe {
+        use core::executor::block_on;
+        let _ = block_on(timer_driver.sleep(Duration::from_ms(100)));
+    }
 
     // LowLevelDebug: App 0x0 prints 0xA
     libtock::debug::low_level_print1(0xA);
