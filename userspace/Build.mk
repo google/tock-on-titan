@@ -32,7 +32,7 @@ userspace/devicetests: $(addsuffix /devicetests,$(BUILD_SUBDIRS))
 
 .PHONY: userspace/doc
 userspace/doc:
-	cd userspace && cargo doc --release
+	cd userspace && TOCK_KERNEL_VERSION=h1b cargo doc --release
 
 .PHONY: userspace/localtests
 userspace/localtests: $(addsuffix /localtests,$(BUILD_SUBDIRS))
