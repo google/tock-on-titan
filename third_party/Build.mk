@@ -23,7 +23,7 @@
 .PHONY: third_party/build
 third_party/build: build/cargo-host/release/elf2tab
 	cd third_party/libtock-rs && \
-		CARGO_TARGET_DIR="../../build/userspace" \
+		CARGO_TARGET_DIR="../../build/userspace/cargo" \
 		cargo build --offline --release --target=thumbv7m-none-eabi --examples
 
 .PHONY: third_party/check
@@ -32,7 +32,7 @@ third_party/check: cargo_version_check
 		CARGO_TARGET_DIR="../../build/cargo-host" \
 		cargo check --frozen --release
 	cd third_party/libtock-rs && \
-		CARGO_TARGET_DIR="../../build/userspace" \
+		CARGO_TARGET_DIR="../../build/userspace/cargo" \
 		cargo check --offline --release --target=thumbv7m-none-eabi --examples
 	cd third_party/rustc-demangle && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
