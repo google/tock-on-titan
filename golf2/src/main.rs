@@ -27,6 +27,7 @@ extern crate cortexm3;
 #[macro_use]
 pub mod io;
 
+mod alarm_test;
 pub mod digest;
 pub mod aes;
 pub mod dcrypto;
@@ -43,9 +44,11 @@ use capsules::console;
 use capsules::virtual_alarm::VirtualMuxAlarm;
 use capsules::virtual_uart::{MuxUart, UartDevice};
 
+use components::debug_writer::DebugWriterComponent;
 
 use kernel::{Chip, Platform};
 use kernel::capabilities;
+use kernel::component::Component;
 use kernel::hil;
 use kernel::hil::entropy::Entropy32;
 use kernel::hil::rng::Rng;
@@ -201,24 +204,7 @@ pub unsafe fn reset_handler() {
     );
     hil::uart::Transmit::set_transmit_client(console_uart, console);
 
-    // Create virtual device for kernel debug.
-    let debugger_uart = static_init!(UartDevice, UartDevice::new(uart_mux, false));
-    debugger_uart.setup();
-    let debugger = static_init!(
-        kernel::debug::DebugWriter,
-        kernel::debug::DebugWriter::new(
-            debugger_uart,
-            &mut kernel::debug::OUTPUT_BUF,
-            &mut kernel::debug::INTERNAL_BUF,
-        )
-    );
-    hil::uart::Transmit::set_transmit_client(debugger_uart, debugger);
-
-    let debug_wrapper = static_init!(
-        kernel::debug::DebugWriterWrapper,
-        kernel::debug::DebugWriterWrapper::new(debugger)
-    );
-    kernel::debug::set_debug_writer_wrapper(debug_wrapper);
+    DebugWriterComponent::new(uart_mux).finalize(());
 
     //debug!("Booting.");
     let gpio_pins = static_init!(
@@ -445,6 +431,7 @@ pub unsafe fn reset_handler() {
     // Uncomment to initialize NvCounter
     //nvcounter_syscall.initialize();
 
+    //alarm_test::run_alarm();
 
     extern "C" {
         /// Beginning of the ROM region containing app images.

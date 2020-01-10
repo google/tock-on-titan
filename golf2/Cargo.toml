@@ -33,8 +33,7 @@ debug = true
 
 [dependencies]
 capsules = { path = "../third_party/tock/capsules" }
+components = { path = "../third_party/tock/boards/components" }
 kernel = { path = "../third_party/tock/kernel" }
 cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
 h1b = { path = "../h1b" }
-
-
