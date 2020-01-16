@@ -12,6 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INVOKE_DIR    := userspace/blink
-TOCK_ON_TITAN := ../..
-include $(TOCK_ON_TITAN)/DirShim.mk
+APP := blink
+include ../CAppMakefile.mk
