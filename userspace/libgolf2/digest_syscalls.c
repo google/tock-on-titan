@@ -93,7 +93,11 @@ int tock_digest_hash_easy(void* input_buf, size_t input_len,
     printf("Digest: error %i on hash_easy update\n", err);
     return err;
   }
-  return tock_digest_hash_finalize();
+  err = tock_digest_hash_finalize();
+  if (err < 0) {
+    printf("Digest: error %i on hash_easy finalize\n", err);
+  }
+  return err;
 }
 
 int tock_digest_with_cert(uint32_t cert,

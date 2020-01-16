@@ -13,4 +13,11 @@
 # limitations under the License.
 
 APP := sha_test
+
+EXTERN_LIBS = ../libgolf2
+
 include ../CAppMakefile.mk
+include ../libgolf2/Makefile
+
+override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
+override CPPFLAGS += -I./include

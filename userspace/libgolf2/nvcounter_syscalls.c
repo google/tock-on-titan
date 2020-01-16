@@ -29,7 +29,7 @@
 // after a callback it's reset to NULL.
 static unsigned int* counter_global = NULL;
 
-static void tock_nvcounter_increment_done(int code,
+static void tock_nvcounter_increment_done(int code __attribute__ ((unused)),
                                           int counter,
                                           int unused2 __attribute__((unused)),
                                           void *callback_args) {
