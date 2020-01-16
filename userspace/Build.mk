@@ -19,10 +19,11 @@ BUILD_SUBDIRS := $(addprefix userspace/,                   \
 					 flash_test        \
 					 gpio_test         \
 					 low_level_debug   \
-					 nvcounter_test    \
 					 nvcounter_ctest   \
+					 nvcounter_test    \
 					 personality_clear \
 					 personality_test  \
+					 rng               \
 					 sha_test          \
 					 spin              \
 					 u2f_app           \
