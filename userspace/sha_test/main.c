@@ -14,13 +14,12 @@
 
 #include <tock.h>
 #include <gpio.h>
+#include <timer.h>
 #include <string.h>
 #include <stdio.h>
-
-#include "digest.h"
+#include "digest_syscalls.h"
 
 #define LED_0 0
-// TODO: Kernel bug? can't `allow` const data
 static /*const*/ char input_data[] = "Hello World!\n";
 
 static const uint8_t sha1_sum[160 / 8] = {
@@ -37,44 +36,6 @@ static const uint8_t sha256_sum[256 / 8] = {
 };
 
 static uint8_t hash_output[256 / 8];
-
-/* Delay for for the given microseconds (approximately).
- *
- * For a 16 MHz CPU, 1us == 16 instructions (assuming each instruction takes
- * one cycle). */
-static void busy_delay_us(int duration)
-{
-        // The inner loop instructions are: 14 NOPs + 1 SUBS/ADDS + 1 CMP
-        while (duration-- != 0) {
-                __asm volatile (
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                        "nop\n"
-                );
-        }
-}
-
-/* Delay for for the given milliseconds (approximately).
- *
- * Note that this is not precise as there are 2 extra instructions on the inner
- * loop. Therefore, there is 1us added every 8 iterations. */
-static void busy_delay_ms(int duration)
-{
-        while (duration-- != 0) {
-                busy_delay_us(1000);
-        }
-}
 
 static void print_buffer(const uint8_t* buf, size_t len) {
   for (size_t i = 0; i < len; ++i) {
@@ -93,7 +54,15 @@ int main(void) {
   memset(hash_output, 0, sizeof(hash_output));
   int ret = tock_digest_hash_easy(input_data, strlen(input_data),
                                   hash_output, sizeof(hash_output), mode);
-  if (ret < 0) goto error;
+  if (ret < 0) {
+    printf("Error on hash: %d\n", ret);
+    gpio_clear(LED_0);
+    while (1) {
+      gpio_toggle(LED_0);
+      delay_ms(1000);
+    }
+    return 1;
+  }
 
   size_t hash_size = mode == DIGEST_MODE_SHA1 ? (160 / 8) : (256 / 8);
   const uint8_t* reference_hash = mode == DIGEST_MODE_SHA1 ? sha1_sum  : sha256_sum;
@@ -111,18 +80,8 @@ int main(void) {
   while (1) {
     if (result != 0) {
       gpio_toggle(LED_0);
-      busy_delay_ms(250);
+      delay_ms(250);
     }
   }
   return 0;
-
-error:
-  printf("Error: %d\n", ret);
-  gpio_clear(LED_0);
-  while (1) {
-    gpio_toggle(LED_0);
-    busy_delay_ms(1000);
-  }
-  return 1;
 }
-

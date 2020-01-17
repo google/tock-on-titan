@@ -12,9 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-BUILD_SUBDIRS := $(addprefix userspace/,aes_test dcrypto_test flash_test gpio_test \
-		low_level_debug nvcounter_test nvcounter_ctest personality_clear \
-		personality_test sha_test spin u2f_app u2f_test )
+BUILD_SUBDIRS := $(addprefix userspace/,                   \
+                                         aes_test          \
+                                         blink             \
+                                         dcrypto_test      \
+                                         flash_test        \
+                                         gpio_test         \
+                                         low_level_debug   \
+                                         nvcounter_ctest   \
+                                         nvcounter_test    \
+                                         personality_clear \
+                                         personality_test  \
+                                         rng               \
+                                         sha_test          \
+                                         spin              \
+                                         u2f_app           \
+                                         u2f_test )
 
 .PHONY: userspace/build
 userspace/build: $(addsuffix /build,$(BUILD_SUBDIRS))
@@ -147,7 +160,7 @@ $(foreach APP,$(RUST_APPS),userspace/$(APP)/run): userspace/%/run: \
 		build/cargo-host/release/runner build/userspace/%/full_image
 	flock build/device_lock -c ' \
 		$(TANGO_SPIFLASH) --verbose \
-		                  --input=build/userspace/$*/full_image ; \
+				  --input=build/userspace/$*/full_image ; \
 		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
 		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
 		build/cargo-host/release/runner'
@@ -215,7 +228,7 @@ $(foreach APP,$(RUST_TESTS),userspace/$(APP)/devicetests): \
 		build/cargo-host/release/runner build/userspace/%/full_image
 	flock build/device_lock -c ' \
 		$(TANGO_SPIFLASH) --verbose \
-		                  --input=build/userspace/$*/full_image ; \
+				  --input=build/userspace/$*/full_image ; \
 		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
 		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
 		build/cargo-host/release/runner --test'
@@ -238,7 +251,7 @@ $(foreach APP,$(RUST_TESTS),userspace/$(APP)/run): userspace/%/run: \
 		build/cargo-host/release/runner build/userspace/%/full_image
 	flock build/device_lock -c ' \
 		$(TANGO_SPIFLASH) --verbose \
-		                  --input=build/userspace/$*/full_image ; \
+				  --input=build/userspace/$*/full_image ; \
 		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
 		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
 		build/cargo-host/release/runner'

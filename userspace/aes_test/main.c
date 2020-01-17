@@ -46,7 +46,7 @@ int main(void) {
     printf("Result    [%i]: ", len);
     print_buffer(buffer, sizeof(buffer));
   } else {
-    printf("Got error while encrypting: %d\n", -len);
+    printf("Got error while encrypting: %d\n", len);
     return -1;
   }
 

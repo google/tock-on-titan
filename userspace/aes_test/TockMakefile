@@ -13,7 +13,6 @@
 # limitations under the License.
 
 APP := aes_test
-STACK_SIZE := 4096
 
 THIRD_PARTY    = ../../third_party
 CHROMIUMOS_DIR = $(THIRD_PARTY)/chromiumos-ec
