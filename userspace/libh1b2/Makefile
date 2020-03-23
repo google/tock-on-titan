@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Makefile for the userspace libgolf2 library. This includes the C code
+# Makefile for the userspace libh1b2 library. This includes the C code
 # for making system calls to H1B peripherals that the golf2 kernel
 # supports.
 
 TOCK_USERLAND_BASE_DIR ?= $(THIRD_PARTY)/libtock-c/libtock
-LIBNAME := libgolf2
+LIBNAME := libh1b2
 $(LIBNAME)_DIR := ../$(LIBNAME)
 
 $(LIBNAME)_SRCS := $($(LIBNAME)_DIR)/dcrypto_syscalls.c  \

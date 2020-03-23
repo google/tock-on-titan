@@ -14,10 +14,10 @@
 
 APP := sha_test
 
-EXTERN_LIBS = ../libgolf2
+EXTERN_LIBS = ../libh1b2
 
 include ../CAppMakefile.mk
-include ../libgolf2/Makefile
+include ../libh1b2/Makefile
 
 override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
 override CPPFLAGS += -I./include

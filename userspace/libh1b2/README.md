@@ -1,7 +1,7 @@
-# README for userspace/libgolf2
+# README for userspace/libh1b2
 
-This directory contains the libgolf2 library for the Tock operating
-system, which provides system calls for golf2/h1b2 specific device
+This directory contains the libh1b2 library for the Tock operating
+system, which provides system calls for h1b2 specific device
 drivers. These system calls were initially designed to be the minimal
 set required to support a U2F application, so do not implement the
 full capabilities of the drivers.
@@ -29,7 +29,7 @@ The digest (SHA) engine on H1B has some additional functionality for
 computing HMAC as well computing entries in its hidden keyladder. It
 implements two allows:
   * 0: input, a buffer containing input for the hash operation
-  * 1: otuput: a buffer for the resulting hash
+  * 1: output: a buffer for the resulting hash
 
 It implements 6 commands:
   * 0: check(?, ?), check if driver present
