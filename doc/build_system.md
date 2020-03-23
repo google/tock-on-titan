@@ -85,7 +85,7 @@ build/
                         # libtock-rs's toolchain version.
         h1b_tests/      # Non-cargo-managed files specific to h1b_tests
         u2f_app/
-        libgolf2/
+        libh1/
         ...
     golf2/
         cargo/          # Cargo-managed artifacts for the golf2 Tock kernel.

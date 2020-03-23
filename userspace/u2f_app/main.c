@@ -20,7 +20,7 @@
 //   - GPIO (for user button presses)
 //   - H1B_DRIVER_DCRYPTO (for ECC crypto acceleration)
 //   - H1B_DRIVER_DIGEST (for SHA256 hash acceleration)
-//   - AES_DRIVER (the H1B variant in libgolf2, for AES acceleration)
+//   - AES_DRIVER (the H1B variant in libh1, for AES acceleration)
 //   - H1B_DRIVER_U2F (for USB transport to the token over EP1)
 //   - CONSOLE (for printing out messages)
 //   - RNG (for entropy generation)

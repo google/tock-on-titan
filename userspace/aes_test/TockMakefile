@@ -16,13 +16,13 @@ APP := aes_test
 
 THIRD_PARTY    = ../../third_party
 CHROMIUMOS_DIR = $(THIRD_PARTY)/chromiumos-ec
-LIBGOLF2_DIR   = ../libgolf2
+LIBH1_DIR   = ../libh1
 
-EXTERN_LIBS += $(CHROMIUMOS_DIR) $(LIBGOLF2_DIR)
+EXTERN_LIBS += $(CHROMIUMOS_DIR) $(LIBH1_DIR)
 
 include ../CAppMakefile.mk
 include $(CHROMIUMOS_DIR)/Makefile
-include $(LIBGOLF2_DIR)/Makefile
+include $(LIBH1_DIR)/Makefile
 
 override CPPFLAGS += -Wno-shadow -Wno-nested-externs -Wno-unused-parameter
 override CPPFLAGS += -I./include
