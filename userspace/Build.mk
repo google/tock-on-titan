@@ -31,6 +31,7 @@ BUILD_SUBDIRS := $(addprefix userspace/,                   \
 
 # All boards that we should build for
 BOARDS += golf2
+BOARDS += papa
 
 # The board we should run tests on
 TANGO_BOARD_FOR_TEST ?= golf2
