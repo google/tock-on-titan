@@ -13,7 +13,7 @@
 # limitations under the License.
 
 [package]
-name = "h1b"
+name = "h1"
 version = "0.1.0"
 authors = ["Amit Levy <amit@amitlevy.com>"]
 edition = "2018"
@@ -25,6 +25,6 @@ kernel = { path = "../third_party/tock/kernel" }
 cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
 
 [features]
-# Exports testing-specific features for use by h1b_tests. Should not be enabled
+# Exports testing-specific features for use by h1_tests. Should not be enabled
 # when compiled for the kernel.
 test = []

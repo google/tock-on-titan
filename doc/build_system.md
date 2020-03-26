@@ -12,18 +12,18 @@ The root Makefile includes `Build.mk` from each directory below it, and each
 `Build.mk` includes the `Build.mk`'s in its subdirectories. As a result, all of
 the Makefile actions are run from the `tock-on-titan/` directory. Each
 `Build.mk`'s actions should contain the path to the `Build.mk` in their name;
-for instance, `userspace/h1b_tests/Build.mk` should implement the following
+for instance, `userspace/h1_tests/Build.mk` should implement the following
 actions:
 
-* `userspace/h1b_tests/build`
-* `userspace/h1b_tests/check`
-* `userspace/h1b_tests/devicetests`
-* `userspace/h1b_tests/doc`
-* `userspace/h1b_tests/program`
-* `userspace/h1b_tests/run`
+* `userspace/h1_tests/build`
+* `userspace/h1_tests/check`
+* `userspace/h1_tests/devicetests`
+* `userspace/h1_tests/doc`
+* `userspace/h1_tests/program`
+* `userspace/h1_tests/run`
 
 We want to be able to run `make` from subdirectories of `tock-on-titan/`, such
-as `userspace/h1b_tests`, but `Build.mk` cannot be run from subdirectories. To
+as `userspace/h1_tests`, but `Build.mk` cannot be run from subdirectories. To
 allow `make` to run from subdirectories, each subdirectory containing code
 additionally has a "directory shim" Makefile. This Makefile includes
 `DirShim.mk` from the root of the repository.
@@ -83,7 +83,7 @@ build/
     userspace/
         cargo/          # userspace/ Cargo workspace target tree. Uses
                         # libtock-rs's toolchain version.
-        h1b_tests/      # Non-cargo-managed files specific to h1b_tests
+        h1_tests/       # Non-cargo-managed files specific to h1_tests
         u2f_app/
         libh1/
         ...

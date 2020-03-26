@@ -14,5 +14,5 @@
 
 #[test]
 fn flash_size() -> bool {
-    core::mem::size_of::<h1b::hil::flash::h1b_hw::H1bHw>() == 384
+    core::mem::size_of::<h1::hil::flash::h1_hw::H1bHw>() == 384
 }

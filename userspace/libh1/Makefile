@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Makefile for the userspace libh1 library. This includes the C code
-# for making system calls to H1B peripherals that the golf2 kernel
+# for making system calls to H1 peripherals that the golf2 kernel
 # supports.
 
 TOCK_USERLAND_BASE_DIR ?= $(THIRD_PARTY)/libtock-c/libtock
@@ -22,7 +22,7 @@ $(LIBNAME)_DIR := ../$(LIBNAME)
 
 $(LIBNAME)_SRCS := $($(LIBNAME)_DIR)/dcrypto_syscalls.c  \
 		   $($(LIBNAME)_DIR)/digest_syscalls.c   \
-		   $($(LIBNAME)_DIR)/h1b_aes_syscalls.c  \
+		   $($(LIBNAME)_DIR)/h1_aes_syscalls.c  \
 		   $($(LIBNAME)_DIR)/nvcounter_syscalls.c  \
 		   $($(LIBNAME)_DIR)/personality_syscalls.c
 #		   $($(LIBNAME)_DIR)/u2f_syscalls.c

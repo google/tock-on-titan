@@ -21,7 +21,7 @@ use ::kernel::ReturnCode;
 use super::hardware::Hardware;
 use super::smart_program::SmartProgramState;
 
-/// The H1B flash driver. The hardware interface (either the real flash modules
+/// The H1 flash driver. The hardware interface (either the real flash modules
 /// or the fake) is injected to support testing. This will not configure the
 /// globalsec flash regions -- that must be done independently.
 pub struct FlashImpl<'d, A: Alarm<'d> + 'd, H: Hardware + 'd> {

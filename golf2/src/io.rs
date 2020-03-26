@@ -17,7 +17,7 @@ use core::panic::PanicInfo;
 use cortexm3;
 use kernel::debug;
 use kernel::hil::led;
-use h1b;
+use h1;
 
 use crate::PROCESSES;
 
@@ -28,15 +28,15 @@ static mut WRITER: Writer = Writer {};
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         unsafe {
-            let uart = &h1b::uart::UART0;
+            let uart = &h1::uart::UART0;
 
             static mut INITIALIZED: bool = false;
             if !INITIALIZED {
                 INITIALIZED = true;
 
-                let pinmux = &mut *h1b::pinmux::PINMUX;
+                let pinmux = &mut *h1::pinmux::PINMUX;
                 // Drive DIOA0 from TX
-                pinmux.diob1.select.set(h1b::pinmux::Function::Uart0Tx);
+                pinmux.diob1.select.set(h1::pinmux::Function::Uart0Tx);
 
                 uart.config(115200);
             }
@@ -51,7 +51,7 @@ impl Write for Writer {
 #[cfg(not(test))]
 #[panic_handler]
 pub unsafe extern "C" fn panic_fmt(pi: &PanicInfo) -> ! {
-    let led = &mut led::LedLow::new(&mut h1b::gpio::PORT0.pins[0]);
+    let led = &mut led::LedLow::new(&mut h1::gpio::PORT0.pins[0]);
     let writer = &mut WRITER;
     debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &PROCESSES)
 }
@@ -60,7 +60,7 @@ pub unsafe extern "C" fn panic_fmt(pi: &PanicInfo) -> ! {
 //#[panic_handler]
 //fn panic_fmt(pi: &PanicInfo) -> ! {
 //    unsafe {
-//        let led = &mut led::LedLow::new(&mut h1b::gpio::PORT0.pins[0]);
+//        let led = &mut led::LedLow::new(&mut h1::gpio::PORT0.pins[0]);
 //        let writer = &mut WRITER;
 //        debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &PROCESSES)
 //    }

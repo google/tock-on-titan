@@ -47,10 +47,10 @@ pub static mut BUFFER: [u32; PAGE_SIZE_U32] = [0; PAGE_SIZE_U32];
 
 // Personality data is stored as the third-to-last (N-3) page of flash;
 // it is followed by the two pages used as a counter.
-const PERSONALITY_ADDRESS: usize = flash::h1b_hw::H1B_FLASH_SIZE - (3 * flash::h1b_hw::H1B_FLASH_PAGE_SIZE) ;
+const PERSONALITY_ADDRESS: usize = flash::h1_hw::H1_FLASH_SIZE - (3 * flash::h1_hw::H1_FLASH_PAGE_SIZE) ;
 const PERSONALITY_ADDRESS_U32: usize = PERSONALITY_ADDRESS / 4;
-const PERSONALITY_SIZE: usize = flash::h1b_hw::H1B_FLASH_PAGE_SIZE;
-const PAGE_SIZE_U32: usize    = flash::h1b_hw::H1B_FLASH_PAGE_SIZE / 4;
+const PERSONALITY_SIZE: usize = flash::h1_hw::H1_FLASH_PAGE_SIZE;
+const PAGE_SIZE_U32: usize    = flash::h1_hw::H1_FLASH_PAGE_SIZE / 4;
 
 impl<'a> PersonalityDriver<'a> {
     const unsafe fn new() -> PersonalityDriver<'a> {
@@ -155,7 +155,7 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
         if self.flash.is_some() {
             self.flash.map(move |flash| {
                 let offset = PERSONALITY_ADDRESS;
-                let page = offset / flash::h1b_hw::H1B_FLASH_PAGE_SIZE;
+                let page = offset / flash::h1_hw::H1_FLASH_PAGE_SIZE;
                 let rval = flash.erase(page);
                 match rval {
                     ReturnCode::SUCCESS => {
@@ -194,14 +194,14 @@ impl<'a> Personality<'a> for PersonalityDriver<'a> {
             if self.flash.is_some() {
                 self.flash.map(move |flash| {
                     let offset = PERSONALITY_ADDRESS;
-                    let page = offset / flash::h1b_hw::H1B_FLASH_PAGE_SIZE;
+                    let page = offset / flash::h1_hw::H1_FLASH_PAGE_SIZE;
                     let rval = flash.erase(page);
 
                     match rval {
                         ReturnCode::SUCCESS => {
                             self.write_buffer.map(|buffer| {
                                 self.state.set(State::ErasingU8);
-                                let len = cmp::min(data.len(), flash::h1b_hw::H1B_FLASH_PAGE_SIZE);
+                                let len = cmp::min(data.len(), flash::h1_hw::H1_FLASH_PAGE_SIZE);
                                 unsafe {
                                     let mut ptr = mem::transmute::<*mut u32, *mut u8>(buffer.as_mut_ptr());
                                     for i in 0..len {

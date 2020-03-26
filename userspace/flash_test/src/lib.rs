@@ -24,7 +24,7 @@ mod driver;
 #[cfg(test)]
 mod fake;
 #[cfg(test)]
-mod h1b_hw;
+mod h1_hw;
 #[cfg(test)]
 mod mock_alarm;
 #[cfg(test)]

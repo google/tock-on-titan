@@ -40,7 +40,7 @@ userspace/build: $(addsuffix /build,$(BUILD_SUBDIRS))
 
 .PHONY: userspace/check
 userspace/check:
-	cd userspace && TOCK_KERNEL_VERSION=h1b_tests cargo check --release
+	cd userspace && TOCK_KERNEL_VERSION=h1_tests cargo check --release
 
 .PHONY: userspace/clean
 userspace/clean:
@@ -51,7 +51,7 @@ userspace/devicetests: $(addsuffix /devicetests,$(BUILD_SUBDIRS))
 
 .PHONY: userspace/doc
 userspace/doc:
-	cd userspace && TOCK_KERNEL_VERSION=h1b cargo doc --release
+	cd userspace && TOCK_KERNEL_VERSION=h1 cargo doc --release
 
 .PHONY: userspace/localtests
 userspace/localtests: $(addsuffix /localtests,$(BUILD_SUBDIRS))

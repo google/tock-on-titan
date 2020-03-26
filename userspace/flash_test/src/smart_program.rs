@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use h1b::hil::flash::driver::WRITE_OPCODE;
-use h1b::hil::flash::{Hardware,smart_program};
+use h1::hil::flash::driver::WRITE_OPCODE;
+use h1::hil::flash::{Hardware,smart_program};
 use kernel::hil::time::{Alarm,Frequency,Time};
 use super::mock_alarm::MockAlarm;
 use test::require;
@@ -42,7 +42,7 @@ fn div_round_up() -> bool {
 #[test]
 fn successful_program() -> bool {
     let alarm = MockAlarm::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
+    let hw = h1::hil::flash::fake::FakeHw::new();
     hw.set_transaction(1300, 1);
     hw.set_write_data(&[0xFFFF0FFF]);
 
@@ -72,7 +72,7 @@ fn successful_program() -> bool {
 #[test]
 fn retries() -> bool {
     let alarm = MockAlarm::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
+    let hw = h1::hil::flash::fake::FakeHw::new();
     hw.set_transaction(1300, 1);
     hw.set_write_data(&[0xFFFF0FFF]);
 
@@ -111,7 +111,7 @@ fn retries() -> bool {
 #[test]
 fn failed() -> bool {
     let alarm = MockAlarm::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
+    let hw = h1::hil::flash::fake::FakeHw::new();
     hw.set_transaction(1300, 1);
     hw.set_write_data(&[0xFFFF0FFF]);
     let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
@@ -137,7 +137,7 @@ fn failed() -> bool {
 #[test]
 fn timeout() -> bool {
     let alarm = MockAlarm::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
+    let hw = h1::hil::flash::fake::FakeHw::new();
     hw.set_transaction(1300, 1);
     hw.set_write_data(&[0xFFFF0FFF]);
 

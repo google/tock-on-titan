@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use h1b::hil::flash::{Flash,Hardware};
+use h1::hil::flash::{Flash,Hardware};
 use kernel::hil::time::Alarm;
 use kernel::ReturnCode;
 use test::require;
@@ -47,7 +47,7 @@ impl<'a> MockClient {
 }
 
 #[cfg(test)]
-impl<'a> h1b::hil::flash::Client<'a> for MockClient {
+impl<'a> h1::hil::flash::Client<'a> for MockClient {
     fn erase_done(&self, code: kernel::ReturnCode) {
         self.state.set(Some(MockClientState::EraseDone(code)));
     }
@@ -62,10 +62,10 @@ fn erase() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
+    let hw = h1::hil::flash::fake::FakeHw::new();
 
     // First attempt.
-    let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+    let driver = unsafe { h1::hil::flash::FlashImpl::new(&alarm, &hw) };
     driver.set_client(&client);
     require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
     require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
@@ -98,8 +98,8 @@ fn erase_max_retries() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
-    let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+    let hw = h1::hil::flash::fake::FakeHw::new();
+    let driver = unsafe { h1::hil::flash::FlashImpl::new(&alarm, &hw) };
     driver.set_client(&client);
     require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
     require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
@@ -133,10 +133,10 @@ fn write_then_erase() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
+    let hw = h1::hil::flash::fake::FakeHw::new();
 
     // Write
-    let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+    let driver = unsafe { h1::hil::flash::FlashImpl::new(&alarm, &hw) };
     driver.set_client(&client);
 
     unsafe {
@@ -160,7 +160,7 @@ fn write_then_erase() -> bool {
     require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFABCD });
 
     // Erase
-    let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+    let driver = unsafe { h1::hil::flash::FlashImpl::new(&alarm, &hw) };
     driver.set_client(&client);
     require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
     require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
@@ -182,10 +182,10 @@ fn successful_program() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
+    let hw = h1::hil::flash::fake::FakeHw::new();
 
     // First attempt.
-    let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+    let driver = unsafe { h1::hil::flash::FlashImpl::new(&alarm, &hw) };
     driver.set_client(&client);
 
     unsafe {
@@ -226,12 +226,12 @@ fn timeout() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
+    let hw = h1::hil::flash::fake::FakeHw::new();
     hw.set_transaction(1300, 1);
     hw.set_write_data(&[0xFFFF0FFF]);
 
     // First attempt.
-    let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+    let driver = unsafe { h1::hil::flash::FlashImpl::new(&alarm, &hw) };
     driver.set_client(&client);
 
     unsafe {
@@ -256,8 +256,8 @@ fn write_max_retries() -> bool {
     use kernel::hil::time::{AlarmClient,Time};
     let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
-    let hw = h1b::hil::flash::fake::FakeHw::new();
-    let driver = unsafe { h1b::hil::flash::FlashImpl::new(&alarm, &hw) };
+    let hw = h1::hil::flash::fake::FakeHw::new();
+    let driver = unsafe { h1::hil::flash::FlashImpl::new(&alarm, &hw) };
     driver.set_client(&client);
 
     unsafe {

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use crate::fake_flash::{ErrorTime, FakeFlash, HIGH_PAGE_START};
-use h1b::hil::flash::flash::Flash;
-use h1b::nvcounter::internal::*;
+use h1::hil::flash::flash::Flash;
+use h1::nvcounter::internal::*;
 use kernel::ReturnCode::SuccessWithValue;
 use test::require;
 

@@ -15,7 +15,7 @@
 /// Non-volatile counter driver. Implements the syscall API documented in
 /// doc/nvcounter_syscalls.md. Must be made the client of the NvCounter capsule.
 
-use h1b::nvcounter::NvCounter;
+use h1::nvcounter::NvCounter;
 use kernel::{AppId,Callback,ReturnCode};
 
 pub const DRIVER_NUM: usize = 0x80040000;
@@ -167,7 +167,7 @@ impl<'c, C: NvCounter<'c>> kernel::Driver for NvCounterSyscall<'c, C> {
     }
 }
 
-impl<'c, C: NvCounter<'c>> h1b::nvcounter::Client for NvCounterSyscall<'c, C> {
+impl<'c, C: NvCounter<'c>> h1::nvcounter::Client for NvCounterSyscall<'c, C> {
     fn initialize_done(&self, status: ReturnCode) {
         if status == ReturnCode::SUCCESS {
             self.init_failed.set(false);

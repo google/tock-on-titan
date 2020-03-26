@@ -19,7 +19,7 @@
 #include "u2f_hid_corp.h"
 
 #include "digest_syscalls.h"
-#include "h1b_aes_syscalls.h"
+#include "h1_aes_syscalls.h"
 #include "personality_syscalls.h"
 #include "u2f_syscalls.h"
 #include "nvcounter_syscalls.h"

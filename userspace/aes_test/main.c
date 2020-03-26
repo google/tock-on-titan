@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "h1b_aes_syscalls.h"
+#include "h1_aes_syscalls.h"
 
 static unsigned char key[] = "1234567890123456";
 static unsigned char data[] = "Data to encrypt. We shall see if this works.....";

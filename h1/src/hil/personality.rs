@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Interface for accessing H1B device personality (individual attestation
+//! Interface for accessing H1 device personality (individual attestation
 //! data). Called "Personality" to remain consistent with ec-cr52 codebase.
 
 use kernel::ReturnCode;

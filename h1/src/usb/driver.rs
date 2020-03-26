@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-//! Provides userspace with access to a H1B USB peripheral.
+//! Provides userspace with access to a H1 USB peripheral.
 
 
 use core::cell::Cell;

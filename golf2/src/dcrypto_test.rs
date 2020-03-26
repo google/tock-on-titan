@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use h1b::test_dcrypto::TestDcrypto;
-use h1b::crypto::dcrypto;
+use h1::test_dcrypto::TestDcrypto;
+use h1::crypto::dcrypto;
 #[allow(unused_imports)]
-use h1b::crypto::dcrypto::{Dcrypto, DcryptoClient, DcryptoEngine};
+use h1::crypto::dcrypto::{Dcrypto, DcryptoClient, DcryptoEngine};
 
 pub unsafe fn run_dcrypto() {
     let r = static_init_test_dcrypto();

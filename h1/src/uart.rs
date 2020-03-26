@@ -25,9 +25,9 @@
 //! baud rate:w
 //!
 //! ```
-//! let uart = &h1b::uart::UART0;
-//! let pinmux = unsafe { &mut *h1b::pinmux::PINMUX };
-//! pinmux.dioa0.select.set(h1b::pinmux::Function::Uart0Tx);
+//! let uart = &h1::uart::UART0;
+//! let pinmux = unsafe { &mut *h1::pinmux::PINMUX };
+//! pinmux.dioa0.select.set(h1::pinmux::Function::Uart0Tx);
 //! uart.config(115200);
 //! uart.enable_tx();
 //! ```

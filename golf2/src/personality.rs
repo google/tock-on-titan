@@ -29,8 +29,8 @@
 //!   0. callback for when a durable write completes.
 
 use core::cell::Cell;
-use h1b::personality;
-use h1b::hil::personality::{Client, Personality};
+use h1::personality;
+use h1::hil::personality::{Client, Personality};
 use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
 use kernel::common::cells::OptionalCell;
 

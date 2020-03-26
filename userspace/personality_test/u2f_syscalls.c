@@ -15,7 +15,7 @@
 #include <tock.h>
 #include "u2f_syscalls.h"
 
-#define H1B_DRIVER_U2F 0x20008
+#define H1_DRIVER_U2F 0x20008
 
 #define TOCK_U2F_CMD_CHECK    0
 
@@ -30,7 +30,7 @@
 //#define TOCK_U2F_SUBSCRIBE_RECONNECT     3
 
 int tock_u2f_check(void) {
-  return command(H1B_DRIVER_U2F, TOCK_U2F_CMD_CHECK, 0, 0);
+  return command(H1_DRIVER_U2F, TOCK_U2F_CMD_CHECK, 0, 0);
 }
 
 static void tock_u2f_transmit_done(int error __attribute__((unused)),
@@ -42,7 +42,7 @@ static void tock_u2f_transmit_done(int error __attribute__((unused)),
 
 int tock_u2f_transmit(void* data, size_t datalen) {
   bool tx_done = false;
-  int ret = subscribe(H1B_DRIVER_U2F, TOCK_U2F_SUBSCRIBE_TRANSMIT_DONE,
+  int ret = subscribe(H1_DRIVER_U2F, TOCK_U2F_SUBSCRIBE_TRANSMIT_DONE,
                       tock_u2f_transmit_done, &tx_done);
 
   if (ret < 0) {
@@ -50,7 +50,7 @@ int tock_u2f_transmit(void* data, size_t datalen) {
     return ret;
   }
 
-  ret = allow(H1B_DRIVER_U2F, TOCK_U2F_ALLOW_TRANSMIT,
+  ret = allow(H1_DRIVER_U2F, TOCK_U2F_ALLOW_TRANSMIT,
               data, datalen);
   if (ret < 0) {
     // This should only occur if application state is not available,
@@ -59,7 +59,7 @@ int tock_u2f_transmit(void* data, size_t datalen) {
     return TOCK_EBUSY;
   }
 
-  ret = command(H1B_DRIVER_U2F, TOCK_U2F_CMD_TRANSMIT, datalen, 0);
+  ret = command(H1_DRIVER_U2F, TOCK_U2F_CMD_TRANSMIT, datalen, 0);
 
   if (ret < 0) {
     printf("Could not transmit over U2F: %d\n", ret);
@@ -81,7 +81,7 @@ static void tock_u2f_receive_done(int error __attribute__((unused)),
 int tock_u2f_receive(void* data, size_t datalen) {
   bool rx_done = false;
 
-  int ret = subscribe(H1B_DRIVER_U2F, TOCK_U2F_SUBSCRIBE_RECEIVE_DONE,
+  int ret = subscribe(H1_DRIVER_U2F, TOCK_U2F_SUBSCRIBE_RECEIVE_DONE,
                       tock_u2f_receive_done, &rx_done);
 
   if (ret < 0) {
@@ -89,7 +89,7 @@ int tock_u2f_receive(void* data, size_t datalen) {
     return ret;
   }
 
-  ret = allow(H1B_DRIVER_U2F, TOCK_U2F_ALLOW_RECEIVE,
+  ret = allow(H1_DRIVER_U2F, TOCK_U2F_ALLOW_RECEIVE,
               data, datalen);
   if (ret < 0) {
     // This should only occur if application state is not available,
@@ -98,7 +98,7 @@ int tock_u2f_receive(void* data, size_t datalen) {
     return TOCK_EBUSY;
   }
 
-  ret = command(H1B_DRIVER_U2F, TOCK_U2F_CMD_RECEIVE, datalen, 0);
+  ret = command(H1_DRIVER_U2F, TOCK_U2F_CMD_RECEIVE, datalen, 0);
 
   if (ret < 0) {
     printf("Could not receive over U2F: %d\n", ret);

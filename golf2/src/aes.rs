@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use core::cell::Cell;
-use h1b::crypto::aes::{AesEngine, AES128Ecb};
+use h1::crypto::aes::{AesEngine, AES128Ecb};
 use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
 use kernel::common::cells::TakeCell;
 use kernel::hil::symmetric_encryption;

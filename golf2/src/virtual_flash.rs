@@ -16,10 +16,10 @@ use core::cell::Cell;
 use ::kernel::common::cells::{OptionalCell, TakeCell};
 use ::kernel::common::{List, ListLink, ListNode};
 use ::kernel::ReturnCode;
-use ::h1b::hil::flash::Flash;
-use ::h1b::hil::flash::Client;
+use ::h1::hil::flash::Flash;
+use ::h1::hil::flash::Client;
 
-/// Virtualizes the H1B flash abstraction to support multiple clients.
+/// Virtualizes the H1 flash abstraction to support multiple clients.
 pub struct MuxFlash<'f> {
     driver: &'f dyn Flash<'f>,
     users: List<'f, FlashUser<'f>>,
