@@ -394,19 +394,19 @@ pub unsafe fn reset_handler() {
              end.wrapping_sub(start));
 
     h1::usb::USB0.init(&mut h1::usb::EP0_OUT_DESCRIPTORS,
-                        &mut h1::usb::EP0_OUT_BUFFERS,
-                        &mut h1::usb::EP0_IN_DESCRIPTORS,
-                        &mut h1::usb::EP0_IN_BUFFER,
-                        &mut h1::usb::EP1_OUT_DESCRIPTOR,
-                        &mut h1::usb::EP1_OUT_BUFFER,
-                        &mut h1::usb::EP1_IN_DESCRIPTOR,
-                        &mut h1::usb::EP1_IN_BUFFER,
-                        &mut h1::usb::CONFIGURATION_BUFFER,
-                        h1::usb::PHY::A,
-                        None,
-                        Some(0x18d1),  // Google vendor ID
-                        Some(0x5026),  // proto2
-                        &mut STRINGS);
+                       &mut h1::usb::EP0_OUT_BUFFERS,
+                       &mut h1::usb::EP0_IN_DESCRIPTORS,
+                       &mut h1::usb::EP0_IN_BUFFER,
+                       &mut h1::usb::EP1_OUT_DESCRIPTOR,
+                       &mut h1::usb::EP1_OUT_BUFFER,
+                       &mut h1::usb::EP1_IN_DESCRIPTOR,
+                       &mut h1::usb::EP1_IN_BUFFER,
+                       &mut h1::usb::CONFIGURATION_BUFFER,
+                       h1::usb::PHY::A,
+                       None,
+                       Some(0x18d1),  // Google vendor ID
+                       Some(0x5026),  // proto2
+                       &mut STRINGS);
     let golf2 = Golf {
         console: console,
         gpio: gpio,
@@ -428,7 +428,7 @@ pub unsafe fn reset_handler() {
             h1::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>>,
         flash_test::FlashTest::<
             h1::hil::flash::FlashImpl<'static,
-                                       VirtualMuxAlarm<'static, Timels>>>::new(flash));
+                                      VirtualMuxAlarm<'static, Timels>>>::new(flash));
 
     #[allow(unused)]
     /*let nvcounter_test = static_init!(
@@ -478,7 +478,7 @@ impl Platform for Golf {
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
             nvcounter_syscall::DRIVER_NUM => f(Some(self.nvcounter)),
-            h1::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
+            h1::usb::driver::DRIVER_NUM   => f(Some(self.u2f_usb)),
             personality::DRIVER_NUM       => f(Some(self.personality)),
             debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
             _ =>  f(None),
