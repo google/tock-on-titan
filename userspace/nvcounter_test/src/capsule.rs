@@ -42,7 +42,7 @@ impl MockClient {
     }
 }
 
-impl h1b::nvcounter::Client for MockClient {
+impl h1::nvcounter::Client for MockClient {
     fn initialize_done(&self, status: ReturnCode) {
         self.last_callback.set(InitializeDone(status));
     }
@@ -56,9 +56,9 @@ impl h1b::nvcounter::Client for MockClient {
 #[test]
 fn test_capsule() -> bool {
     use crate::fake_flash::{ErrorTime,FakeFlash};
-    use h1b::hil::flash::flash::{Client,Flash};
-    use h1b::nvcounter::{FlashCounter,NvCounter};
-    use h1b::nvcounter::internal::{COUNTS_PER_PAGE,Page,WORDS_PER_PAGE};
+    use h1::hil::flash::flash::{Client,Flash};
+    use h1::nvcounter::{FlashCounter,NvCounter};
+    use h1::nvcounter::internal::{COUNTS_PER_PAGE,Page,WORDS_PER_PAGE};
     use ReturnCode::{EBUSY,FAIL,SUCCESS,SuccessWithValue};
     use test::{require,require_eq};
 

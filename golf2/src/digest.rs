@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use core::cell::Cell;
-use h1b::hil::digest::{DigestEngine, DigestError, DigestMode};
+use h1::hil::digest::{DigestEngine, DigestError, DigestMode};
 use kernel::{AppId, AppSlice, Driver, Grant, ReturnCode, Shared};
 
 pub const DRIVER_NUM: usize = 0x40003;

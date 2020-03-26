@@ -11,7 +11,7 @@ This document documents the underlying system calls.
 
 ## DCRYPTO (0x40004)
 
-dcrypto is the bignum accelerator on H1B. It has its own assembly
+dcrypto is the bignum accelerator on H1. It has its own assembly
 language. It implements two allows:
   * 0: data, a buffer containing data input/output
   * 1: program: a buffer containing assembly instructions to execute
@@ -25,7 +25,7 @@ It implements one callback:
 
 ## DIGEST (0x40003)
 
-The digest (SHA) engine on H1B has some additional functionality for
+The digest (SHA) engine on H1 has some additional functionality for
 computing HMAC as well computing entries in its hidden keyladder. It
 implements two allows:
   * 0: input, a buffer containing input for the hash operation
@@ -39,7 +39,7 @@ It implements 6 commands:
   * 4: busy(?, ?), check if the hash engine is busy
   * 5: certificate_initialize(cert, ?): initialize hash with certificate `cert`
 
-## H1B_AES (0x40010)
+## H1_AES (0x40010)
 
 The AES engine implements a different syscall API than standard Tock
 because its hardware is quite different. It offers the same library

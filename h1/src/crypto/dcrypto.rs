@@ -15,7 +15,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-//! Software interface to the dcrypto peripheral of the H1B chip
+//! Software interface to the dcrypto peripheral of the H1 chip
 //! for the Tock operating system.
 //!
 //! dcrypto is a processor designed to offload the SC300 CPU and

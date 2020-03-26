@@ -19,7 +19,7 @@
 #![feature(core_intrinsics)]
 
 extern crate capsules;
-extern crate h1b;
+extern crate h1;
 #[macro_use(static_init, debug, create_capability)]
 extern crate kernel;
 extern crate cortexm3;
@@ -51,11 +51,11 @@ use kernel::hil::entropy::Entropy32;
 use kernel::hil::rng::Rng;
 use kernel::mpu::MPU;
 
-use h1b::crypto::dcrypto::Dcrypto;
-use h1b::hil::flash::Flash;
-use h1b::nvcounter::{FlashCounter,NvCounter};
-use h1b::timels::Timels;
-use h1b::usb::{Descriptor, StringDescriptor};
+use h1::crypto::dcrypto::Dcrypto;
+use h1::hil::flash::Flash;
+use h1::nvcounter::{FlashCounter,NvCounter};
+use h1::timels::Timels;
+use h1::usb::{Descriptor, StringDescriptor};
 
 use nvcounter_syscall::NvCounterSyscall;
 use virtual_flash::FlashUser;
@@ -81,13 +81,13 @@ pub struct Golf {
     gpio: &'static capsules::gpio::GPIO<'static>,
     timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, Timels>>,
     ipc: kernel::ipc::IPC,
-    digest: &'static digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
+    digest: &'static digest::DigestDriver<'static, h1::crypto::sha::ShaEngine>,
     aes: &'static aes::AesDriver<'static>,
     rng: &'static capsules::rng::RngDriver<'static>,
     dcrypto: &'static dcrypto::DcryptoDriver<'static>,
     nvcounter: &'static NvCounterSyscall<'static,
         FlashCounter<'static, FlashUser<'static>>>,
-    u2f_usb: &'static h1b::usb::driver::U2fSyscallDriver<'static>,
+    u2f_usb: &'static h1::usb::driver::U2fSyscallDriver<'static>,
     uint_printer: debug_syscall::UintPrinter,
     personality: &'static personality::PersonalitySyscall<'static>,
 }
@@ -137,11 +137,11 @@ static mut STRINGS: [StringDescriptor; 7] = [
 pub unsafe fn reset_handler() {
     use kernel::hil::time::Alarm;
 
-    h1b::init();
+    h1::init();
 
     let timerhs = {
-        use h1b::pmu::*;
-        use h1b::timeus::Timeus;
+        use h1::pmu::*;
+        use h1::timeus::Timeus;
         Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeUs0Timer)).enable();
         Clock::new(PeripheralClock::Bank1(PeripheralClock1::TimeLs0)).enable();
         let timer = Timeus::new(0);
@@ -152,20 +152,20 @@ pub unsafe fn reset_handler() {
     let start = timerhs.now();
 
     {
-        use h1b::pmu::*;
+        use h1::pmu::*;
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
-        let pinmux = &mut *h1b::pinmux::PINMUX;
+        let pinmux = &mut *h1::pinmux::PINMUX;
         // LED_0
-        pinmux.dioa11.select.set(h1b::pinmux::Function::Gpio0Gpio0);
+        pinmux.dioa11.select.set(h1::pinmux::Function::Gpio0Gpio0);
 
         // SW1
-        pinmux.gpio0_gpio1.select.set(h1b::pinmux::SelectablePin::Diom2);
-        pinmux.diom2.select.set(h1b::pinmux::Function::Gpio0Gpio1);
+        pinmux.gpio0_gpio1.select.set(h1::pinmux::SelectablePin::Diom2);
+        pinmux.diom2.select.set(h1::pinmux::Function::Gpio0Gpio1);
         pinmux.diom2.control.set(1 << 2 | 1 << 4);
 
-        pinmux.diob1.select.set(h1b::pinmux::Function::Uart0Tx);
+        pinmux.diob1.select.set(h1::pinmux::Function::Uart0Tx);
         pinmux.diob6.control.set(1 << 2 | 1 << 4);
-        pinmux.uart0_rx.select.set(h1b::pinmux::SelectablePin::Diob6);
+        pinmux.uart0_rx.select.set(h1::pinmux::SelectablePin::Diob6);
     }
 
     // Create capabilities that the board needs to call certain protected kernel
@@ -179,12 +179,12 @@ pub unsafe fn reset_handler() {
     let uart_mux = static_init!(
         MuxUart<'static>,
         MuxUart::new(
-            &h1b::uart::UART0,
+            &h1::uart::UART0,
             &mut capsules::virtual_uart::RX_BUF,
             115200
         )
     );
-    hil::uart::Transmit::set_transmit_client(&h1b::uart::UART0, uart_mux);
+    hil::uart::Transmit::set_transmit_client(&h1::uart::UART0, uart_mux);
 
     // Create virtual device for console.
     let console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
@@ -223,7 +223,7 @@ pub unsafe fn reset_handler() {
     //debug!("Booting.");
     let gpio_pins = static_init!(
         [&'static dyn kernel::hil::gpio::InterruptValuePin; 2],
-        [&h1b::gpio::PORT0.pins[0], &h1b::gpio::PORT0.pins[1]]);
+        [&h1::gpio::PORT0.pins[0], &h1::gpio::PORT0.pins[1]]);
 
     let gpio = static_init!(
         capsules::gpio::GPIO<'static>,
@@ -234,15 +234,15 @@ pub unsafe fn reset_handler() {
 
     let alarm_mux = static_init!(
         capsules::virtual_alarm::MuxAlarm<'static, Timels>,
-        capsules::virtual_alarm::MuxAlarm::new(&h1b::timels::TIMELS0));
-    h1b::timels::TIMELS0.set_client(alarm_mux);
+        capsules::virtual_alarm::MuxAlarm::new(&h1::timels::TIMELS0));
+    h1::timels::TIMELS0.set_client(alarm_mux);
 
     // Create flash driver and its virtualization
     let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels>,
                                            VirtualMuxAlarm::new(alarm_mux));
     let flash = static_init!(
-        h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>,
-        h1b::hil::flash::FlashImpl::new(flash_virtual_alarm, &*h1b::hil::flash::h1b_hw::H1B_HW));
+        h1::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>,
+        h1::hil::flash::FlashImpl::new(flash_virtual_alarm, &*h1::hil::flash::h1_hw::H1_HW));
     flash_virtual_alarm.set_client(flash);
 
     let flash_mux = static_init!(
@@ -266,23 +266,23 @@ pub unsafe fn reset_handler() {
     timer_virtual_alarm.set_client(timer);
 
     let digest = static_init!(
-        digest::DigestDriver<'static, h1b::crypto::sha::ShaEngine>,
+        digest::DigestDriver<'static, h1::crypto::sha::ShaEngine>,
         digest::DigestDriver::new(
-                &mut h1b::crypto::sha::KEYMGR0_SHA,
+                &mut h1::crypto::sha::KEYMGR0_SHA,
                 kernel.create_grant(&grant_cap)));
 
     let aes = static_init!(
         aes::AesDriver,
-        aes::AesDriver::new(&mut h1b::crypto::aes::KEYMGR0_AES, kernel.create_grant(&grant_cap)));
-    h1b::crypto::aes::KEYMGR0_AES.set_client(aes);
+        aes::AesDriver::new(&mut h1::crypto::aes::KEYMGR0_AES, kernel.create_grant(&grant_cap)));
+    h1::crypto::aes::KEYMGR0_AES.set_client(aes);
     aes.initialize(&mut aes::AES_BUF);
 
-    h1b::crypto::dcrypto::DCRYPTO.initialize();
+    h1::crypto::dcrypto::DCRYPTO.initialize();
     let dcrypto = static_init!(
         dcrypto::DcryptoDriver<'static>,
-        dcrypto::DcryptoDriver::new(&mut h1b::crypto::dcrypto::DCRYPTO));
+        dcrypto::DcryptoDriver::new(&mut h1::crypto::dcrypto::DCRYPTO));
 
-    h1b::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
+    h1::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
 
     let nvcounter_buffer = static_init!([u32; 1], [0]);
     let nvcounter = static_init!(
@@ -297,15 +297,15 @@ pub unsafe fn reset_handler() {
     nvcounter.set_client(nvcounter_syscall);
 
     let u2f = static_init!(
-        h1b::usb::driver::U2fSyscallDriver<'static>,
-        h1b::usb::driver::U2fSyscallDriver::new(&mut h1b::usb::USB0, kernel.create_grant(&grant_cap)));
-    h1b::usb::u2f::UsbHidU2f::set_u2f_client(&h1b::usb::USB0, u2f);
+        h1::usb::driver::U2fSyscallDriver<'static>,
+        h1::usb::driver::U2fSyscallDriver::new(&mut h1::usb::USB0, kernel.create_grant(&grant_cap)));
+    h1::usb::u2f::UsbHidU2f::set_u2f_client(&h1::usb::USB0, u2f);
 
 
-    h1b::trng::TRNG0.init();
+    h1::trng::TRNG0.init();
     let entropy_to_random = static_init!(
         capsules::rng::Entropy32ToRandom<'static>,
-        capsules::rng::Entropy32ToRandom::new(&h1b::trng::TRNG0)
+        capsules::rng::Entropy32ToRandom::new(&h1::trng::TRNG0)
     );
 
     let rng = static_init!(
@@ -315,18 +315,18 @@ pub unsafe fn reset_handler() {
             kernel.create_grant(&grant_cap)
         )
     );
-    h1b::trng::TRNG0.set_client(entropy_to_random);
+    h1::trng::TRNG0.set_client(entropy_to_random);
     entropy_to_random.set_client(rng);
 
     let personality = static_init!(
         personality::PersonalitySyscall<'static>,
-        personality::PersonalitySyscall::new(&mut h1b::personality::PERSONALITY,
+        personality::PersonalitySyscall::new(&mut h1::personality::PERSONALITY,
                                              kernel.create_grant(&grant_cap)));
 
-    h1b::personality::PERSONALITY.set_flash(flash_user);
-    h1b::personality::PERSONALITY.set_buffer(&mut h1b::personality::BUFFER);
-    h1b::personality::PERSONALITY.set_client(personality);
-    flash_user.set_client(&h1b::personality::PERSONALITY);
+    h1::personality::PERSONALITY.set_flash(flash_user);
+    h1::personality::PERSONALITY.set_buffer(&mut h1::personality::BUFFER);
+    h1::personality::PERSONALITY.set_client(personality);
+    flash_user.set_client(&h1::personality::PERSONALITY);
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
@@ -386,27 +386,27 @@ pub unsafe fn reset_handler() {
     }
 
     let mut _ctr = 0;
-    let chip = static_init!(h1b::chip::Hotel, h1b::chip::Hotel::new());
+    let chip = static_init!(h1::chip::Hotel, h1::chip::Hotel::new());
     chip.mpu().enable_mpu();
 
     let end = timerhs.now();
     println!("Tock: booted in {} tics; initializing USB and loading processes.",
              end.wrapping_sub(start));
 
-    h1b::usb::USB0.init(&mut h1b::usb::EP0_OUT_DESCRIPTORS,
-                        &mut h1b::usb::EP0_OUT_BUFFERS,
-                        &mut h1b::usb::EP0_IN_DESCRIPTORS,
-                        &mut h1b::usb::EP0_IN_BUFFER,
-                        &mut h1b::usb::EP1_OUT_DESCRIPTOR,
-                        &mut h1b::usb::EP1_OUT_BUFFER,
-                        &mut h1b::usb::EP1_IN_DESCRIPTOR,
-                        &mut h1b::usb::EP1_IN_BUFFER,
-                        &mut h1b::usb::CONFIGURATION_BUFFER,
-                        h1b::usb::PHY::A,
-                        None,
-                        Some(0x18d1),  // Google vendor ID
-                        Some(0x5026),  // proto2
-                        &mut STRINGS);
+    h1::usb::USB0.init(&mut h1::usb::EP0_OUT_DESCRIPTORS,
+                       &mut h1::usb::EP0_OUT_BUFFERS,
+                       &mut h1::usb::EP0_IN_DESCRIPTORS,
+                       &mut h1::usb::EP0_IN_BUFFER,
+                       &mut h1::usb::EP1_OUT_DESCRIPTOR,
+                       &mut h1::usb::EP1_OUT_BUFFER,
+                       &mut h1::usb::EP1_IN_DESCRIPTOR,
+                       &mut h1::usb::EP1_IN_BUFFER,
+                       &mut h1::usb::CONFIGURATION_BUFFER,
+                       h1::usb::PHY::A,
+                       None,
+                       Some(0x18d1),  // Google vendor ID
+                       Some(0x5026),  // proto2
+                       &mut STRINGS);
     let golf2 = Golf {
         console: console,
         gpio: gpio,
@@ -425,10 +425,10 @@ pub unsafe fn reset_handler() {
     #[allow(unused)]
     let flash_test = static_init!(
         flash_test::FlashTest<
-            h1b::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>>,
+            h1::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>>,
         flash_test::FlashTest::<
-            h1b::hil::flash::FlashImpl<'static,
-                                       VirtualMuxAlarm<'static, Timels>>>::new(flash));
+            h1::hil::flash::FlashImpl<'static,
+                                      VirtualMuxAlarm<'static, Timels>>>::new(flash));
 
     #[allow(unused)]
     /*let nvcounter_test = static_init!(
@@ -478,7 +478,7 @@ impl Platform for Golf {
             kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
             dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
             nvcounter_syscall::DRIVER_NUM => f(Some(self.nvcounter)),
-            h1b::usb::driver::DRIVER_NUM  => f(Some(self.u2f_usb)),
+            h1::usb::driver::DRIVER_NUM   => f(Some(self.u2f_usb)),
             personality::DRIVER_NUM       => f(Some(self.personality)),
             debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
             _ =>  f(None),

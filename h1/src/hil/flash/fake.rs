@@ -23,7 +23,7 @@ struct LogEntry {
     offset: usize,
 }
 
-/// A fake version of H1B's flash modules. Starts initialized with all 1's as if
+/// A fake version of H1's flash modules. Starts initialized with all 1's as if
 /// the flash had just been erased. To keep memory usage small, this supports a
 /// limited number of operations before panicking.
 pub struct FakeHw {

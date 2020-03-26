@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use h1b::nvcounter::NvCounter;
+use h1::nvcounter::NvCounter;
 use kernel::ReturnCode;
 use ReturnCode::SuccessWithValue;
 
@@ -44,7 +44,7 @@ impl<'t, C: NvCounter<'t>> NvCounterTest<'t, C> {
     }
 }
 
-impl<'t, C: NvCounter<'t>> h1b::nvcounter::Client for NvCounterTest<'t, C> {
+impl<'t, C: NvCounter<'t>> h1::nvcounter::Client for NvCounterTest<'t, C> {
     fn initialize_done(&self, status: ReturnCode) {
         println!("NvCounterTest: Initialize done, status: {:?}", status);
         if status != ReturnCode::SUCCESS {

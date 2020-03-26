@@ -20,16 +20,16 @@ use kernel::common::registers::{self, register_bitfields, ReadWrite};
 
 // The hardware flash controller. Cannot be used in userspace (accessing will
 // trigger a fault), and should only be manipulated by the flash hardware.
-pub static mut H1B_HW: *const H1bHw = 0x40720000 as *const H1bHw;
+pub static mut H1_HW: *const H1bHw = 0x40720000 as *const H1bHw;
 
-pub const H1B_FLASH_START: usize     = 0x40000;
-pub const H1B_FLASH_BANK_SIZE: usize = 0x40000;
-pub const H1B_FLASH_SIZE: usize      = 0x80000; // Two banks
-pub const H1B_FLASH_PAGE_SIZE: usize = 0x00800; // 2kB
+pub const H1_FLASH_START: usize     = 0x40000;
+pub const H1_FLASH_BANK_SIZE: usize = 0x40000;
+pub const H1_FLASH_SIZE: usize      = 0x80000; // Two banks
+pub const H1_FLASH_PAGE_SIZE: usize = 0x00800; // 2kB
 
-pub const H1B_INFO_0_START: usize    = 0x20000;
-pub const H1B_INFO_1_START: usize    = 0x28000;
-pub const H1B_INFO_SIZE: usize       = 0x00800;
+pub const H1_INFO_0_START: usize    = 0x20000;
+pub const H1_INFO_1_START: usize    = 0x28000;
+pub const H1_INFO_SIZE: usize       = 0x00800;
 
 register_bitfields![u32,
     TransactionParameters [
@@ -250,12 +250,12 @@ impl super::hardware::Hardware for H1bHw {
     fn read(&self, offset: usize) -> ReturnCode {
         // The two flash macros are in consecutive memory locations, so they can
         // be addressed as one.
-        if offset > H1B_FLASH_SIZE {
+        if offset > H1_FLASH_SIZE {
             ReturnCode::ESIZE
         } else {
             unsafe {
                 ReturnCode::SuccessWithValue {
-                    value: ::core::ptr::read_volatile((H1B_FLASH_START as *const u32).add(offset)) as usize
+                    value: ::core::ptr::read_volatile((H1_FLASH_START as *const u32).add(offset)) as usize
                 }
             }
         }
@@ -270,7 +270,7 @@ impl super::hardware::Hardware for H1bHw {
         // The offset is relative to the beginning of the flash module. There
         // are 128 pages per flash module.
         // TODO(jrvanwhy): Assumes the read is from the second flash bank.
-        if offset > H1B_FLASH_SIZE {
+        if offset > H1_FLASH_SIZE {
            return; // TODO(pal): Fails silently!
         }
 

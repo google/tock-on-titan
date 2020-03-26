@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Display the console output of the running h1b firmware. If --test is passed,
-// this will reset the h1b (to restart the running tests) and exit when the
+// Display the console output of the running h1 firmware. If --test is passed,
+// this will reset the h1 (to restart the running tests) and exit when the
 // tests are complete. If --test is passed, the return code indicates whether
 // the tests were successful. If --test is not passed, this always returns
 // success (even when interrupted); this allows it to be killed with an
@@ -40,31 +40,31 @@ fn main() {
         .get_matches();
 
     // Parse the command line arguments early so that we fail fast (with a nice
-    // error message) if we cannot parse them. This avoids resetting the H1B if
+    // error message) if we cannot parse them. This avoids resetting the H1 if
     // a bad command line argument is used.
     let delay = cmdline_matches.value_of("delay")
         .map_or(100, |d| d.parse().expect("Unable to parse --delay value"));
 
-    // When this runner starts, the H1B will already be running. As a result, we
+    // When this runner starts, the H1 will already be running. As a result, we
     // may have missed some of its output. This is particularly problematic for
     // --test, as we may have missed important markers.
     //
-    // To collect as much of the H1B's output as possible, we perform the
+    // To collect as much of the H1's output as possible, we perform the
     // following sequence:
-    //   1. Power down the H1B (write "0").
+    //   1. Power down the H1 (write "0").
     //   2. Wait a bit (unfortunately we don't have a way to know for sure
     //      whether the device is powered down). Flush the target's console
     //      during/after the wait.
     //   3. Start listening to the debug console output (this happens
     //      implicitly).
-    //   4. Power up the H1B (write "1").
+    //   4. Power up the H1 (write "1").
     let mut debug_console = std::fs::OpenOptions::new()
                             .append(true)
                             .open("/dev/ttyUltraConsole3")
                             .expect("Unable to open /dev/ttyUltraConsole3");
-    // 1. Power down the H1B
-    debug_console.write_all(b"0").expect("Unable to reset H1B (failed write)");
-    debug_console.flush().expect("Unable to reset H1B (failed flush)");
+    // 1. Power down the H1
+    debug_console.write_all(b"0").expect("Unable to reset H1 (failed write)");
+    debug_console.flush().expect("Unable to reset H1 (failed flush)");
 
     // 2. Wait for --delay milliseconds.
     std::thread::sleep(std::time::Duration::from_millis(delay));
@@ -75,9 +75,9 @@ fn main() {
                          .open("/dev/ttyUltraTarget2")
                          .expect("Unable to open /dev/ttyUltraTarget2");
 
-    // 4. Power up the H1B.
-    debug_console.write_all(b"1").expect("Unable to restart H1B (failed write)");
-    debug_console.flush().expect("Unable to restart H1B (failed flush)");
+    // 4. Power up the H1.
+    debug_console.write_all(b"1").expect("Unable to restart H1 (failed write)");
+    debug_console.flush().expect("Unable to restart H1 (failed flush)");
 
     // If we're not in --test mode, return 0 on SIGINT.
     let test_mode = cmdline_matches.is_present("test");

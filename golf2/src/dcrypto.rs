@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use core::cell::Cell;
-use h1b::crypto::dcrypto::{Dcrypto, DcryptoClient, ProgramFault};
+use h1::crypto::dcrypto::{Dcrypto, DcryptoClient, ProgramFault};
 use kernel::{AppId, Callback, Driver, ReturnCode, Shared, AppSlice};
 use kernel::common::cells::MapCell;
 

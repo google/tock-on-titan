@@ -15,13 +15,13 @@
 // This code is a rewrite/port of the u2f_transport.c code from
 // Cr52. It implements a U2F (2 factor authentication token)
 // application as a process in the Tock operating system. It is
-// intended to run on an H1B tock-on-titan Tock kernel. It depends on
+// intended to run on an H1 tock-on-titan Tock kernel. It depends on
 // the following system call drivers:
 //   - GPIO (for user button presses)
-//   - H1B_DRIVER_DCRYPTO (for ECC crypto acceleration)
-//   - H1B_DRIVER_DIGEST (for SHA256 hash acceleration)
-//   - AES_DRIVER (the H1B variant in libh1, for AES acceleration)
-//   - H1B_DRIVER_U2F (for USB transport to the token over EP1)
+//   - H1_DRIVER_DCRYPTO (for ECC crypto acceleration)
+//   - H1_DRIVER_DIGEST (for SHA256 hash acceleration)
+//   - AES_DRIVER (the H1 variant in libh1, for AES acceleration)
+//   - H1_DRIVER_U2F (for USB transport to the token over EP1)
 //   - CONSOLE (for printing out messages)
 //   - RNG (for entropy generation)
 

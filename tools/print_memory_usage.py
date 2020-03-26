@@ -28,7 +28,7 @@ Script to print out the memory usage of a Tock kernel binary ELF.
 Usage: print_memory_usage.py ELF
 Options:
   -dn, --depth=n      Group symbols at depth n or greater. E.g.,
-                      depth=2 will group all h1b::uart:: symbols
+                      depth=2 will group all h1::uart:: symbols
                       together. Default: 1
   -v, --verbose       Print verbose output.
   -s, --show-waste    Show where RAM is wasted (due to padding)
@@ -66,7 +66,7 @@ def usage(message):
     print("""Usage: print_memory_usage.py ELF
 Options:
   -dn, --depth=n      Group symbols at depth n or greater. E.g.,
-                      depth=2 will group all h1b::uart:: symbols
+                      depth=2 will group all h1::uart:: symbols
                       together. Default: 1
   -v, --verbose       Print verbose output.
   -s, --show-waste    Show where RAM is wasted (due to padding)""")
@@ -173,7 +173,7 @@ def print_section_information():
     relocate_size = sections["relocate"]
     sram_size = sections["sram"]
     app_size = 0
-    if "app_memory" in sections:  # H1B-style linker file, static app section
+    if "app_memory" in sections:  # H1-style linker file, static app section
         app_size = sections["app_memory"]
     else: # Mainline Tock-style linker file, using APP_MEMORY
         for (name, addr, size, tsize) in kernel_uninitialized:
@@ -198,7 +198,7 @@ def print_section_information():
 # sizes are determined by the global symbol depth, which indicates how
 # many levels of the naming heirarchy to display. A depth of 0 means
 # group all symbols together into one category; a depth of 1 means
-# aggregate symbols into top level categories (e.g, 'h1b::*'). A depth
+# aggregate symbols into top level categories (e.g, 'h1::*'). A depth
 # of 100 means aggregate symbols only if they have the same first 100
 # name levels, so effectively print every symbol individually.
 #

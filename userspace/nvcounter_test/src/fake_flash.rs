@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// A fake h1b::hil::flash::Flash implementation with enough functionality to
-/// test the NvCounter capsule. Unlike the fake flash module in h1b, this
+/// A fake h1::hil::flash::Flash implementation with enough functionality to
+/// test the NvCounter capsule. Unlike the fake flash module in h1, this
 /// implements the Flash HIL (rather than the Hardware trait), only supports the
 /// NvCounter pages, and uses run-length encoding so it can support the
 /// NvCounter's write patterns using a reasonable amount of stack space.
@@ -51,7 +51,7 @@ impl<'c> FakeFlash<'c> {
     }
 }
 
-impl<'c> h1b::hil::flash::Flash<'c> for FakeFlash<'c> {
+impl<'c> h1::hil::flash::Flash<'c> for FakeFlash<'c> {
     fn erase(&self, page: usize) -> ReturnCode {
         if let Some(error_time) = self.error_time.get() {
             return start_return_code(error_time);
@@ -102,12 +102,12 @@ impl<'c> h1b::hil::flash::Flash<'c> for FakeFlash<'c> {
     }
 
     // No-op -- the tests call erase_done and write_done directly.
-    fn set_client(&self, _client: &'c dyn h1b::hil::flash::Client<'c>) {}
+    fn set_client(&self, _client: &'c dyn h1::hil::flash::Client<'c>) {}
 }
 
 #[test]
 fn test_fake_flash() -> bool {
-    use h1b::hil::flash::Flash;
+    use h1::hil::flash::Flash;
     use kernel::ReturnCode::{FAIL,SUCCESS,SuccessWithValue};
     let flash = FakeFlash::new();
     require!(flash.erase(254) == SUCCESS);
@@ -146,7 +146,7 @@ fn test_fake_flash() -> bool {
 // Implementation details below
 // -----------------------------------------------------------------------------
 
-use h1b::nvcounter::internal::{Page, WORDS_PER_PAGE};
+use h1::nvcounter::internal::{Page, WORDS_PER_PAGE};
 use kernel::ReturnCode;
 use test::require;
 

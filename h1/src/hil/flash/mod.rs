@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Flash driver for H1B. Implements the Tock flash HIL trait as well as an API
-// more representative of the H1B flash hardware's capabilities (e.g. sub-page
+// Flash driver for H1. Implements the Tock flash HIL trait as well as an API
+// more representative of the H1 flash hardware's capabilities (e.g. sub-page
 // writes and counters).
 
 pub mod driver;
 #[cfg(feature = "test")]
 pub mod fake;
 pub mod flash;
-pub mod h1b_hw;
+pub mod h1_hw;
 mod hardware;
 pub mod smart_program;
 
@@ -28,7 +28,7 @@ pub mod smart_program;
 pub type FlashImpl<'h, A> = self::driver::FlashImpl<'h, A, self::fake::FakeHw>;
 
  #[cfg(not(feature = "test"))]
-pub type FlashImpl<'h, A> = self::driver::FlashImpl<'static, A, self::h1b_hw::H1bHw>;
+pub type FlashImpl<'h, A> = self::driver::FlashImpl<'static, A, self::h1_hw::H1bHw>;
 
 pub use self::flash::{Client,Flash};
 pub use self::hardware::Hardware;

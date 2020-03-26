@@ -16,7 +16,7 @@
 #include "tock.h"
 
 // TODO These need to be standardized
-#define H1B_DRIVER_DIGEST 0x40003
+#define H1_DRIVER_DIGEST 0x40003
 
 // command() type ids
 #define TOCK_DIGEST_CMD_CHECK      0
@@ -31,7 +31,7 @@
 #define TOCK_DIGEST_ALLOW_OUTPUT   1
 
 int tock_digest_set_input(void* buf, size_t len) {
-  int rval = allow(H1B_DRIVER_DIGEST, TOCK_DIGEST_ALLOW_INPUT, buf, len);
+  int rval = allow(H1_DRIVER_DIGEST, TOCK_DIGEST_ALLOW_INPUT, buf, len);
   if (rval != TOCK_SUCCESS){
     printf("Digest set input returned error %i\n", rval);
   }
@@ -39,7 +39,7 @@ int tock_digest_set_input(void* buf, size_t len) {
 }
 
 int tock_digest_set_output(void* buf, size_t len) {
-  int rval = allow(H1B_DRIVER_DIGEST, TOCK_DIGEST_ALLOW_OUTPUT, buf, len);
+  int rval = allow(H1_DRIVER_DIGEST, TOCK_DIGEST_ALLOW_OUTPUT, buf, len);
   if (rval != TOCK_SUCCESS){
     printf("Digest set output returned error %i\n", rval);
   }
@@ -47,27 +47,27 @@ int tock_digest_set_output(void* buf, size_t len) {
 }
 
 int tock_digest_check(void) {
-  return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_CHECK, 0, 0);
+  return command(H1_DRIVER_DIGEST, TOCK_DIGEST_CMD_CHECK, 0, 0);
 }
 
 int tock_digest_hash_initialize(TockDigestMode mode) {
-  return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_INITIALIZE, mode, 0);
+  return command(H1_DRIVER_DIGEST, TOCK_DIGEST_CMD_INITIALIZE, mode, 0);
 }
 
 int tock_digest_cert_initialize(uint32_t cert) {
-  return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_CERT_INIT, cert, 0);
+  return command(H1_DRIVER_DIGEST, TOCK_DIGEST_CMD_CERT_INIT, cert, 0);
 }
 
 int tock_digest_hash_update(size_t n) {
-  return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_UPDATE, n, 0);
+  return command(H1_DRIVER_DIGEST, TOCK_DIGEST_CMD_UPDATE, n, 0);
 }
 
 int tock_digest_hash_finalize(void) {
-  return command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_FINALIZE, 0, 0);
+  return command(H1_DRIVER_DIGEST, TOCK_DIGEST_CMD_FINALIZE, 0, 0);
 }
 
 int tock_digest_busy(void) {
-  return (command(H1B_DRIVER_DIGEST, TOCK_DIGEST_CMD_BUSY, 0, 0) == TOCK_EBUSY);
+  return (command(H1_DRIVER_DIGEST, TOCK_DIGEST_CMD_BUSY, 0, 0) == TOCK_EBUSY);
 }
 
 int tock_digest_hash_easy(void* input_buf, size_t input_len,

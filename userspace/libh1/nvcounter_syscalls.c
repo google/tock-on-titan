@@ -15,7 +15,7 @@
 #include "nvcounter_syscalls.h"
 #include "tock.h"
 
-#define H1B_DRIVER_NVCOUNTER 0x80040000
+#define H1_DRIVER_NVCOUNTER 0x80040000
 
 #define TOCK_NVCOUNTER_CMD_CHECK   0
 #define TOCK_NVCOUNTER_CMD_INCREMENT     1
@@ -42,21 +42,21 @@ static void tock_nvcounter_increment_done(int code __attribute__ ((unused)),
 }
 
 int tock_nvcounter_check(void) {
-  return command(H1B_DRIVER_NVCOUNTER, TOCK_NVCOUNTER_CMD_CHECK, 0, 0);
+  return command(H1_DRIVER_NVCOUNTER, TOCK_NVCOUNTER_CMD_CHECK, 0, 0);
 }
 
 int tock_nvcounter_increment(unsigned int* counter) {
   int ret = 0;
   bool increment_done = false;
 
-  ret = subscribe(H1B_DRIVER_NVCOUNTER, TOCK_NVCOUNTER_INCREMENT_DONE,
+  ret = subscribe(H1_DRIVER_NVCOUNTER, TOCK_NVCOUNTER_INCREMENT_DONE,
                   tock_nvcounter_increment_done, &increment_done);
   if (ret < 0) {
     printf("Could not register for NV counter increment callback.\n");
     return ret;
   }
 
-  ret = command(H1B_DRIVER_NVCOUNTER, TOCK_NVCOUNTER_CMD_INCREMENT,
+  ret = command(H1_DRIVER_NVCOUNTER, TOCK_NVCOUNTER_CMD_INCREMENT,
                 0, 0);
   if (ret < 0) {
     printf("Could not increment NV counter: %s (%i).\n", tock_strerror(ret), ret);
