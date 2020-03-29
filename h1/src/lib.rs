@@ -137,4 +137,29 @@ pub unsafe fn init() {
     cortexm3::nvic::disable_all();
     cortexm3::nvic::clear_all_pending();
     cortexm3::nvic::enable_all();
+
+    // -------------------------------------------------------------------
+
+    // Test code. Only enable if you actually want to run these tests,
+    // since they cause HW wear.
+
+    /*
+    let flash_test = static_init!(
+        flash_test::FlashTest<
+            h1::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>>,
+        flash_test::FlashTest::<
+            h1::hil::flash::FlashImpl<'static,
+                                      VirtualMuxAlarm<'static, Timels>>>::new(flash));
+
+    let nvcounter_test = static_init!(
+        nvcounter_test::NvCounterTest<'static, FlashCounter<'static,
+            virtual_flash::FlashUser<'static>>>,
+        nvcounter_test::NvCounterTest::new(nvcounter));
+    nvcounter.set_client(nvcounter_test);
+
+    dcrypto_test::run_dcrypto();
+    rng_test::run_rng();
+    flash_test.run();
+    nvcounter_test.run();
+    */
 }

@@ -1,4 +1,4 @@
-# Copyright 2018 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +13,9 @@
 # limitations under the License.
 
 [package]
-name = "golf2"
+name = "h1_syscalls"
 version = "0.1.0"
-authors = ["Philip Levis <plevis@google.com>"]
-build = "build.rs"
+authors = ["Philip Levis <plevis@google.com>", "Oskar Senft <osk@google.com"]
 edition = "2018"
 
 [profile.dev]
@@ -32,8 +31,5 @@ opt-level = "z"
 debug = true
 
 [dependencies]
-capsules = { path = "../third_party/tock/capsules" }
 kernel = { path = "../third_party/tock/kernel" }
-cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
 h1 = { path = "../h1" }
-h1_syscalls = { path = "../h1_syscalls" }

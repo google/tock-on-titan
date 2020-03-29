@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use ::kernel::ReturnCode;
-use ::h1::hil::flash::Flash;
+use super::flash::Flash;
+use super::flash::Client;
 
 /// Test tool for the flash driver -- runs test cases using the provided driver.
 /// Used for integration testing against the real hardware. Will set itself as
@@ -25,7 +26,7 @@ pub struct FlashTest<F: Flash<'static> + 'static> {
 
 static mut BUF: [u32; 1] = [0; 1];
 
-impl<F: Flash<'static> + 'static> ::h1::hil::flash::Client<'static> for FlashTest<F> {
+impl<F: Flash<'static> + 'static> Client<'static> for FlashTest<F> {
     fn erase_done(&self, code: ReturnCode) {
         match self.state.take() {
             None => println!("FlashTest FAIL: erase_done() w/ state == None"),
