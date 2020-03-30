@@ -140,8 +140,12 @@ pub unsafe fn init() {
 
     // -------------------------------------------------------------------
 
-    // Test code. Only enable if you actually want to run these tests,
-    // since they cause HW wear.
+    // Test code. Only enable if you actually want to run these tests.
+    // WARNING!!!
+    //   FlashTest and NvCounterTest cause hardware wear.
+    // WARNING!!!
+    //   Remaining tests take a considerable amount of time and should
+    //   only be enabled if needed.
 
     /*
     let flash_test = static_init!(
