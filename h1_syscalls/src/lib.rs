@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![crate_name = "h1_syscalls"]
-#![crate_type = "rlib"]
 #![no_std]
-#![feature(asm, core_intrinsics, const_fn, naked_functions)]
 
 extern crate h1;
 #[macro_use(static_init, debug)]

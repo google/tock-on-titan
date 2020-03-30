@@ -18,18 +18,6 @@ version = "0.1.0"
 authors = ["Philip Levis <plevis@google.com>", "Oskar Senft <osk@google.com"]
 edition = "2018"
 
-[profile.dev]
-panic = "abort"
-lto = false
-opt-level = "z"
-debug = true
-
-[profile.release]
-panic = "abort"
-lto = true
-opt-level = "z"
-debug = true
-
 [dependencies]
 kernel = { path = "../third_party/tock/kernel" }
 h1 = { path = "../h1" }
