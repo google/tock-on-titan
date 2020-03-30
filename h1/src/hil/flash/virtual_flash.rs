@@ -16,8 +16,8 @@ use core::cell::Cell;
 use ::kernel::common::cells::{OptionalCell, TakeCell};
 use ::kernel::common::{List, ListLink, ListNode};
 use ::kernel::ReturnCode;
-use ::h1::hil::flash::Flash;
-use ::h1::hil::flash::Client;
+use super::flash::Flash;
+use super::flash::Client;
 
 /// Virtualizes the H1 flash abstraction to support multiple clients.
 pub struct MuxFlash<'f> {
@@ -107,7 +107,7 @@ impl<'f> Flash<'f> for FlashUser<'f> {
 }
 
 
-impl Client<'f> for FlashUser<'f> {
+impl<'f> Client<'f> for FlashUser<'f> {
     fn erase_done(&self, rcode: ReturnCode) {
         self.operation.set(Operation::Idle);
         self.client.map(|client| client.erase_done(rcode));

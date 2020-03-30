@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Non-volatile counter capsule. Implements a global no-rollback counter using
-/// the last two pages of flash.
+#![no_std]
 
-mod capsule;
-mod nvcounter_test;
-mod traits;
+extern crate h1;
+#[macro_use(static_init, debug)]
+extern crate kernel;
 
-// Export the ::internal module if we're being tested to make the internal
-// methods unit-testable.
-#[cfg(feature = "test")]
-pub mod internal;
-#[cfg(not(feature = "test"))]
-mod internal;
+pub mod digest;
+pub mod aes;
+pub mod dcrypto;
+pub mod dcrypto_test;
+pub mod debug_syscall;
+pub mod nvcounter_syscall;
+pub mod personality;
 
-pub use self::capsule::FlashCounter;
-pub use self::traits::{Client,NvCounter};
+pub unsafe fn init() {
+}

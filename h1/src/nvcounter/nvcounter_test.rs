@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use h1::nvcounter::NvCounter;
 use kernel::ReturnCode;
 use ReturnCode::SuccessWithValue;
+use super::traits::Client;
+use super::traits::NvCounter;
 
 /// Integration test for the NvCounter. Will set itself as the NvCounter's
 /// client.
@@ -44,7 +45,7 @@ impl<'t, C: NvCounter<'t>> NvCounterTest<'t, C> {
     }
 }
 
-impl<'t, C: NvCounter<'t>> h1::nvcounter::Client for NvCounterTest<'t, C> {
+impl<'t, C: NvCounter<'t>> Client for NvCounterTest<'t, C> {
     fn initialize_done(&self, status: ReturnCode) {
         println!("NvCounterTest: Initialize done, status: {:?}", status);
         if status != ReturnCode::SUCCESS {

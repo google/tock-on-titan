@@ -20,9 +20,11 @@ pub mod driver;
 #[cfg(feature = "test")]
 pub mod fake;
 pub mod flash;
+mod flash_test;
 pub mod h1_hw;
 mod hardware;
 pub mod smart_program;
+pub mod virtual_flash;
 
 #[cfg(feature = "test")]
 pub type FlashImpl<'h, A> = self::driver::FlashImpl<'h, A, self::fake::FakeHw>;

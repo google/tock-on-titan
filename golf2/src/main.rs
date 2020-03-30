@@ -19,24 +19,11 @@
 #![feature(core_intrinsics)]
 
 extern crate capsules;
+#[macro_use(print, println)]
 extern crate h1;
 #[macro_use(static_init, debug, create_capability)]
 extern crate kernel;
 extern crate cortexm3;
-
-#[macro_use]
-pub mod io;
-
-pub mod digest;
-pub mod aes;
-pub mod dcrypto;
-pub mod dcrypto_test;
-pub mod debug_syscall;
-mod flash_test;
-mod nvcounter_syscall;
-mod nvcounter_test;
-pub mod personality;
-pub mod virtual_flash;
 
 use capsules::alarm::AlarmDriver;
 use capsules::console;
@@ -57,14 +44,20 @@ use h1::nvcounter::{FlashCounter,NvCounter};
 use h1::timels::Timels;
 use h1::usb::{Descriptor, StringDescriptor};
 
-use nvcounter_syscall::NvCounterSyscall;
-use virtual_flash::FlashUser;
-
 // State for loading apps
 const NUM_PROCS: usize = 1;
 
 // how should the kernel respond when a process faults
 const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultResponse::Panic;
+
+/// Panic handler.
+#[cfg(not(test))]
+#[panic_handler]
+pub unsafe extern "C" fn panic_fmt(pi: &core::panic::PanicInfo) -> ! {
+    let led = &mut kernel::hil::led::LedLow::new(&mut h1::gpio::PORT0.pins[0]);
+    let writer = &mut h1::io::WRITER;
+    kernel::debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &crate::PROCESSES)
+}
 
 #[link_section = ".app_memory"]
 static mut APP_MEMORY: [u8; 0xc000] = [0; 0xc000];
@@ -81,15 +74,15 @@ pub struct Golf {
     gpio: &'static capsules::gpio::GPIO<'static>,
     timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, Timels>>,
     ipc: kernel::ipc::IPC,
-    digest: &'static digest::DigestDriver<'static, h1::crypto::sha::ShaEngine>,
-    aes: &'static aes::AesDriver<'static>,
+    digest: &'static h1_syscalls::digest::DigestDriver<'static, h1::crypto::sha::ShaEngine>,
+    aes: &'static h1_syscalls::aes::AesDriver<'static>,
     rng: &'static capsules::rng::RngDriver<'static>,
-    dcrypto: &'static dcrypto::DcryptoDriver<'static>,
-    nvcounter: &'static NvCounterSyscall<'static,
-        FlashCounter<'static, FlashUser<'static>>>,
+    dcrypto: &'static h1_syscalls::dcrypto::DcryptoDriver<'static>,
+    nvcounter: &'static h1_syscalls::nvcounter_syscall::NvCounterSyscall<'static,
+        FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>>,
     u2f_usb: &'static h1::usb::driver::U2fSyscallDriver<'static>,
-    uint_printer: debug_syscall::UintPrinter,
-    personality: &'static personality::PersonalitySyscall<'static>,
+    uint_printer: h1_syscalls::debug_syscall::UintPrinter,
+    personality: &'static h1_syscalls::personality::PersonalitySyscall<'static>,
 }
 
 static mut STRINGS: [StringDescriptor; 7] = [
@@ -186,6 +179,10 @@ pub unsafe fn reset_handler() {
     );
     hil::uart::Transmit::set_transmit_client(&h1::uart::UART0, uart_mux);
 
+    // Configure UART speed
+    let uart = &h1::uart::UART0;
+    uart.config(115200);
+
     // Create virtual device for console.
     let console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
     console_uart.setup();
@@ -246,15 +243,15 @@ pub unsafe fn reset_handler() {
     flash_virtual_alarm.set_client(flash);
 
     let flash_mux = static_init!(
-        virtual_flash::MuxFlash<'static>,
-        virtual_flash::MuxFlash::new(flash));
+        h1::hil::flash::virtual_flash::MuxFlash<'static>,
+        h1::hil::flash::virtual_flash::MuxFlash::new(flash));
 
     let flash_user = static_init!(
-        virtual_flash::FlashUser<'static>,
-        virtual_flash::FlashUser::new(flash_mux));
+        h1::hil::flash::virtual_flash::FlashUser<'static>,
+        h1::hil::flash::virtual_flash::FlashUser::new(flash_mux));
 
-    let nvcounter_flash = static_init!(virtual_flash::FlashUser<'static>,
-                                       virtual_flash::FlashUser::new(flash_mux));
+    let nvcounter_flash = static_init!(h1::hil::flash::virtual_flash::FlashUser<'static>,
+                                       h1::hil::flash::virtual_flash::FlashUser::new(flash_mux));
 
     flash.set_client(flash_mux);
 
@@ -266,34 +263,34 @@ pub unsafe fn reset_handler() {
     timer_virtual_alarm.set_client(timer);
 
     let digest = static_init!(
-        digest::DigestDriver<'static, h1::crypto::sha::ShaEngine>,
-        digest::DigestDriver::new(
+        h1_syscalls::digest::DigestDriver<'static, h1::crypto::sha::ShaEngine>,
+        h1_syscalls::digest::DigestDriver::new(
                 &mut h1::crypto::sha::KEYMGR0_SHA,
                 kernel.create_grant(&grant_cap)));
 
     let aes = static_init!(
-        aes::AesDriver,
-        aes::AesDriver::new(&mut h1::crypto::aes::KEYMGR0_AES, kernel.create_grant(&grant_cap)));
+        h1_syscalls::aes::AesDriver,
+        h1_syscalls::aes::AesDriver::new(&mut h1::crypto::aes::KEYMGR0_AES, kernel.create_grant(&grant_cap)));
     h1::crypto::aes::KEYMGR0_AES.set_client(aes);
-    aes.initialize(&mut aes::AES_BUF);
+    aes.initialize(&mut h1_syscalls::aes::AES_BUF);
 
     h1::crypto::dcrypto::DCRYPTO.initialize();
     let dcrypto = static_init!(
-        dcrypto::DcryptoDriver<'static>,
-        dcrypto::DcryptoDriver::new(&mut h1::crypto::dcrypto::DCRYPTO));
+        h1_syscalls::dcrypto::DcryptoDriver<'static>,
+        h1_syscalls::dcrypto::DcryptoDriver::new(&mut h1::crypto::dcrypto::DCRYPTO));
 
     h1::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
 
     let nvcounter_buffer = static_init!([u32; 1], [0]);
     let nvcounter = static_init!(
-        FlashCounter<'static, virtual_flash::FlashUser<'static>>,
+        FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>,
         FlashCounter::new(nvcounter_buffer, nvcounter_flash));
     nvcounter_flash.set_client(nvcounter);
 
     let nvcounter_syscall = static_init!(
-        NvCounterSyscall<'static,
-            FlashCounter<'static, virtual_flash::FlashUser<'static>>>,
-        NvCounterSyscall::new(nvcounter, kernel.create_grant(&grant_cap)));
+        h1_syscalls::nvcounter_syscall::NvCounterSyscall<'static,
+            FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>>,
+        h1_syscalls::nvcounter_syscall::NvCounterSyscall::new(nvcounter, kernel.create_grant(&grant_cap)));
     nvcounter.set_client(nvcounter_syscall);
 
     let u2f = static_init!(
@@ -319,9 +316,9 @@ pub unsafe fn reset_handler() {
     entropy_to_random.set_client(rng);
 
     let personality = static_init!(
-        personality::PersonalitySyscall<'static>,
-        personality::PersonalitySyscall::new(&mut h1::personality::PERSONALITY,
-                                             kernel.create_grant(&grant_cap)));
+        h1_syscalls::personality::PersonalitySyscall<'static>,
+        h1_syscalls::personality::PersonalitySyscall::new(&mut h1::personality::PERSONALITY,
+                                                          kernel.create_grant(&grant_cap)));
 
     h1::personality::PERSONALITY.set_flash(flash_user);
     h1::personality::PERSONALITY.set_buffer(&mut h1::personality::BUFFER);
@@ -419,32 +416,11 @@ pub unsafe fn reset_handler() {
         rng: rng,
         u2f_usb: u2f,
         personality: personality,
-        uint_printer: debug_syscall::UintPrinter::new(),
+        uint_printer: h1_syscalls::debug_syscall::UintPrinter::new(),
     };
-
-    #[allow(unused)]
-    let flash_test = static_init!(
-        flash_test::FlashTest<
-            h1::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>>,
-        flash_test::FlashTest::<
-            h1::hil::flash::FlashImpl<'static,
-                                      VirtualMuxAlarm<'static, Timels>>>::new(flash));
-
-    #[allow(unused)]
-    /*let nvcounter_test = static_init!(
-        nvcounter_test::NvCounterTest<'static, FlashCounter<'static,
-            virtual_flash::FlashUser<'static>>>,
-        nvcounter_test::NvCounterTest::new(nvcounter));
-    nvcounter.set_client(nvcounter_test); */
-
-    // dcrypto_test::run_dcrypto();
-    //    rng_test::run_rng();
-    //flash_test.run();
-    //nvcounter_test.run();
 
     // Uncomment to initialize NvCounter
     //nvcounter_syscall.initialize();
-
 
     extern "C" {
         /// Beginning of the ROM region containing app images.
@@ -469,18 +445,18 @@ impl Platform for Golf {
         where F: FnOnce(Option<&dyn kernel::Driver>) -> R
     {
         match driver_num {
-            capsules::console::DRIVER_NUM => f(Some(self.console)),
-            capsules::gpio::DRIVER_NUM    => f(Some(self.gpio)),
-            digest::DRIVER_NUM            => f(Some(self.digest)),
-            capsules::alarm::DRIVER_NUM   => f(Some(self.timer)),
-            aes::DRIVER_NUM               => f(Some(self.aes)),
-            capsules::rng::DRIVER_NUM     => f(Some(self.rng)),
-            kernel::ipc::DRIVER_NUM       => f(Some(&self.ipc)),
-            dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
-            nvcounter_syscall::DRIVER_NUM => f(Some(self.nvcounter)),
-            h1::usb::driver::DRIVER_NUM   => f(Some(self.u2f_usb)),
-            personality::DRIVER_NUM       => f(Some(self.personality)),
-            debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
+            capsules::alarm::DRIVER_NUM                => f(Some(self.timer)),
+            capsules::console::DRIVER_NUM              => f(Some(self.console)),
+            capsules::gpio::DRIVER_NUM                 => f(Some(self.gpio)),
+            capsules::rng::DRIVER_NUM                  => f(Some(self.rng)),
+            h1::usb::driver::DRIVER_NUM                => f(Some(self.u2f_usb)),
+            h1_syscalls::aes::DRIVER_NUM               => f(Some(self.aes)),
+            h1_syscalls::dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
+            h1_syscalls::debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
+            h1_syscalls::digest::DRIVER_NUM            => f(Some(self.digest)),
+            h1_syscalls::nvcounter_syscall::DRIVER_NUM => f(Some(self.nvcounter)),
+            h1_syscalls::personality::DRIVER_NUM       => f(Some(self.personality)),
+            kernel::ipc::DRIVER_NUM                    => f(Some(&self.ipc)),
             _ =>  f(None),
         }
     }
