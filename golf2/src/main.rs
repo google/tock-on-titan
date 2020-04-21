@@ -14,7 +14,7 @@
 
 #![no_std]
 #![no_main]
-#![feature(asm, const_fn, lang_items, compiler_builtins_lib)]
+#![feature(asm, const_fn, lang_items)]
 #![feature(in_band_lifetimes)]
 #![feature(core_intrinsics)]
 
