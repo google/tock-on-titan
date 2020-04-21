@@ -33,6 +33,7 @@ use capsules::virtual_uart::{MuxUart, UartDevice};
 
 use kernel::{Chip, Platform};
 use kernel::capabilities;
+use kernel::common::RingBuffer;
 use kernel::hil;
 use kernel::hil::entropy::Entropy32;
 use kernel::hil::rng::Rng;
@@ -151,6 +152,10 @@ pub unsafe fn reset_handler() {
     hil::uart::Transmit::set_transmit_client(console_uart, console);
 
     // Create virtual device for kernel debug.
+    let ring_buffer = static_init!(
+        RingBuffer<'static, u8>,
+        RingBuffer::new(&mut kernel::debug::INTERNAL_BUF)
+    );
     let debugger_uart = static_init!(UartDevice, UartDevice::new(uart_mux, false));
     debugger_uart.setup();
     let debugger = static_init!(
@@ -158,7 +163,7 @@ pub unsafe fn reset_handler() {
         kernel::debug::DebugWriter::new(
             debugger_uart,
             &mut kernel::debug::OUTPUT_BUF,
-            &mut kernel::debug::INTERNAL_BUF,
+            ring_buffer
         )
     );
     hil::uart::Transmit::set_transmit_client(debugger_uart, debugger);
