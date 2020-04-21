@@ -18,7 +18,7 @@ runner/build: build/cargo-host/release/runner
 .PHONY: runner/check
 runner/check:
 	cd runner && \
-		CARGO_BUILD_TARGET_DIR="../build/cargo-host" cargo check
+		CARGO_TARGET_DIR="../build/cargo-host" cargo check
 
 .PHONY: runner/devicetests
 runner/devicetests:
@@ -26,16 +26,16 @@ runner/devicetests:
 .PHONY: runner/doc
 runner/doc:
 	cd runner && \
-		CARGO_BUILD_TARGET_DIR="../build/cargo-host" cargo doc
+		CARGO_TARGET_DIR="../build/cargo-host" cargo doc
 
 .PHONY: runner/localtests
 runner/localtests:
 	cd runner && \
-		CARGO_BUILD_TARGET_DIR="../build/cargo-host" cargo test
+		CARGO_TARGET_DIR="../build/cargo-host" cargo test
 
 
 .PHONY: build/cargo-host/release/runner
 build/cargo-host/release/runner:
 	cd runner && \
-		CARGO_BUILD_TARGET_DIR="../build/cargo-host" \
+		CARGO_TARGET_DIR="../build/cargo-host" \
 		cargo build --release
