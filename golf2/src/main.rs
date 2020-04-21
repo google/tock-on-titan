@@ -204,27 +204,7 @@ pub unsafe fn reset_handler() {
     hil::uart::Transmit::set_transmit_client(console_uart, console);
 
     // Create virtual device for kernel debug.
-    let ring_buffer = static_init!(
-        RingBuffer<'static, u8>,
-        RingBuffer::new(&mut kernel::debug::INTERNAL_BUF)
-    );
-    let debugger_uart = static_init!(UartDevice, UartDevice::new(uart_mux, false));
-    debugger_uart.setup();
-    let debugger = static_init!(
-        kernel::debug::DebugWriter,
-        kernel::debug::DebugWriter::new(
-            debugger_uart,
-            &mut kernel::debug::OUTPUT_BUF,
-            ring_buffer
-        )
-    );
-    hil::uart::Transmit::set_transmit_client(debugger_uart, debugger);
-
-    let debug_wrapper = static_init!(
-        kernel::debug::DebugWriterWrapper,
-        kernel::debug::DebugWriterWrapper::new(debugger)
-    );
-    kernel::debug::set_debug_writer_wrapper(debug_wrapper);
+    components::debug_writer::DebugWriterComponent::new(uart_mux).finalize(());
 
     //debug!("Booting.");
     let gpio_pins = static_init!(
