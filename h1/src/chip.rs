@@ -126,4 +126,7 @@ impl Chip for Hotel {
         cortexm3::support::atomic(f)
     }
 
+    unsafe fn print_state(&self, writer: &mut dyn core::fmt::Write) {
+        cortexm3::print_cortexm3_state(writer);
+    }
 }

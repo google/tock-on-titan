@@ -53,13 +53,16 @@ const NUM_PROCS: usize = 1;
 // how should the kernel respond when a process faults
 const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultResponse::Panic;
 
+// Used by panic_fmt to print chip-specific debugging information.
+static mut CHIP: Option<&'static h1::chip::Hotel> = None;
+
 /// Panic handler.
 #[cfg(not(test))]
 #[panic_handler]
 pub unsafe extern "C" fn panic_fmt(pi: &core::panic::PanicInfo) -> ! {
     let led = &mut kernel::hil::led::LedLow::new(&mut h1::gpio::PORT0.pins[0]);
     let writer = &mut h1::io::WRITER;
-    kernel::debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &crate::PROCESSES)
+    kernel::debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &crate::PROCESSES, &CHIP)
 }
 
 #[link_section = ".app_memory"]
@@ -374,6 +377,7 @@ pub unsafe fn reset_handler() {
     let mut _ctr = 0;
     let chip = static_init!(h1::chip::Hotel, h1::chip::Hotel::new());
     chip.mpu().enable_mpu();
+    CHIP = Some(chip);
 
     let end = timerhs.now();
     println!("Tock: booted in {} tics; initializing USB and loading processes.",
