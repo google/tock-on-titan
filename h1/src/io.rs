@@ -35,6 +35,14 @@ impl Write for Writer {
     }
 }
 
+impl kernel::debug::IoWrite for Writer {
+    fn write(&mut self, buf: &[u8]) {
+        unsafe {
+            uart::UART0.send_bytes_sync(buf);
+        }
+    }
+}
+
 #[macro_export]
 macro_rules! print {
         ($($arg:tt)*) => (
