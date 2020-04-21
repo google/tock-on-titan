@@ -17,7 +17,7 @@ use kernel::common::cells::VolatileCell;
 use kernel::common::registers::{register_bitfields, ReadWrite};
 
 register_bitfields![u32,
-    AhbConfig [  // OTG Databook, Table 5-9
+    pub AhbConfig [  // OTG Databook, Table 5-9
         GlobalInterruptMask                OFFSET(0)  NUMBITS(1) [],
         BurstLength                        OFFSET(1)  NUMBITS(4) [
             Len1Word    = 0b0000,
@@ -38,7 +38,7 @@ register_bitfields![u32,
         InverseDescEndianness              OFFSET(24) NUMBITS(1) []
     ],
 
-    UsbConfiguration [  // OTG Databook, Table 5-10
+    pub UsbConfiguration [  // OTG Databook, Table 5-10
         TimeoutCalibration                 OFFSET(0)  NUMBITS(3) [],
         PhysicalInterface                  OFFSET(3)  NUMBITS(1) [
             Bits8  = 0,
@@ -67,7 +67,7 @@ register_bitfields![u32,
         // Bits 15+ not used by SW; not included because they won't be tested
     ],
 
-    Reset [  // OTG Databook, Table 5-11
+    pub Reset [  // OTG Databook, Table 5-11
         AhbMasterIdle                      OFFSET(31) NUMBITS(1) [],
         DmaRequestSignal                   OFFSET(30) NUMBITS(1) [],
         TxFifoNumber                       OFFSET(6)  NUMBITS(5) [
@@ -96,7 +96,7 @@ register_bitfields![u32,
         PiuFsDedicatedControllerSoftReset  OFFSET(1)  NUMBITS(1) []
     ],
 
-    Interrupt [  // OTG Databook, Table 5-13
+    pub Interrupt [  // OTG Databook, Table 5-13
         // Note this field is not valid on the Mask register
         CurrentMode                        OFFSET(0)  NUMBITS(1) [
             Host   = 0b0,
@@ -129,7 +129,7 @@ register_bitfields![u32,
         ResumeWakeup                       OFFSET(31) NUMBITS(1) []
     ],
 
-    Gpio [  // OTG Databook, Table 5-22
+    pub Gpio [  // OTG Databook, Table 5-22
         Gpi                                OFFSET(0)  NUMBITS(16) [],
         GpoRegister                        OFFSET(16) NUMBITS(4)  [],
         GpoValue                           OFFSET(20) NUMBITS(8)  [],
@@ -139,7 +139,7 @@ register_bitfields![u32,
         ]
     ],
 
-    DeviceConfig [  // OTG Databook, Table 5-53
+    pub DeviceConfig [  // OTG Databook, Table 5-53
         DeviceSpeed                        OFFSET(0) NUMBITS(2) [
             High  = 0b00,
             Full2 = 0b01,
@@ -166,7 +166,7 @@ register_bitfields![u32,
         ResumeValidationPeriod             OFFSET(26) NUMBITS(6) []
     ],
 
-    DeviceControl [  // OTG Databook, Table 5-54
+    pub DeviceControl [  // OTG Databook, Table 5-54
         RemoteWakeupSignaling              OFFSET(0)  NUMBITS(1) [],
         SoftDisconnect                     OFFSET(1)  NUMBITS(1) [],
         GlobalNonPeriodicInNakStatus       OFFSET(2)  NUMBITS(1) [],
@@ -196,7 +196,7 @@ register_bitfields![u32,
         DeepSleepBESLReject                OFFSET(18) NUMBITS(1) []
     ],
 
-    InEndpointInterruptMask [  // OTG Databook, Table 5-57
+    pub InEndpointInterruptMask [  // OTG Databook, Table 5-57
         TransferCompleted                0,
         EndpointDisabled                 1,
         AhbError                         2,
@@ -212,7 +212,7 @@ register_bitfields![u32,
         // Bits 14-31 reserved
     ],
 
-    OutEndpointInterruptMask [  // OTG Databook, Table 5-58
+    pub OutEndpointInterruptMask [  // OTG Databook, Table 5-58
         TransferCompleted                     0,
         EndpointDisabled                      1,
         AhbError                              2,
@@ -230,7 +230,7 @@ register_bitfields![u32,
         // Bits 15-31 reserved
     ],
 
-    AllEndpointInterrupt [  // OTG Databook Table 5-59
+    pub AllEndpointInterrupt [  // OTG Databook Table 5-59
         IN0    0,
         IN1    1,
         IN2    2,
@@ -265,7 +265,7 @@ register_bitfields![u32,
         OUT15 31
     ],
 
-    EndpointControl [
+    pub EndpointControl [
         MaximumPacketSize                  OFFSET(0)  NUMBITS(11) [],
         NextEndpoint                       OFFSET(11) NUMBITS(4)  [],
         UsbActiveEndpoint                  OFFSET(15) NUMBITS(1)  [],
