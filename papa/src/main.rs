@@ -28,12 +28,14 @@ extern crate cortexm3;
 use capsules::alarm::AlarmDriver;
 use capsules::console;
 use capsules::virtual_alarm::VirtualMuxAlarm;
-use capsules::virtual_uart::{MuxUart, UartDevice};
+use capsules::virtual_uart::UartDevice;
 
 
 use kernel::{Chip, Platform};
 use kernel::capabilities;
+use kernel::common::dynamic_deferred_call::{DynamicDeferredCall, DynamicDeferredCallClientState};
 use kernel::common::RingBuffer;
+use kernel::component::Component;
 use kernel::hil;
 use kernel::hil::entropy::Entropy32;
 use kernel::hil::rng::Rng;
@@ -122,14 +124,16 @@ pub unsafe fn reset_handler() {
 
     let kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
-    let uart_mux = static_init!(
-        MuxUart<'static>,
-        MuxUart::new(
-            &h1::uart::UART0,
-            &mut capsules::virtual_uart::RX_BUF,
-            115200
-        )
+    let dynamic_deferred_call_clients =
+        static_init!([DynamicDeferredCallClientState; 2], Default::default());
+    let dynamic_deferred_caller = static_init!(
+        DynamicDeferredCall,
+        DynamicDeferredCall::new(dynamic_deferred_call_clients)
     );
+    DynamicDeferredCall::set_global_instance(dynamic_deferred_caller);
+
+    let uart_mux = components::console::UartMuxComponent::new(&h1::uart::UART0, 115200, dynamic_deferred_caller)
+        .finalize(());
     hil::uart::Transmit::set_transmit_client(&h1::uart::UART0, uart_mux);
 
     // Configure UART speed
