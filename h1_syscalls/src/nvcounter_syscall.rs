@@ -27,7 +27,8 @@ pub struct AppData {
 }
 
 pub struct NvCounterSyscall<'c, C: NvCounter<'c>> {
-    current_app: core::cell::Cell<usize>,  // max_value() if no op ongoing.
+    op_ongoing: core::cell::Cell<bool>,
+    current_app: core::cell::Cell<usize>,  // AppId::id, if an op is ongoing
     grant: kernel::Grant<AppData>,
     init_failed: core::cell::Cell<bool>,
     nvcounter: &'c C,
@@ -37,7 +38,8 @@ pub struct NvCounterSyscall<'c, C: NvCounter<'c>> {
 impl<'c, C: NvCounter<'c>> NvCounterSyscall<'c, C> {
     pub fn new(nvcounter: &'c C, grant: kernel::Grant<AppData>) -> Self {
         NvCounterSyscall {
-            current_app: core::cell::Cell::new(usize::max_value()),
+            op_ongoing: core::cell::Cell::new(false),
+            current_app: core::cell::Cell::new(0),
             grant,
             init_failed: Default::default(),
             nvcounter,
@@ -78,14 +80,14 @@ impl<'c, C: NvCounter<'c>> NvCounterSyscall<'c, C> {
     // increment. This will also call the callback for app callback_id with the
     // given callback code -- specify an id if usize::max_value() if no callback
     // is necessary.
-    fn do_next_op(&self, callback_id: usize, callback_code: usize) {
+    fn do_next_op(&self, callback_id: Option<usize>, callback_code: usize) {
         use ReturnCode::SuccessWithValue;
         // TODO: Fairness? This seems to be the common approach but it gives
         // priority to lower-numbered apps. Probably not an issue for this
         // particular driver because read_and_increment() shouldn't see much
         // contention.
         self.grant.each(|app_data| {
-            if self.current_app.get() == usize::max_value() &&
+            if !self.op_ongoing.get() &&
                app_data.wants_increment
             {
                 app_data.wants_increment = false;
@@ -93,13 +95,14 @@ impl<'c, C: NvCounter<'c>> NvCounterSyscall<'c, C> {
                     self.nvcounter.read_and_increment()
                 {
                     self.value.set(value);
-                    self.current_app.set(app_data.appid().idx());
+                    self.op_ongoing.set(true);
+                    self.current_app.set(app_data.appid().id());
                 } else if let Some(mut callback) = app_data.callback {
                     callback.schedule(0, 0, 0);
                 }
             }
 
-            if app_data.appid().idx() == callback_id {
+            if Some(app_data.appid().id()) == callback_id {
                 if let Some(mut callback) = app_data.callback {
                     callback.schedule(callback_code, self.value.get(), 0);
                 }
@@ -121,7 +124,7 @@ impl<'c, C: NvCounter<'c>> NvCounterSyscall<'c, C> {
             return result;
         }
         // Currently, idle, so just increment
-        if self.current_app.get() == usize::max_value() {
+        if !self.op_ongoing.get() {
             let increment_result = self.nvcounter.read_and_increment();
             match increment_result {
                 ReturnCode::SuccessWithValue{value} => {
@@ -132,7 +135,8 @@ impl<'c, C: NvCounter<'c>> NvCounterSyscall<'c, C> {
                     return ReturnCode::FAIL;
                 }
             }
-            self.current_app.set(app.idx());
+            self.op_ongoing.set(true);
+            self.current_app.set(app.id());
             ReturnCode::SUCCESS
         } else { // Busy, so mark wants_increment, perform op later
             self.grant.enter(app, |app_data, _| {
@@ -172,7 +176,7 @@ impl<'c, C: NvCounter<'c>> h1::nvcounter::Client for NvCounterSyscall<'c, C> {
         if status == ReturnCode::SUCCESS {
             self.init_failed.set(false);
             self.value.set(0);
-            self.do_next_op(usize::max_value(), 0);
+            self.do_next_op(None, 0);
         } else {
             self.handle_failed_init();
         }
@@ -180,12 +184,12 @@ impl<'c, C: NvCounter<'c>> h1::nvcounter::Client for NvCounterSyscall<'c, C> {
 
     fn increment_done(&self, status: ReturnCode) {
         let callback_app = self.current_app.get();
-        self.current_app.set(usize::max_value());
+        self.op_ongoing.set(false);
         let mut callback_code = 1;
         if status == ReturnCode::SUCCESS {
             self.value.set(self.value.get() + 1);
             callback_code = 2;
         }
-        self.do_next_op(callback_app, callback_code);
+        self.do_next_op(Some(callback_app), callback_code);
     }
 }

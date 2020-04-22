@@ -102,7 +102,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         match self.current_user.get() {
-                                Some(cur) if cur.idx() == caller_id.idx() => {}
+                                Some(cur) if cur == caller_id => {}
                             _ => {
                                 return ReturnCode::EBUSY
                             }
@@ -133,7 +133,7 @@ impl<'a, E: DigestEngine> Driver for DigestDriver<'a, E> {
                 self.apps
                     .enter(caller_id, |app_data, _| {
                         match self.current_user.get() {
-                            Some(cur) if cur.idx() == caller_id.idx() => {}
+                            Some(cur) if cur == caller_id => {}
                             _ => {
                                 return ReturnCode::EBUSY
                             }
