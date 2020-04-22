@@ -83,10 +83,13 @@ pub struct Golf {
     aes: &'static h1_syscalls::aes::AesDriver<'static>,
     rng: &'static capsules::rng::RngDriver<'static>,
     dcrypto: &'static h1_syscalls::dcrypto::DcryptoDriver<'static>,
+    low_level_debug: &'static capsules::low_level_debug::LowLevelDebug<
+        'static,
+        capsules::virtual_uart::UartDevice<'static>
+    >,
     nvcounter: &'static h1_syscalls::nvcounter_syscall::NvCounterSyscall<'static,
         FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>>,
     u2f_usb: &'static h1::usb::driver::U2fSyscallDriver<'static>,
-    uint_printer: h1_syscalls::debug_syscall::UintPrinter,
     personality: &'static h1_syscalls::personality::PersonalitySyscall<'static>,
 }
 
@@ -207,6 +210,24 @@ pub unsafe fn reset_handler() {
 
     // Create virtual device for kernel debug.
     components::debug_writer::DebugWriterComponent::new(uart_mux).finalize(());
+
+    // LowLevelDebug driver
+    static mut LOW_LEVEL_DEBUG_BUF: [u8; capsules::low_level_debug::BUF_LEN] =
+        [0; capsules::low_level_debug::BUF_LEN];
+    let low_level_debug_uart = static_init!(UartDevice, UartDevice::new(uart_mux, false));
+    low_level_debug_uart.setup();
+    let low_level_debug = static_init!(
+        capsules::low_level_debug::LowLevelDebug<
+            'static,
+            capsules::virtual_uart::UartDevice<'static>
+        >,
+        capsules::low_level_debug::LowLevelDebug::new(
+            &mut LOW_LEVEL_DEBUG_BUF,
+            low_level_debug_uart,
+            kernel.create_grant(&grant_cap)
+        )
+    );
+    hil::uart::Transmit::set_transmit_client(low_level_debug_uart, low_level_debug);
 
     //debug!("Booting.");
     let gpio_pins = static_init!(
@@ -404,11 +425,11 @@ pub unsafe fn reset_handler() {
         digest: digest,
         aes: aes,
         dcrypto: dcrypto,
+        low_level_debug,
         nvcounter: nvcounter_syscall,
         rng: rng,
         u2f_usb: u2f,
         personality: personality,
-        uint_printer: h1_syscalls::debug_syscall::UintPrinter::new(),
     };
 
     // Uncomment to initialize NvCounter
@@ -448,11 +469,11 @@ impl Platform for Golf {
             capsules::alarm::DRIVER_NUM                => f(Some(self.timer)),
             capsules::console::DRIVER_NUM              => f(Some(self.console)),
             capsules::gpio::DRIVER_NUM                 => f(Some(self.gpio)),
+            capsules::low_level_debug::DRIVER_NUM      => f(Some(self.low_level_debug)),
             capsules::rng::DRIVER_NUM                  => f(Some(self.rng)),
             h1::usb::driver::DRIVER_NUM                => f(Some(self.u2f_usb)),
             h1_syscalls::aes::DRIVER_NUM               => f(Some(self.aes)),
             h1_syscalls::dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
-            h1_syscalls::debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),
             h1_syscalls::digest::DRIVER_NUM            => f(Some(self.digest)),
             h1_syscalls::nvcounter_syscall::DRIVER_NUM => f(Some(self.nvcounter)),
             h1_syscalls::personality::DRIVER_NUM       => f(Some(self.personality)),
