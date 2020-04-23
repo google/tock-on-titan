@@ -77,10 +77,10 @@ const IMEM_SIZE: usize = 1024;
 
 const RAND_STALL_EN: u32 = 0x1;
 const RAND_STALL_EN_MASK: u32 = !RAND_STALL_EN;
-const RAND_STALL_FREQ_50: u32 = (3 << 1);
-const RAND_STALL_FREQ_1: u32 = (3 << 1);
-const RAND_STALL_FREQ_2: u32 = (3 << 1);
-const RAND_STALL_FREQ_6: u32 = (3 << 1);
+const RAND_STALL_FREQ_50: u32 = 3 << 1;
+const RAND_STALL_FREQ_1: u32 = 3 << 1;
+const RAND_STALL_FREQ_2: u32 = 3 << 1;
+const RAND_STALL_FREQ_6: u32 = 3 << 1;
 const RAND_STALL_FREQ_MASK: u32 = !(0x3 << 1);
 
 #[derive(Copy, Clone, Debug, PartialEq)]

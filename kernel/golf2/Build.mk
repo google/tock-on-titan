@@ -13,7 +13,7 @@
 # limitations under the License.
 
 .PHONY: golf2/build
-golf2/build: golf2/target/thumbv7m-none-eabi/release/golf2
+golf2/build: build/kernel/cargo/release/golf2
 
 .PHONY: golf2/check
 golf2/check:
@@ -35,6 +35,6 @@ golf2/doc:
 golf2/localtests:
 
 
-.PHONY: golf2/target/thumbv7m-none-eabi/release/golf2
-golf2/target/thumbv7m-none-eabi/release/golf2:
-	$(MAKE) -C golf2 -f TockMakefile target/thumbv7m-none-eabi/release/golf2
+.PHONY: build/kernel/cargo/release/golf2
+build/kernel/cargo/release/golf2:
+	cd golf2 && cargo build --release

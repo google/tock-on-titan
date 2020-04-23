@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ use capsules::virtual_uart::UartDevice;
 use kernel::{Chip, Platform};
 use kernel::capabilities;
 use kernel::common::dynamic_deferred_call::{DynamicDeferredCall, DynamicDeferredCallClientState};
-use kernel::common::RingBuffer;
 use kernel::component::Component;
 use kernel::hil;
 use kernel::hil::entropy::Entropy32;
@@ -45,7 +44,6 @@ use h1::crypto::dcrypto::Dcrypto;
 use h1::hil::flash::Flash;
 use h1::nvcounter::{FlashCounter,NvCounter};
 use h1::timels::Timels;
-use h1::usb::{Descriptor, StringDescriptor};
 
 // State for loading apps
 const NUM_PROCS: usize = 1;
@@ -75,7 +73,7 @@ static mut PROCESSES: [Option<&'static dyn kernel::procs::ProcessType>; NUM_PROC
 #[link_section = ".stack_buffer"]
 pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 
-pub struct Golf {
+pub struct Papa {
     console: &'static capsules::console::Console<'static>,
     gpio: &'static capsules::gpio::GPIO<'static>,
     timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, Timels>>,
@@ -86,51 +84,9 @@ pub struct Golf {
     dcrypto: &'static h1_syscalls::dcrypto::DcryptoDriver<'static>,
     nvcounter: &'static h1_syscalls::nvcounter_syscall::NvCounterSyscall<'static,
         FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>>,
-    u2f_usb: &'static h1::usb::driver::U2fSyscallDriver<'static>,
     uint_printer: h1_syscalls::debug_syscall::UintPrinter,
     personality: &'static h1_syscalls::personality::PersonalitySyscall<'static>,
 }
-
-static mut STRINGS: [StringDescriptor; 7] = [
-    StringDescriptor {
-        b_length: 4,
-        b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0409], // English
-    },
-    StringDescriptor {
-        b_length: 24,
-        b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0047, 0x006f, 0x006f, 0x0067, 0x006c, 0x0065, 0x0020, 0x0049, 0x006e, 0x0063, 0x002e], // Google Inc.
-    },
-    StringDescriptor {
-        b_length: 14,
-        b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0070, 0x0072, 0x006f, 0x0074, 0x006f, 0x0032], // proto2
-    },
-    StringDescriptor {
-        b_length: 54,
-        b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0070, 0x0072, 0x006F, 0x0074, 0x006F, 0x0032, 0x005F, 0x0076, 0x0031, 0x002E, 0x0031, 0x002E, 0x0038, 0x0037, 0x0031, 0x0033, 0x002D, 0x0030, 0x0031, 0x0033, 0x0032, 0x0031, 0x0037, 0x0064, 0x0039, 0x0031], // proto2-...
-    },
-    // Why does this need 3 l (0x6C)? Linux seems to be truncating last one.
-    // Verified GetDescriptor for the String is returning complete information.
-    // -pal
-    StringDescriptor {
-        b_length: 12,
-        b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0053, 0x0068, 0x0065, 0x006C, 0x006C, 0x006C], // Shell
-    },
-    StringDescriptor {
-        b_length: 8,
-        b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0042, 0x004C, 0x0041, 0x0048],  // BLAH
-    },
-    StringDescriptor {
-        b_length: 20,
-        b_descriptor_type: Descriptor::String as u8,
-        b_string: &[0x0048, 0x006F, 0x0074, 0x0065, 0x006C, 0x0020, 0x0055, 0x0032, 0x0046], // Hotel U2F
-    },
-];
 
 #[no_mangle]
 pub unsafe fn reset_handler() {
@@ -155,16 +111,11 @@ pub unsafe fn reset_handler() {
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
         let pinmux = &mut *h1::pinmux::PINMUX;
         // LED_0
-        pinmux.dioa11.select.set(h1::pinmux::Function::Gpio0Gpio0);
+        pinmux.diob2.select.set(h1::pinmux::Function::Gpio0Gpio0);
 
-        // SW1
-        pinmux.gpio0_gpio1.select.set(h1::pinmux::SelectablePin::Diom2);
-        pinmux.diom2.select.set(h1::pinmux::Function::Gpio0Gpio1);
-        pinmux.diom2.control.set(1 << 2 | 1 << 4);
-
-        pinmux.diob1.select.set(h1::pinmux::Function::Uart0Tx);
-        pinmux.diob6.control.set(1 << 2 | 1 << 4);
-        pinmux.uart0_rx.select.set(h1::pinmux::SelectablePin::Diob6);
+        pinmux.dioa0.select.set(h1::pinmux::Function::Uart0Tx);
+        pinmux.diom0.control.set(1 << 2 | 1 << 4);
+        pinmux.uart0_rx.select.set(h1::pinmux::SelectablePin::Diom0);
     }
 
     // Create capabilities that the board needs to call certain protected kernel
@@ -211,8 +162,8 @@ pub unsafe fn reset_handler() {
 
     //debug!("Booting.");
     let gpio_pins = static_init!(
-        [&'static dyn kernel::hil::gpio::InterruptValuePin; 2],
-        [&h1::gpio::PORT0.pins[0], &h1::gpio::PORT0.pins[1]]);
+        [&'static dyn kernel::hil::gpio::InterruptValuePin; 1],
+        [&h1::gpio::PORT0.pins[0]]);
 
     let gpio = static_init!(
         capsules::gpio::GPIO<'static>,
@@ -284,11 +235,6 @@ pub unsafe fn reset_handler() {
             FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>>,
         h1_syscalls::nvcounter_syscall::NvCounterSyscall::new(nvcounter, kernel.create_grant(&grant_cap)));
     nvcounter.set_client(nvcounter_syscall);
-
-    let u2f = static_init!(
-        h1::usb::driver::U2fSyscallDriver<'static>,
-        h1::usb::driver::U2fSyscallDriver::new(&mut h1::usb::USB0, kernel.create_grant(&grant_cap)));
-    h1::usb::u2f::UsbHidU2f::set_u2f_client(&h1::usb::USB0, u2f);
 
 
     h1::trng::TRNG0.init();
@@ -383,21 +329,7 @@ pub unsafe fn reset_handler() {
     println!("Tock: booted in {} tics; initializing USB and loading processes.",
              end.wrapping_sub(start));
 
-    h1::usb::USB0.init(&mut h1::usb::EP0_OUT_DESCRIPTORS,
-                       &mut h1::usb::EP0_OUT_BUFFERS,
-                       &mut h1::usb::EP0_IN_DESCRIPTORS,
-                       &mut h1::usb::EP0_IN_BUFFER,
-                       &mut h1::usb::EP1_OUT_DESCRIPTOR,
-                       &mut h1::usb::EP1_OUT_BUFFER,
-                       &mut h1::usb::EP1_IN_DESCRIPTOR,
-                       &mut h1::usb::EP1_IN_BUFFER,
-                       &mut h1::usb::CONFIGURATION_BUFFER,
-                       h1::usb::PHY::A,
-                       None,
-                       Some(0x18d1),  // Google vendor ID
-                       Some(0x5026),  // proto2
-                       &mut STRINGS);
-    let golf2 = Golf {
+    let papa = Papa {
         console: console,
         gpio: gpio,
         timer: timer,
@@ -407,7 +339,6 @@ pub unsafe fn reset_handler() {
         dcrypto: dcrypto,
         nvcounter: nvcounter_syscall,
         rng: rng,
-        u2f_usb: u2f,
         personality: personality,
         uint_printer: h1_syscalls::debug_syscall::UintPrinter::new(),
     };
@@ -433,13 +364,15 @@ pub unsafe fn reset_handler() {
         &mut PROCESSES,
         FAULT_RESPONSE,
         &process_mgmt_cap,
-    );
+    ).unwrap_or_else(|err| {
+        debug!("Error loading processes!\n{:?}", err);
+    });
     debug!("Tock: starting main loop.");
     debug!(" ");
-    kernel.kernel_loop(&golf2, chip, Some(&golf2.ipc), &main_cap);
+    kernel.kernel_loop(&papa, chip, Some(&papa.ipc), &main_cap);
 }
 
-impl Platform for Golf {
+impl Platform for Papa {
     fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
         where F: FnOnce(Option<&dyn kernel::Driver>) -> R
     {
@@ -448,7 +381,6 @@ impl Platform for Golf {
             capsules::console::DRIVER_NUM              => f(Some(self.console)),
             capsules::gpio::DRIVER_NUM                 => f(Some(self.gpio)),
             capsules::rng::DRIVER_NUM                  => f(Some(self.rng)),
-            h1::usb::driver::DRIVER_NUM                => f(Some(self.u2f_usb)),
             h1_syscalls::aes::DRIVER_NUM               => f(Some(self.aes)),
             h1_syscalls::dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
             h1_syscalls::debug_syscall::DRIVER_NUM     => f(Some(&self.uint_printer)),

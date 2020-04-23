@@ -1,4 +1,4 @@
-# Copyright 2018 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[package]
-name = "flash_test"
-version = "0.1.0"
-authors = ["jrvanwhy <jrvanwhy@google.com>"]
-edition = "2018"
-publish = false
+.PHONY: kernel/build
+kernel/build:
+	cd kernel && cargo build --release
 
-[dependencies]
-h1 = { features = ["test"], path = "../../kernel/h1" }
-kernel = { path = "../../third_party/tock/kernel" }
-libtock = { path = "../../third_party/libtock-rs" }
+.PHONY: kernel/check
+kernel/check:
+	cd kernel && cargo check --release
 
-[dev-dependencies]
-test = { path = "../test_harness" }
+.PHONY: kernel/clean
+kernel/clean:
+	rm -f kernel/Cargo.lock
+
+.PHONY: kernel/devicetests
+kernel/devicetests:
+
+.PHONY: kernel/doc
+kernel/doc:
+	cd kernel && cargo doc --release
+
+.PHONY: kernel/localtests
+kernel/localtests:

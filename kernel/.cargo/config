@@ -12,29 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[package]
-name = "papa"
-version = "0.1.0"
-authors = ["Oskar Senft <osk@google.com>"]
-build = "build.rs"
-edition = "2018"
+[build]
+target = "thumbv7m-none-eabi"
+target-dir = "../build/kernel/cargo"
 
-[profile.dev]
-panic = "abort"
-lto = false
-opt-level = "z"
-debug = true
-
-[profile.release]
-panic = "abort"
-lto = true
-opt-level = "z"
-debug = true
-
-[dependencies]
-capsules = { path = "../third_party/tock/capsules" }
-components = { path = "../third_party/tock/boards/components" }
-kernel = { path = "../third_party/tock/kernel" }
-cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
-h1 = { path = "../h1" }
-h1_syscalls = { path = "../h1_syscalls" }
+[target.thumbv7m-none-eabi]
+rustflags = ["-C", "link-arg=-T./layout.ld"]

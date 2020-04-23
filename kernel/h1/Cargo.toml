@@ -13,28 +13,18 @@
 # limitations under the License.
 
 [package]
-name = "golf2"
+name = "h1"
 version = "0.1.0"
-authors = ["Philip Levis <plevis@google.com>"]
-build = "build.rs"
+authors = ["Amit Levy <amit@amitlevy.com>"]
 edition = "2018"
 
-[profile.dev]
-panic = "abort"
-lto = false
-opt-level = "z"
-debug = true
-
-[profile.release]
-panic = "abort"
-lto = true
-opt-level = "z"
-debug = true
+build = "build.rs"
 
 [dependencies]
-capsules = { path = "../third_party/tock/capsules" }
-components = { path = "../third_party/tock/boards/components" }
-kernel = { path = "../third_party/tock/kernel" }
-cortexm3 = { path = "../third_party/tock/arch/cortex-m3" }
-h1 = { path = "../h1" }
-h1_syscalls = { path = "../h1_syscalls" }
+kernel = { path = "../../third_party/tock/kernel" }
+cortexm3 = { path = "../../third_party/tock/arch/cortex-m3" }
+
+[features]
+# Exports testing-specific features for use by h1_tests. Should not be enabled
+# when compiled for the kernel.
+test = []

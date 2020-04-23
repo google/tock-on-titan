@@ -52,7 +52,7 @@ impl<F: Flash<'static> + 'static> FlashTest<F> {
     const TEST_PAGE: usize = 255;
     const TEST_WORD: usize = 512 * Self::TEST_PAGE;
 
-
+    #[allow(unused)]
     pub fn new(driver: &'static F) -> Self {
         FlashTest { driver, state: ::core::cell::Cell::new(None) }
     }

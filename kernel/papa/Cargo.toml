@@ -13,11 +13,16 @@
 # limitations under the License.
 
 [package]
-name = "h1_syscalls"
+name = "papa"
 version = "0.1.0"
-authors = ["Philip Levis <plevis@google.com>", "Oskar Senft <osk@google.com"]
+authors = ["Oskar Senft <osk@google.com>"]
+build = "build.rs"
 edition = "2018"
 
 [dependencies]
-kernel = { path = "../third_party/tock/kernel" }
+capsules = { path = "../../third_party/tock/capsules" }
+components = { path = "../../third_party/tock/boards/components" }
+kernel = { path = "../../third_party/tock/kernel" }
+cortexm3 = { path = "../../third_party/tock/arch/cortex-m3" }
 h1 = { path = "../h1" }
+h1_syscalls = { path = "../h1_syscalls" }

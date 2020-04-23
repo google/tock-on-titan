@@ -125,9 +125,9 @@ build/userspace/$(APP)/$(BOARD)/cortex-m3/cortex-m3.tbf: \
 
 build/userspace/$(APP)/$(BOARD)/full_image: \
 		build/userspace/$(APP)/$(BOARD)/cortex-m3/cortex-m3.tbf \
-		$(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD)
+		kernel/build
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp $(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) \
+	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
 	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
@@ -261,9 +261,9 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 
 build/userspace/$(APP)/$(BOARD)/full_image: \
 		build/userspace/$(APP)/$(BOARD)/app.tbf \
-		$(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) ;
+		kernel/build
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp $(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) \
+	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
 	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
@@ -405,9 +405,9 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 
 build/userspace/$(APP)/$(BOARD)/full_image: \
 		build/userspace/$(APP)/$(BOARD)/app.tbf \
-		$(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) ;
+		kernel/build
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp $(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) \
+	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
 	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
