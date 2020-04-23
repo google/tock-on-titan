@@ -12,17 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[package]
-name = "flash_test"
-version = "0.1.0"
-authors = ["jrvanwhy <jrvanwhy@google.com>"]
-edition = "2018"
-publish = false
+.PHONY: golf2/build
+golf2/build: build/kernel/cargo/release/golf2
 
-[dependencies]
-h1 = { features = ["test"], path = "../../kernel/h1" }
-kernel = { path = "../../third_party/tock/kernel" }
-libtock = { path = "../../third_party/libtock-rs" }
+.PHONY: golf2/check
+golf2/check:
+	$(MAKE) -C golf2 -f TockMakefile check
 
-[dev-dependencies]
-test = { path = "../test_harness" }
+.PHONY: golf2/clean
+golf2/clean:
+	$(MAKE) -C golf2 -f TockMakefile clean
+	rm -f golf2/Cargo.lock
+
+.PHONY: golf2/devicetests
+golf2/devicetests:
+
+.PHONY: golf2/doc
+golf2/doc:
+	$(MAKE) -C golf2 -f TockMakefile doc
+
+.PHONY: golf2/localtests
+golf2/localtests:
+
+
+.PHONY: build/kernel/cargo/release/golf2
+build/kernel/cargo/release/golf2:
+	cd golf2 && cargo build --release

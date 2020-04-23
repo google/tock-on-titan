@@ -74,7 +74,7 @@ pub enum TestType { UnitTest }
 pub fn test_main_static(tests: &[&TestDescAndFn]) {
     use core::fmt::Write;
     let mut console = libtock::console::Console::new();
-    console.write("Starting tests.\n");
+    let _ = console.write("Starting tests.\n");
     let mut overall_success = true;
     for test_case in tests {
         // Skip ignored test cases.

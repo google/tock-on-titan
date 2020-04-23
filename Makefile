@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Subdirectories containing Build.mk files.
-BUILD_SUBDIRS := golf2 papa runner third_party tools userspace
+BUILD_SUBDIRS := kernel runner third_party tools userspace
 
 .PHONY: all
 all: build
@@ -26,7 +26,7 @@ check: $(addsuffix /check,$(BUILD_SUBDIRS))
 
 # No need to recurse into most directories, as rm does that for us.
 .PHONY: clean
-clean: golf2/clean papa/clean userspace/clean
+clean: kernel/clean userspace/clean
 	rm -rf build/
 
 .PHONY: devicetests

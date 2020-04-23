@@ -12,17 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[package]
-name = "flash_test"
-version = "0.1.0"
-authors = ["jrvanwhy <jrvanwhy@google.com>"]
-edition = "2018"
-publish = false
+[profile.dev]
+codegen-units = 1
+incremental = false
+lto = true
+opt-level = "z"
+panic = "abort"
 
-[dependencies]
-h1 = { features = ["test"], path = "../../kernel/h1" }
-kernel = { path = "../../third_party/tock/kernel" }
-libtock = { path = "../../third_party/libtock-rs" }
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+panic = "abort"
 
-[dev-dependencies]
-test = { path = "../test_harness" }
+[workspace]
+members = [
+	"golf2",
+	"h1",
+	"h1_syscalls",
+	"papa",
+]

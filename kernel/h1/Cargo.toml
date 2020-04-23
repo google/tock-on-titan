@@ -13,16 +13,18 @@
 # limitations under the License.
 
 [package]
-name = "flash_test"
+name = "h1"
 version = "0.1.0"
-authors = ["jrvanwhy <jrvanwhy@google.com>"]
+authors = ["Amit Levy <amit@amitlevy.com>"]
 edition = "2018"
-publish = false
+
+build = "build.rs"
 
 [dependencies]
-h1 = { features = ["test"], path = "../../kernel/h1" }
 kernel = { path = "../../third_party/tock/kernel" }
-libtock = { path = "../../third_party/libtock-rs" }
+cortexm3 = { path = "../../third_party/tock/arch/cortex-m3" }
 
-[dev-dependencies]
-test = { path = "../test_harness" }
+[features]
+# Exports testing-specific features for use by h1_tests. Should not be enabled
+# when compiled for the kernel.
+test = []

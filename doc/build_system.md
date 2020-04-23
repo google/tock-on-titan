@@ -56,17 +56,17 @@ top-level `Makefile`, rather than `Build.mk`. They are:
 
 * `all`: These are redirected to `build` by `DirShim.mk` or the top-level
   `Makefile`, so `Build.mk`s don't need to handle it.
-* `clean`: clean is generally done repository-wide. An exception is made for
-  subdirectories that do not use the main `build/` directory, which do need to
-  implement their own `clean`. `golf2/` does this.
+* `clean`: clean is generally done repository-wide by removing the `build/`
+  directory. However, some directories (such as cargo workspaces) have some
+  other cleanup (e.g. removing `Cargo.lock`), and therefore have their own clean
+  targets.
 * `prtest`: This always runs repository-wide, and is implemented by the
   top-level Makefile.
 
 ### Layout of build/
 
 When possible, we build binaries in a directory called `build/` in the root of
-the repository. Currently, only `golf2/` puts its compilation artifacts outside
-`build/`.
+the repository.
 
 `build/` should contain a directory structure that mirrors that of the source
 repository. However, because many of our targets are built by Cargo, which
@@ -87,8 +87,8 @@ build/
         u2f_app/
         libh1/
         ...
-    golf2/
-        cargo/          # Cargo-managed artifacts for the golf2 Tock kernel.
+    kernel/
+        cargo/          # Cargo-managed artifacts for h1 Tock kernels.
                         # Uses tock's toolchain version.
         ...
     third_party/

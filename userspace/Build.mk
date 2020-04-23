@@ -125,9 +125,9 @@ build/userspace/$(APP)/$(BOARD)/cortex-m3/cortex-m3.tbf: \
 
 build/userspace/$(APP)/$(BOARD)/full_image: \
 		build/userspace/$(APP)/$(BOARD)/cortex-m3/cortex-m3.tbf \
-		$(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD)
+		kernel/build
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp $(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) \
+	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
 	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
@@ -249,7 +249,7 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		build/cargo-host/release/elf2tab build/userspace/$(APP)/$(BOARD)/app
 	build/cargo-host/release/elf2tab -n $(APP) \
 		-o build/userspace/$(APP)/$(BOARD)/app_tab \
-		build/userspace/$(APP)/$(BOARD)/app --stack=2048 --app-heap=1024 \
+		build/userspace/$(APP)/$(BOARD)/app --stack=2048 --app-heap=4096 \
 		--kernel-heap=1024 --protected-region-size=64
 	if [ "$$(wc -c <build/userspace/$(APP)/$(BOARD)/app.tbf)" -ge 65536 ]; \
 		then echo "#########################################################"; \
@@ -261,9 +261,9 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 
 build/userspace/$(APP)/$(BOARD)/full_image: \
 		build/userspace/$(APP)/$(BOARD)/app.tbf \
-		$(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) ;
+		kernel/build
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp $(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) \
+	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
 	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
@@ -393,7 +393,7 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		build/cargo-host/release/elf2tab build/userspace/$(APP)/$(BOARD)/app
 	build/cargo-host/release/elf2tab -n $(APP) \
 		-o build/userspace/$(APP)/$(BOARD)/app_tab \
-		build/userspace/$(APP)/$(BOARD)/app --stack=2048 --app-heap=1024 \
+		build/userspace/$(APP)/$(BOARD)/app --stack=2048 --app-heap=4096 \
 		--kernel-heap=1024 --protected-region-size=64
 	if [ "$$(wc -c <build/userspace/$(APP)/$(BOARD)/app.tbf)" -ge 65536 ]; \
 		then echo "#########################################################"; \
@@ -405,9 +405,9 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 
 build/userspace/$(APP)/$(BOARD)/full_image: \
 		build/userspace/$(APP)/$(BOARD)/app.tbf \
-		$(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) ;
+		kernel/build
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp $(BOARD)/target/thumbv7m-none-eabi/release/$(BOARD) \
+	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
 	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
