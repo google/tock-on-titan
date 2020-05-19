@@ -21,50 +21,50 @@
 # their target configurations are in different directories.
 
 .PHONY: third_party/build
-third_party/build: build/cargo-host/release/elf2tab
+third_party/build: build/cargo-host/release/elf2tab sandbox_setup
 	cd third_party/libtock-rs && \
 		CARGO_TARGET_DIR="../../build/userspace/cargo" \
-		cargo build --offline --release --target=thumbv7m-none-eabi --examples
+		$(BWRAP) cargo build --offline --release --target=thumbv7m-none-eabi --examples
 
 .PHONY: third_party/check
-third_party/check: cargo_version_check
+third_party/check: cargo_version_check sandbox_setup
 	cd third_party/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
-		cargo check --frozen --release
+		$(BWRAP) cargo check --frozen --release
 	cd third_party/libtock-rs && \
 		CARGO_TARGET_DIR="../../build/userspace/cargo" \
-		cargo check --offline --release --target=thumbv7m-none-eabi --examples
+		$(BWRAP) cargo check --offline --release --target=thumbv7m-none-eabi --examples
 	cd third_party/rustc-demangle && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
-		cargo check --offline --release
+		$(BWRAP) cargo check --offline --release
 
 .PHONY: third_party/devicetests
 third_party/devicetests:
 
 .PHONY: third_party/doc
-third_party/doc: cargo_version_check
+third_party/doc: cargo_version_check sandbox_setup
 	cd third_party/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
-		cargo doc --frozen --release
+		$(BWRAP) cargo doc --frozen --release
 	cd third_party/rustc-demangle && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
-		cargo doc --offline --release
+		$(BWRAP) cargo doc --offline --release
 
 .PHONY: third_party/localtests
-third_party/localtests: cargo_version_check
+third_party/localtests: cargo_version_check sandbox_setup
 	cd third_party/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
-		cargo test --frozen --release
+		$(BWRAP) cargo test --frozen --release
 	cd third_party/libtock-rs && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
-		cargo test --lib --offline --release
+		$(BWRAP) cargo test --lib --offline --release
 	cd third_party/rustc-demangle && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
-		cargo test --offline --release
+		$(BWRAP) cargo test --offline --release
 
 
 .PHONY: build/cargo-host/release/elf2tab
-build/cargo-host/release/elf2tab: cargo_version_check
+build/cargo-host/release/elf2tab: cargo_version_check sandbox_setup
 	cd third_party/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
-		cargo build --frozen --release
+		$(BWRAP) cargo build --frozen --release
