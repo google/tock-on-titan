@@ -22,7 +22,6 @@ pub mod digest;
 pub mod aes;
 pub mod dcrypto;
 pub mod dcrypto_test;
-pub mod debug_syscall;
 pub mod nvcounter_syscall;
 pub mod personality;
 
