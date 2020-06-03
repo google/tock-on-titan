@@ -40,8 +40,8 @@ TANGO_BOARD_FOR_TEST ?= golf2
 userspace/build: $(addsuffix /build,$(BUILD_SUBDIRS))
 
 .PHONY: userspace/check
-userspace/check:
-	cd userspace && TOCK_KERNEL_VERSION=h1_tests cargo check --release
+userspace/check: sandbox_setup
+	cd userspace && TOCK_KERNEL_VERSION=h1_tests $(BWRAP) cargo check --release
 
 .PHONY: userspace/clean
 userspace/clean:
@@ -51,8 +51,8 @@ userspace/clean:
 userspace/devicetests: $(addsuffix /devicetests,$(BUILD_SUBDIRS))
 
 .PHONY: userspace/doc
-userspace/doc:
-	cd userspace && TOCK_KERNEL_VERSION=h1 cargo doc --release
+userspace/doc: sandbox_setup
+	cd userspace && TOCK_KERNEL_VERSION=h1 $(BWRAP) cargo doc --release
 
 .PHONY: userspace/localtests
 userspace/localtests: $(addsuffix /localtests,$(BUILD_SUBDIRS))
@@ -118,13 +118,8 @@ userspace/$(APP)/$(BOARD)/run: \
 		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
 		build/cargo-host/release/runner'
 
-.PHONY: build/userspace/$(APP)/$(BOARD)/cortex-m3/cortex-m3.tbf
-build/userspace/$(APP)/$(BOARD)/cortex-m3/cortex-m3.tbf: \
-		build/cargo-host/release/elf2tab
-	$(MAKE) -C userspace/$(APP) -f TockMakefile
-
 build/userspace/$(APP)/$(BOARD)/full_image: \
-		build/userspace/$(APP)/$(BOARD)/cortex-m3/cortex-m3.tbf \
+		build/userspace/$(APP)/cortex-m3/cortex-m3.tbf \
 		kernel/build
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
 	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
@@ -142,9 +137,24 @@ build/userspace/$(APP)/$(BOARD)/full_image: \
 
 endef
 
+# C_APP_TARGET contains build rules that are specific to a C app but not an
+# (APP, BOARD) combination.
+define C_APP_TARGETS
+
+# Because $(MAKE) is expanded inside an outer variable, `make` isn't sure it
+# refers to `make`. Because of that, it won't pass through jobserver arguments.
+# The leading '+' tells it to do so anyway.
+.PHONY: build/userspace/$(APP)/cortex-m3/cortex-m3.tbf
+build/userspace/$(APP)/cortex-m3/cortex-m3.tbf: \
+		build/cargo-host/release/elf2tab
+	+$(BWRAP) $(MAKE) -C userspace/$(APP) -f TockMakefile
+
+endef
+
 # ------------------------------------------------------------------------------
 # Generate the targets for all board-and-app combinations.
 $(foreach BOARD,$(BOARDS),$(foreach APP,$(C_APPS) $(C_APPS_$(BOARD)),$(eval $(C_APP_BOARD_TARGETS))))
+$(foreach APP,$(C_APPS),$(eval $(C_APP_TARGETS)))
 
 
 # ------------------------------------------------------------------------------
@@ -153,7 +163,7 @@ $(foreach BOARD,$(BOARDS),$(foreach APP,$(C_APPS) $(C_APPS_$(BOARD)),$(eval $(C_
 # A combination with a board is valid if the app is in $(C_APPS) or in $(C_APPS_$(BOARD)).
 # Arguments:
 # - $(APP)
-define C_APP_TARGET
+define C_APP_COMBINED_TARGET
 
 # Entry target for an individual app to build app for all boards
 .PHONY: userspace/$(APP)/build
@@ -183,7 +193,7 @@ endef
 
 # ------------------------------------------------------------------------------
 # Generate the targets for all apps combinations.
-$(foreach APP,$(C_APPS) $(foreach BOARD,$(BOARDS),$(C_APPS_$(BOARD))),$(eval $(C_APP_TARGET)))
+$(foreach APP,$(C_APPS) $(foreach BOARD,$(BOARDS),$(C_APPS_$(BOARD))),$(eval $(C_APP_COMBINED_TARGET)))
 
 # ------------------------------------------------------------------------------
 # Build rules shared between Rust app targets. These are not used for Rust test
@@ -205,16 +215,17 @@ userspace/$(APP)/$(BOARD)/build: \
 		build/userspace/$(APP)/$(BOARD)/full_image
 
 .PHONY: userspace/$(APP)/$(BOARD)/check
-userspace/$(APP)/$(BOARD)/check:
-	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) cargo check \
+userspace/$(APP)/$(BOARD)/check: sandbox_setup
+	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo check \
 		--offline --release
 
 .PHONY: userspace/$(APP)/$(BOARD)/devicetests
 userspace/$(APP)/$(BOARD)/devicetests:
 
 .PHONY: userspace/$(APP)/$(BOARD)/doc
-userspace/$(APP)/$(BOARD)/doc:
-	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) cargo doc --offline --release
+userspace/$(APP)/$(BOARD)/doc: sandbox_setup
+	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo doc \
+		--offline --release
 
 .PHONY: userspace/$(APP)/$(BOARD)/localtests
 userspace/$(APP)/$(BOARD)/localtests:
@@ -236,9 +247,10 @@ userspace/$(APP)/$(BOARD)/run: \
 		build/cargo-host/release/runner'
 
 .PHONY: build/userspace/$(APP)/$(BOARD)/app
-build/userspace/$(APP)/$(BOARD)/app:
+build/userspace/$(APP)/$(BOARD)/app: sandbox_setup
 	rm -f build/userspace/cargo/thumbv7m-none-eabi/release/$(APP)-*
-	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) cargo build --offline --release
+	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo build \
+		--offline --release
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
 	cp "build/userspace/cargo/thumbv7m-none-eabi/release/$(APP)" \
 		"build/userspace/$(APP)/$(BOARD)/app"
@@ -340,8 +352,8 @@ userspace/$(APP)/$(BOARD)/build: \
 		build/userspace/$(APP)/$(BOARD)/full_image
 
 .PHONY: userspace/$(APP)/$(BOARD)/check
-userspace/$(APP)/$(BOARD)/check:
-	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) cargo check \
+userspace/$(APP)/$(BOARD)/check: sandbox_setup
+	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo check \
 		--offline --release
 
 .PHONY: userspace/$(APP)/$(BOARD)/devicetests
@@ -355,8 +367,9 @@ userspace/$(APP)/$(BOARD)/devicetests: \
 		build/cargo-host/release/runner --test'
 
 .PHONY: userspace/$(APP)/$(BOARD)/doc
-userspace/$(APP)/$(BOARD)/doc:
-	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) cargo doc --offline --release
+userspace/$(APP)/$(BOARD)/doc: sandbox_setup
+	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo doc \
+		--offline --release
 
 .PHONY: userspace/$(APP)/$(BOARD)/localtests
 userspace/$(APP)/$(BOARD)/localtests:
@@ -378,10 +391,10 @@ userspace/$(APP)/$(BOARD)/run: \
 		build/cargo-host/release/runner'
 
 .PHONY: build/userspace/$(APP)/$(BOARD)/app
-build/userspace/$(APP)/$(BOARD)/app:
+build/userspace/$(APP)/$(BOARD)/app: sandbox_setup
 	rm -f build/userspace/cargo/thumbv7m-none-eabi/release//$(APP)-*
 	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) \
-		cargo test --no-run --offline --release
+		$(BWRAP) cargo test --no-run --offline --release
 	mkdir -p build/userspace/$(APP)/$(BOARD)
 	find build/userspace/cargo/thumbv7m-none-eabi/release/ -maxdepth 1 -regex \
 		'build/userspace/cargo/thumbv7m-none-eabi/release/$(APP)-[^.]+' \

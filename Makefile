@@ -15,6 +15,19 @@
 # Subdirectories containing Build.mk files.
 BUILD_SUBDIRS := kernel runner third_party tools userspace
 
+# Both cargo and Tock's build system like connecting to the internet and
+# installing things during builds. We don't like that. This is a sandbox we can
+# run commands in that denies network access as well as write access outside the
+# build/ directory.
+BWRAP := bwrap                                 \
+         --ro-bind / /                         \
+         --bind "$(PWD)/build" "$(PWD)/build"  \
+         --bind "$(PWD)/kernel/Cargo.lock" "$(PWD)/kernel/Cargo.lock"  \
+         --bind "$(PWD)/userspace/Cargo.lock" "$(PWD)/userspace/Cargo.lock"  \
+         --dev /dev                            \
+         --tmpfs /tmp                          \
+         --unshare-all
+
 .PHONY: all
 all: build
 
@@ -65,5 +78,12 @@ cargo_version_check:
 		     echo "#######################################################################"; \
 		     exit 1; \
 		fi
+
+# A target that sets up directories the bwrap sandbox needs.
+.PHONY: sandbox_setup
+sandbox_setup:
+	mkdir -p build
+	>>kernel/Cargo.lock
+	>>userspace/Cargo.lock
 
 include $(addsuffix /Build.mk,$(BUILD_SUBDIRS))

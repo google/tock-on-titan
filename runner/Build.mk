@@ -16,26 +16,26 @@
 runner/build: build/cargo-host/release/runner
 
 .PHONY: runner/check
-runner/check:
+runner/check: sandbox_setup
 	cd runner && \
-		CARGO_TARGET_DIR="../build/cargo-host" cargo check
+		CARGO_TARGET_DIR="../build/cargo-host" $(BWRAP) cargo check
 
 .PHONY: runner/devicetests
 runner/devicetests:
 
 .PHONY: runner/doc
-runner/doc:
+runner/doc: sandbox_setup
 	cd runner && \
-		CARGO_TARGET_DIR="../build/cargo-host" cargo doc
+		CARGO_TARGET_DIR="../build/cargo-host" $(BWRAP) cargo doc
 
 .PHONY: runner/localtests
-runner/localtests:
+runner/localtests: sandbox_setup
 	cd runner && \
-		CARGO_TARGET_DIR="../build/cargo-host" cargo test
+		CARGO_TARGET_DIR="../build/cargo-host" $(BWRAP) cargo test
 
 
 .PHONY: build/cargo-host/release/runner
-build/cargo-host/release/runner:
+build/cargo-host/release/runner: sandbox_setup
 	cd runner && \
 		CARGO_TARGET_DIR="../build/cargo-host" \
-		cargo build --release
+		$(BWRAP) cargo build --release

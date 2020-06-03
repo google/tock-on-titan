@@ -13,12 +13,12 @@
 # limitations under the License.
 
 .PHONY: kernel/build
-kernel/build:
-	cd kernel && cargo build --release
+kernel/build: sandbox_setup
+	cd kernel && $(BWRAP) cargo build --release
 
 .PHONY: kernel/check
-kernel/check:
-	cd kernel && cargo check --release
+kernel/check: sandbox_setup
+	cd kernel && $(BWRAP) cargo check --release
 
 .PHONY: kernel/clean
 kernel/clean:
@@ -28,8 +28,8 @@ kernel/clean:
 kernel/devicetests:
 
 .PHONY: kernel/doc
-kernel/doc:
-	cd kernel && cargo doc --release
+kernel/doc: sandbox_setup
+	cd kernel && $(BWRAP) cargo doc --release
 
 .PHONY: kernel/localtests
 kernel/localtests:

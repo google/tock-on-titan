@@ -13,20 +13,20 @@
 # limitations under the License.
 
 .PHONY: tools/build
-tools/build: cargo_version_check
-	cd tools && cargo build --offline --release
+tools/build: cargo_version_check sandbox_setup
+	cd tools && $(BWRAP) cargo build --offline --release
 
 .PHONY: tools/check
-tools/check: cargo_version_check
-	cd tools && cargo check --offline --release
+tools/check: cargo_version_check sandbox_setup
+	cd tools && $(BWRAP) cargo check --offline --release
 
 .PHONY: tools/devicetests
 tools/devicetests:
 
 .PHONY: tools/doc
-tools/doc: cargo_version_check
-	cd tools && cargo doc --offline --release
+tools/doc: cargo_version_check sandbox_setup
+	cd tools && $(BWRAP) cargo doc --offline --release
 
 .PHONY: tools/localtests
-tools/localtests: cargo_version_check
-	cd tools && cargo test --offline --release
+tools/localtests: cargo_version_check sandbox_setup
+	cd tools && $(BWRAP) cargo test --offline --release
