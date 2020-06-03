@@ -19,13 +19,16 @@ BUILD_SUBDIRS := kernel runner third_party tools userspace
 # installing things during builds. We don't like that. This is a sandbox we can
 # run commands in that denies network access as well as write access outside the
 # build/ directory.
-BWRAP := bwrap                                 \
-         --ro-bind / /                         \
-         --bind "$(PWD)/build" "$(PWD)/build"  \
-         --bind "$(PWD)/kernel/Cargo.lock" "$(PWD)/kernel/Cargo.lock"  \
-         --bind "$(PWD)/userspace/Cargo.lock" "$(PWD)/userspace/Cargo.lock"  \
-         --dev /dev                            \
-         --tmpfs /tmp                          \
+BWRAP := bwrap                                                               \
+         --ro-bind / /                                                       \
+         --bind "$(CURDIR)/build" "$(CURDIR)/build"                          \
+         --bind "$(CURDIR)/kernel/Cargo.lock" "$(CURDIR)/kernel/Cargo.lock"  \
+         --bind "$(CURDIR)/userspace/Cargo.lock"                             \
+                "$(CURDIR)/userspace/Cargo.lock"                             \
+         --bind "$(CURDIR)/third_party/libtock-rs/Cargo.lock"                \
+                "$(CURDIR)/third_party/libtock-rs/Cargo.lock"                \
+         --dev /dev                                                          \
+         --tmpfs /tmp                                                        \
          --unshare-all
 
 .PHONY: all
