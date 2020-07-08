@@ -1,0 +1,10 @@
+[package]
+
+name = "spiutils"
+version = "0.1.0"
+authors = [ "Oskar Senft <osk@google.com>" ]
+license = "MIT"
+keywords = ["spi-utils"]
+description = """
+Utilities for SPI
+"""
