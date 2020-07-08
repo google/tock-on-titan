@@ -23,6 +23,7 @@ build = "build.rs"
 [dependencies]
 kernel = { path = "../../third_party/tock/kernel" }
 cortexm3 = { path = "../../third_party/tock/arch/cortex-m3" }
+spiutils = { path = "../../shared-lib/spiutils" }
 
 [features]
 # Exports testing-specific features for use by h1_tests. Should not be enabled
