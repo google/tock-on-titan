@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+.PHONY: all
+all: build
+
 # Subdirectories containing Build.mk files.
 BUILD_SUBDIRS := kernel runner third_party tools userspace
 
@@ -23,16 +26,25 @@ BWRAP := bwrap                                                               \
          --ro-bind / /                                                       \
          --bind "$(CURDIR)/build" "$(CURDIR)/build"                          \
          --bind "$(CURDIR)/kernel/Cargo.lock" "$(CURDIR)/kernel/Cargo.lock"  \
-         --bind "$(CURDIR)/userspace/Cargo.lock"                             \
-                "$(CURDIR)/userspace/Cargo.lock"                             \
+         --bind "$(CURDIR)/runner/Cargo.lock" "$(CURDIR)/runner/Cargo.lock"  \
          --bind "$(CURDIR)/third_party/libtock-rs/Cargo.lock"                \
                 "$(CURDIR)/third_party/libtock-rs/Cargo.lock"                \
+         --bind "$(CURDIR)/tools/Cargo.lock" "$(CURDIR)/tools/Cargo.lock"    \
+         --bind "$(CURDIR)/userspace/Cargo.lock"                             \
+                "$(CURDIR)/userspace/Cargo.lock"                             \
          --dev /dev                                                          \
          --tmpfs /tmp                                                        \
          --unshare-all
 
-.PHONY: all
-all: build
+# A target that sets up directories the bwrap sandbox needs.
+.PHONY: sandbox_setup
+sandbox_setup:
+	mkdir -p build
+	>>kernel/Cargo.lock
+	>>runner/Cargo.lock
+	>>third_party/libtock-rs/Cargo.lock
+	>>tools/Cargo.lock
+	>>userspace/Cargo.lock
 
 .PHONY: build
 build: $(addsuffix /build,$(BUILD_SUBDIRS))
@@ -43,6 +55,9 @@ check: $(addsuffix /check,$(BUILD_SUBDIRS))
 # No need to recurse into most directories, as rm does that for us.
 .PHONY: clean
 clean: kernel/clean userspace/clean
+	rm -f runner/Cargo.lock
+	rm -f third_party/libtock-rs/Cargo.lock
+	rm -f tools/Cargo.lock
 	rm -rf build/
 
 .PHONY: devicetests
@@ -81,12 +96,5 @@ cargo_version_check:
 		     echo "#######################################################################"; \
 		     exit 1; \
 		fi
-
-# A target that sets up directories the bwrap sandbox needs.
-.PHONY: sandbox_setup
-sandbox_setup:
-	mkdir -p build
-	>>kernel/Cargo.lock
-	>>userspace/Cargo.lock
 
 include $(addsuffix /Build.mk,$(BUILD_SUBDIRS))
