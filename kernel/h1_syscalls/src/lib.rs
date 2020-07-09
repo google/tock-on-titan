@@ -24,6 +24,8 @@ pub mod dcrypto;
 pub mod dcrypto_test;
 pub mod nvcounter_syscall;
 pub mod personality;
+pub mod spi_host;
+pub mod spi_device;
 
 pub unsafe fn init() {
 }
