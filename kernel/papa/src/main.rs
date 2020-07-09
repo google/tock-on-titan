@@ -28,7 +28,10 @@ extern crate cortexm3;
 use capsules::alarm::AlarmDriver;
 use capsules::console;
 use capsules::virtual_alarm::VirtualMuxAlarm;
+use capsules::virtual_spi::{MuxSpiMaster, VirtualSpiMasterDevice};
 use capsules::virtual_uart::UartDevice;
+
+use components::spi::SpiSyscallComponent;
 
 
 use kernel::{Chip, Platform};
@@ -42,6 +45,7 @@ use kernel::mpu::MPU;
 
 use h1::crypto::dcrypto::Dcrypto;
 use h1::hil::flash::Flash;
+use h1::hil::spi_device::SpiDevice;
 use h1::nvcounter::{FlashCounter,NvCounter};
 use h1::timels::Timels;
 
@@ -81,6 +85,9 @@ pub struct Papa {
     digest: &'static h1_syscalls::digest::DigestDriver<'static, h1::crypto::sha::ShaEngine>,
     aes: &'static h1_syscalls::aes::AesDriver<'static>,
     rng: &'static capsules::rng::RngDriver<'static>,
+    h1_spi_host_syscalls: &'static h1_syscalls::spi_host::SpiHostSyscall<'static>,
+    h1_spi_device_syscalls: &'static h1_syscalls::spi_device::SpiDeviceSyscall<'static>,
+    spi_host_syscalls: &'static capsules::spi::Spi<'static, VirtualSpiMasterDevice<'static, h1::spi_host::SpiHostHardware>>,
     dcrypto: &'static h1_syscalls::dcrypto::DcryptoDriver<'static>,
     low_level_debug: &'static capsules::low_level_debug::LowLevelDebug<
         'static,
@@ -119,6 +126,14 @@ pub unsafe fn reset_handler() {
         pinmux.dioa0.select.set(h1::pinmux::Function::Uart0Tx);
         pinmux.diom0.control.set(1 << 2 | 1 << 4);
         pinmux.uart0_rx.select.set(h1::pinmux::SelectablePin::Diom0);
+
+        // SPI MISO: input enable + pull-up enable
+        pinmux.dioa11.control.set(1 << 2 | 1 << 4);
+
+        // SPS CLK, CS, MOSI: input enable + pull-up enable
+        pinmux.dioa6.control.set(1 << 2 | 1 << 4);
+        pinmux.dioa12.control.set(1 << 2 | 1 << 4);
+        pinmux.dioa2.control.set(1 << 2 | 1 << 4);
     }
 
     // Create capabilities that the board needs to call certain protected kernel
@@ -284,6 +299,24 @@ pub unsafe fn reset_handler() {
     h1::personality::PERSONALITY.set_client(personality);
     flash_user.set_client(&h1::personality::PERSONALITY);
 
+    h1::spi_host::SPI_HOST0.init();
+    let h1_spi_host_syscalls = static_init!(
+        h1_syscalls::spi_host::SpiHostSyscall<'static>,
+        h1_syscalls::spi_host::SpiHostSyscall::new(&h1::spi_host::SPI_HOST0, kernel.create_grant(&grant_cap))
+    );
+    let spi_host_mux = components::spi::SpiMuxComponent::new(&h1::spi_host::SPI_HOST0)
+        .finalize(components::spi_mux_component_helper!(h1::spi_host::SpiHostHardware));
+    let spi_host_syscalls = SpiSyscallComponent::new(spi_host_mux, false)
+        .finalize(components::spi_syscall_component_helper!(h1::spi_host::SpiHostHardware));
+
+    h1::spi_device::SPI_DEVICE0.init();
+    let h1_spi_device_syscalls = static_init!(
+        h1_syscalls::spi_device::SpiDeviceSyscall<'static>,
+        h1_syscalls::spi_device::SpiDeviceSyscall::new(&h1::spi_device::SPI_DEVICE0, kernel.create_grant(&grant_cap))
+    );
+    h1::spi_device::SPI_DEVICE0.set_client(Some(h1_spi_device_syscalls));
+
+
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
     {
@@ -361,6 +394,9 @@ pub unsafe fn reset_handler() {
         low_level_debug,
         nvcounter: nvcounter_syscall,
         rng: rng,
+        spi_host_syscalls: spi_host_syscalls,
+        h1_spi_host_syscalls: h1_spi_host_syscalls,
+        h1_spi_device_syscalls: h1_spi_device_syscalls,
         personality: personality,
     };
 
@@ -388,6 +424,7 @@ pub unsafe fn reset_handler() {
     ).unwrap_or_else(|err| {
         debug!("Error loading processes!\n{:?}", err);
     });
+
     debug!("Tock: starting main loop.");
     debug!(" ");
     kernel.kernel_loop(&papa, chip, Some(&papa.ipc), &main_cap);
@@ -403,6 +440,9 @@ impl Platform for Papa {
             capsules::gpio::DRIVER_NUM                 => f(Some(self.gpio)),
             capsules::low_level_debug::DRIVER_NUM      => f(Some(self.low_level_debug)),
             capsules::rng::DRIVER_NUM                  => f(Some(self.rng)),
+            capsules::spi::DRIVER_NUM                  => f(Some(self.spi_host_syscalls)),
+            h1_syscalls::spi_host::DRIVER_NUM          => f(Some(self.h1_spi_host_syscalls)),
+            h1_syscalls::spi_device::DRIVER_NUM        => f(Some(self.h1_spi_device_syscalls)),
             h1_syscalls::aes::DRIVER_NUM               => f(Some(self.aes)),
             h1_syscalls::dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
             h1_syscalls::digest::DRIVER_NUM            => f(Some(self.digest)),
