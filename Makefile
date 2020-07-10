@@ -29,6 +29,8 @@ BWRAP := bwrap                                                               \
          --bind "$(CURDIR)/runner/Cargo.lock" "$(CURDIR)/runner/Cargo.lock"  \
          --bind "$(CURDIR)/third_party/libtock-rs/Cargo.lock"                \
                 "$(CURDIR)/third_party/libtock-rs/Cargo.lock"                \
+         --bind "$(CURDIR)/third_party/rustc-demangle/Cargo.lock"            \
+                "$(CURDIR)/third_party/rustc-demangle/Cargo.lock"            \
          --bind "$(CURDIR)/tools/Cargo.lock" "$(CURDIR)/tools/Cargo.lock"    \
          --bind "$(CURDIR)/userspace/Cargo.lock"                             \
                 "$(CURDIR)/userspace/Cargo.lock"                             \
@@ -43,6 +45,7 @@ sandbox_setup:
 	>>kernel/Cargo.lock
 	>>runner/Cargo.lock
 	>>third_party/libtock-rs/Cargo.lock
+	>>third_party/rustc-demangle/Cargo.lock
 	>>tools/Cargo.lock
 	>>userspace/Cargo.lock
 
@@ -57,6 +60,7 @@ check: $(addsuffix /check,$(BUILD_SUBDIRS))
 clean: kernel/clean userspace/clean
 	rm -f runner/Cargo.lock
 	rm -f third_party/libtock-rs/Cargo.lock
+	rm -f third_party/rustc-demangle/Cargo.lock
 	rm -f tools/Cargo.lock
 	rm -rf build/
 
