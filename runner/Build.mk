@@ -20,6 +20,10 @@ runner/check: sandbox_setup
 	cd runner && \
 		CARGO_TARGET_DIR="../build/cargo-host" $(BWRAP) cargo check
 
+.PHONY: kernel/clean
+runner/clean:
+	rm -f runner/Cargo.lock
+
 .PHONY: runner/devicetests
 runner/devicetests:
 

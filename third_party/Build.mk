@@ -38,6 +38,11 @@ third_party/check: cargo_version_check sandbox_setup
 		CARGO_TARGET_DIR="../../build/cargo-host" \
 		$(BWRAP) cargo check --offline --release
 
+.PHONY: third_party/clean
+third_party/clean:
+	rm -f third_party/libtock-rs/Cargo.lock
+	rm -f third_party/rustc-demangle/Cargo.lock
+
 .PHONY: third_party/devicetests
 third_party/devicetests:
 

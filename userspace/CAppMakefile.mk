@@ -21,6 +21,9 @@ APP_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))$(APP)
 ELF2TAB := ../../build/cargo-host/release/elf2tab
 TOCK_ARCHS := cortex-m3
 TOCK_USERLAND_BASE_DIR = $(APP_DIR)/../../third_party/libtock-c
+chromiumos-ec_BUILDDIR = $(APP_DIR)/../../build/chromiumos-ec
+libtock_BUILDDIR = $(APP_DIR)/../../build/libtock
+libh1_BUILDDIR = $(APP_DIR)/../../build/libh1
 BUILDDIR ?= $(APP_DIR)/../../build/userspace/$(APP)
 
 C_SRCS   := $(wildcard *.c)
