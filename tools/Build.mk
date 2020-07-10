@@ -20,6 +20,10 @@ tools/build: cargo_version_check sandbox_setup
 tools/check: cargo_version_check sandbox_setup
 	cd tools && $(BWRAP) cargo check --offline --release
 
+.PHONY: tools/clean
+tools/clean:
+	rm -f tools/Cargo.lock
+
 .PHONY: tools/devicetests
 tools/devicetests:
 

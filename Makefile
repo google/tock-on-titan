@@ -57,11 +57,7 @@ check: $(addsuffix /check,$(BUILD_SUBDIRS))
 
 # No need to recurse into most directories, as rm does that for us.
 .PHONY: clean
-clean: kernel/clean userspace/clean
-	rm -f runner/Cargo.lock
-	rm -f third_party/libtock-rs/Cargo.lock
-	rm -f third_party/rustc-demangle/Cargo.lock
-	rm -f tools/Cargo.lock
+clean: kernel/clean runner/clean third_party/clean tools/clean userspace/clean
 	rm -rf build/
 
 .PHONY: devicetests
