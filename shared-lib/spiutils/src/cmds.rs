@@ -5,7 +5,12 @@ pub enum OpCodes {
     /// No operation
     Nop = 0x00,
 
+    ////////////////////////////////////////////////////////////
+    // Status commands
 
+    /// Returns contents of eeprom_status register.
+    /// Implemented in hardware.
+    ReadStatusRegister = 0x05,
 
     /// Disables writes to device, sets WEL = 0 in hardware.
     WriteDisable = 0x04,
@@ -19,7 +24,8 @@ pub enum OpCodes {
     /// Resumes write. Software should set WSP or WSE = 0.
     WriteResume = 0x30,
 
-
+    ////////////////////////////////////////////////////////////
+    // Erase and program commands
 
     /// Clears bits of a particular 4KB sector to '1'.
     /// Must be implemented in software. HW sets BUSY bit.
@@ -44,7 +50,8 @@ pub enum OpCodes {
     /// Must be implemented in software. HW sets BUSY bit.
     PageProgram = 0x02,
 
-
+    ////////////////////////////////////////////////////////////
+    // ID commands
 
     /// Retrieves JEDEC-ID as configured in jedec_id registers.
     /// Implemented in hardware.
@@ -54,11 +61,8 @@ pub enum OpCodes {
     /// Implemented in hardware.
     ReadSfdp = 0x5a,
 
-    /// Returns contents of eeprom_status register.
-    /// Implemented in hardware.
-    ReadStatusRegister = 0x05,
-
-
+    ////////////////////////////////////////////////////////////
+    // Read commands
 
     /// Retrieves data. The behavior of this command depends on the selected
     /// mode.
@@ -75,6 +79,8 @@ pub enum OpCodes {
     /// Similar to FastRead with output on both MISO and MOSI.
     FastReadDualOutput = 0x3b,
 
+    ////////////////////////////////////////////////////////////
+    // Address mode commands
 
     /// Enable 4 byte address mode.
     /// Must be implemented in software.
