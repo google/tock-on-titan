@@ -1,6 +1,5 @@
 /// SPI flash op codes
 #[repr(u8)]
-#[allow(dead_code)]
 pub enum OpCodes {
     /// No operation
     Nop = 0x00,
