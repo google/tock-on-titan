@@ -1,0 +1,8 @@
+[package]
+name = "spiutils"
+version = "0.1.0"
+authors = [ "Oskar Senft <osk@google.com>" ]
+license = "Apache-2.0"
+description = """
+Utilities for SPI
+"""
