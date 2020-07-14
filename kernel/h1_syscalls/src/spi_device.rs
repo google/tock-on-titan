@@ -30,11 +30,11 @@ impl<'a> SpiDeviceSyscall<'a> {
     fn send_data(&self, caller_id: AppId, clear_busy: bool) -> ReturnCode {
         self.apps.enter(caller_id, |app_data, _| {
             if let Some(ref tx_buffer) = app_data.tx_buffer {
-                debug!("send_data: clear_busy={:?}", clear_busy);
+                //debug!("send_data: clear_busy={:?}", clear_busy);
                 let return_code = self.device.put_send_data(tx_buffer.as_ref());
                 if isize::from(return_code) < 0 { return return_code; }
 
-                self.device.clear_busy();
+                if clear_busy { self.device.clear_busy(); }
                 return ReturnCode::SUCCESS;
             }
 
@@ -44,7 +44,7 @@ impl<'a> SpiDeviceSyscall<'a> {
 
     fn clear_busy(&self, caller_id: AppId) -> ReturnCode {
         self.apps.enter(caller_id, |_app_data, _| {
-            debug!("clear_busy");
+            //debug!("clear_busy");
             self.device.clear_busy();
 
             ReturnCode::SUCCESS
@@ -54,14 +54,15 @@ impl<'a> SpiDeviceSyscall<'a> {
 
 impl<'a> SpiDeviceClient for SpiDeviceSyscall<'a> {
     fn data_available(&self, is_busy: bool) {
-        debug!("data_available");
+        //debug!("data_available");
         self.current_user.get().map(|current_user| {
             let _ = self.apps.enter(current_user, move |app_data, _| {
                 let mut rx_len = 0;
                 if let Some(ref mut rx_buffer) = app_data.rx_buffer {
                     rx_len = self.device.get_received_data(rx_buffer.as_mut());
                 }
-                app_data.data_received_callback.map(|mut cb| cb.schedule(rx_len, usize::from(is_busy), 0));
+                app_data.data_received_callback.map(
+                    |mut cb| cb.schedule(rx_len, usize::from(is_busy), 0));
             });
         });
     }
@@ -73,7 +74,8 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
                  callback: Option<Callback>,
                  app_id: AppId,
     ) -> ReturnCode {
-        debug!("subscribe: num={}, callback={}", subscribe_num, if callback.is_some() { "Some" } else { "None" });
+        //debug!("subscribe: num={}, callback={}",
+        //    subscribe_num, if callback.is_some() { "Some" } else { "None" });
         match subscribe_num {
             0 => { // Data received
                 self.apps.enter(app_id, |app_data, _| {
@@ -86,7 +88,7 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
     }
 
     fn command(&self, command_num: usize, arg1: usize, _: usize, caller_id: AppId) -> ReturnCode {
-        debug!("command: num={}", command_num);
+        //debug!("command: num={}", command_num);
         if self.current_user.get() == None {
             self.current_user.set(Some(caller_id));
         }
@@ -108,7 +110,8 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
              minor_num: usize,
              slice: Option<AppSlice<Shared, u8>>
     ) -> ReturnCode {
-        debug!("allow: num={}, slice={}", minor_num, if slice.is_some() { "Some" } else { "None" });
+        //debug!("allow: num={}, slice={}",
+        //    minor_num, if slice.is_some() { "Some" } else { "None" });
         match minor_num {
                 0 => {
                     // TX Buffer

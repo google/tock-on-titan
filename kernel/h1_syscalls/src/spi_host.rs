@@ -43,7 +43,8 @@ impl<'a> Driver for SpiHostSyscall<'a> {
         }
     }
 
-    fn command(&self, command_num: usize, arg1: usize, _arg2: usize, caller_id: AppId) -> ReturnCode {
+    fn command(&self, command_num: usize, arg1: usize, _arg2: usize, caller_id: AppId)
+        -> ReturnCode {
         if self.current_user.get() == None {
             self.current_user.set(Some(caller_id));
         }

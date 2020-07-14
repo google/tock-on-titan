@@ -7,7 +7,8 @@ use kernel::common::StaticRef;
 use kernel::hil::spi::{ClockPolarity, ClockPhase, SpiMaster, SpiMasterClient};
 use kernel::ReturnCode;
 
-// The TX and RX FIFOs both have the same length. We write and read at the same time.
+// The TX and RX FIFOs both have the same length. We write and read at the same
+// time.
 
 // Registers for the SPI host controller
 register_structs! {
@@ -32,29 +33,40 @@ register_bitfields![u32,
         CPHA OFFSET(1) NUMBITS(1) [],
         /// CSB to SCK setup time in SCK cycles + 1.5
         CSBSU OFFSET(2) NUMBITS(4) [],
-        /// CSB from SCK hold time in SCK cycles + 1 (defined with respect to the last SCK edge)
+        /// CSB from SCK hold time in SCK cycles + 1 (defined with respect to
+        /// the last SCK edge)
         CSBHLD OFFSET(6) NUMBITS(4) [],
-        /// SPI Clk Divider. Actual divider is IDIV+1. A value of 0 gives divide by 1 clock, 1 gives divide by 2 etc.
+        /// SPI Clk Divider. Actual divider is IDIV+1. A value of 0 gives divide
+        /// by 1 clock, 1 gives divide by 2 etc.
         IDIV OFFSET(10) NUMBITS(12) [],
         /// Polarity of CSB signal. 0:active low 1:active high
         CSBPOL OFFSET(22) NUMBITS(1) [],
-        /// Order in which bits of byte are sent. 0: send bit 0 first. 1: send bit 7 first
+        /// Order in which bits of byte are sent. 0: send bit 0 first. 1: send
+        /// bit 7 first
         TXBITOR OFFSET(23) NUMBITS(1) [],
-        /// Order in which bytes of buffer word are sent. 0: send byte 0 first. 1: send byte 3 first
+        /// Order in which bytes of buffer word are sent.
+        /// 0: send byte 0 first. 1: send byte 3 first
         TXBYTOR OFFSET(24) NUMBITS(1) [],
-        /// Order in which received bits are packed into byte. 0: first bit received is bit0 1: last bit received is bit 0
+        /// Order in which received bits are packed into byte.
+        /// 0: first bit received is bit0 1: last bit received is bit 0
         RXBITOR OFFSET(25) NUMBITS(1) [],
-        /// Order in which received bytes are packed into word. 0: first byte received is byte 0 1: first byte received is byte 3
+        /// Order in which received bytes are packed into word.
+        /// 0: first byte received is byte 0 1: first byte received is byte 3
         RXBYTOR OFFSET(26) NUMBITS(1) [],
-        /// SPI Passthrough Mode. 0: Disable, 1: Enable. This is the host side control of whether passthrough is allowed. In order for full passthrough functionality, both the host and device passthrough functionality have to be enabled
+        /// SPI Passthrough Mode. 0: Disable, 1: Enable. This is the host side
+        /// control of whether passthrough is allowed. In order for full
+        /// passthrough functionality, both the host and device passthrough
+        /// functionality have to be enabled
         ENPASSTHRU OFFSET(27) NUMBITS(1) []
     ],
     XACT [
         /// Initiate transaction in buffer
         START OFFSET(0) NUMBITS(1) [],
-        /// Bits-1 in last byte transferred. The default assumes last byte will have 8 bits, this should be sufficient for most usage.
+        /// Bits-1 in last byte transferred. The default assumes last byte will
+        /// have 8 bits, this should be sufficient for most usage.
         BCNT OFFSET(1) NUMBITS(3) [],
-        /// Total number of transactions in bytes-1. If 64 bytes are to be transferred, this should be programmed as 63.
+        /// Total number of transactions in bytes-1. If 64 bytes are to be
+        /// transferred, this should be programmed as 63.
         SIZE OFFSET(4) NUMBITS(7) [],
         /// Poll for ready
         RDY_POLL OFFSET(11) NUMBITS(1) [],
@@ -130,7 +142,6 @@ impl SpiHostHardware {
         self.registers.ictrl.modify(ICTRL::TXDONE::CLEAR);
     }
 
-    #[inline(never)]
     pub fn handle_interrupt(&self) {
         //debug!("h1::Spi:handle_interrupt: ISTATE = {:08x}", self.registers.istate.get());
         if self.registers.istate.is_set(ISTATE::TXDONE) {
@@ -143,19 +154,28 @@ impl SpiHostHardware {
                         self.read_data(rx_buf);
                     });
 
-                    client.read_write_done(tx_buf, self.rx_buffer.take(), self.transaction_len.get())
+                    client.read_write_done(
+                        tx_buf,
+                        self.rx_buffer.take(),
+                        self.transaction_len.get())
                 });
             });
         }
         self.disable_tx_interrupt();
     }
 
-    fn start_transaction(&self, write_buffer: Option<&'static mut [u8]>, read_buffer: Option<&'static mut [u8]>, transaction_len: usize) -> ReturnCode {
+    fn start_transaction(
+        &self,
+        write_buffer: Option<&'static mut [u8]>,
+        read_buffer: Option<&'static mut [u8]>,
+        transaction_len: usize) -> ReturnCode {
         //debug!("h1::Spi:start_transaction: transaction_len={}", transaction_len);
         // The transaction needs at least one byte.
         // It also cannot have more bytes than tx_fifo or rx_fifo is long.
-        if (transaction_len == 0) || (transaction_len >= self.registers.tx_fifo.len()) || (transaction_len >= self.registers.rx_fifo.len()) {
-            debug!("h1::Spi::start_transaction: Invalid transaction_len={}", transaction_len);
+        if (transaction_len == 0) ||
+            (transaction_len >= self.registers.tx_fifo.len()) ||
+            (transaction_len >= self.registers.rx_fifo.len()) {
+            //debug!("h1::Spi::start_transaction: Invalid transaction_len={}", transaction_len);
             return ReturnCode::ESIZE;
         }
         self.registers.xact.modify(XACT::BCNT.val(7));
@@ -169,7 +189,10 @@ impl SpiHostHardware {
             }
         });
 
-        // Clear the TX fifo for additional bytes not supplied by write_buffer
+        // Clear the TX FIFO for additional bytes not supplied by write_buffer.
+        // Since we have no control over how many bytes the SPI host reads, we
+        // want to make sure to not accidentally leak information that made it
+        // into the TX FIFO beyond the length of the `write_buffer`.
         for idx in tx_buf_len..transaction_len {
             self.registers.tx_fifo[idx].set(0xff);
         }
@@ -199,7 +222,8 @@ impl SpiHostHardware {
 
 impl SpiHost for SpiHostHardware {
     fn spi_device_spi_host_passthrough(&self, enabled: bool) {
-        self.registers.ctrl.modify(if enabled { CTRL::ENPASSTHRU::SET } else { CTRL::ENPASSTHRU::CLEAR });
+        self.registers.ctrl.modify(
+            if enabled { CTRL::ENPASSTHRU::SET } else { CTRL::ENPASSTHRU::CLEAR });
     }
 }
 
@@ -210,9 +234,7 @@ impl SpiMaster for SpiHostHardware {
         self.client.set(client);
     }
 
-    fn init(&self) {
-
-    }
+    fn init(&self) {}
 
     fn is_busy(&self) -> bool {
         self.registers.istate.is_set(ISTATE::TXDONE)

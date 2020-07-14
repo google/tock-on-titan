@@ -331,8 +331,8 @@ register_bitfields![u32,
         RXFIFO_OVERFLOW OFFSET(10) NUMBITS(1) []
     ],
     EEPROM_CTRL [
-        /// SPI device EEPROM mode address selection. 0 -> 3 byte address for read
-        /// commands. 1 -> 4 byte address for read commands
+        /// SPI device EEPROM mode address selection. 0 -> 3 byte address for
+        /// read commands. 1 -> 4 byte address for read commands
         ADDR_MODE OFFSET(0) NUMBITS(1) [],
         /// Disable passthrough filtering completely
         PASSTHRU_DIS OFFSET(1) NUMBITS(1) [],
@@ -427,7 +427,8 @@ const PAGE_SHIFT: u8 = 9;
 #[allow(dead_code)]
 const PAGE_SIZE: u32 = 1 << PAGE_SHIFT;
 
-/// SPI device EEPROM sector size is 4KiB, since this is the smallest erasable size.
+/// SPI device EEPROM sector size is 4KiB, since this is the smallest erasable
+/// size.
 #[allow(dead_code)]
 const SECTOR_SIZE: u16 = 4096;
 
@@ -457,11 +458,6 @@ impl SpiDeviceHardware {
         }
     }
 
-    unsafe fn print_reg(&self, addr : u32) {
-        let val : u32 = *(addr as *const u32);
-        debug!("addr: {:08x} = {:08x}", addr, val);
-    }
-
     pub fn init(&self) {
         let configure_fastread4b = false;
 
@@ -488,21 +484,26 @@ impl SpiDeviceHardware {
 
         // Then, configure and enable features
 
-        // Configure external flash at virtual address 0x0 with length EXT_FLASH_SIZE
-        self.registers.ext_flash_base_page.write(PAGE::ID.val(EXT_FLASH_VIRTUAL_BASE >> PAGE_SHIFT));
-        self.registers.ext_flash_limit_page.write(PAGE::ID.val((EXT_FLASH_VIRTUAL_BASE + (EXT_FLASH_SIZE - 1)) >> PAGE_SHIFT));
+        // Configure external flash at virtual address 0x0 with length
+        // EXT_FLASH_SIZE
+        self.registers.ext_flash_base_page.write(
+            PAGE::ID.val(EXT_FLASH_VIRTUAL_BASE >> PAGE_SHIFT));
+        self.registers.ext_flash_limit_page.write(
+            PAGE::ID.val((EXT_FLASH_VIRTUAL_BASE + (EXT_FLASH_SIZE - 1)) >> PAGE_SHIFT));
 
         // Zero out all address bits beyond the size of the flash chip
-        self.registers.ext_flash_trans_bit_vector.set(EXT_FLASH_VIRTUAL_BASE + (EXT_FLASH_SIZE - 1));
+        self.registers.ext_flash_trans_bit_vector.set(
+            EXT_FLASH_VIRTUAL_BASE + (EXT_FLASH_SIZE - 1));
         self.registers.ext_flash_trans_addr.set(0);
 
         self.registers.eeprom_ctrl.modify(EEPROM_CTRL::EXT_FLASH_DIS::CLEAR);
 
         // Configure all available EEPROM mode RAM pages after EXT_FLASH
-        debug!("ram_addr = 0x{:08x}", EXT_FLASH_VIRTUAL_BASE + EXT_FLASH_SIZE);
+        //debug!("ram_addr = 0x{:08x}", EXT_FLASH_VIRTUAL_BASE + EXT_FLASH_SIZE);
         let ram_virtual_page_base = (EXT_FLASH_VIRTUAL_BASE + EXT_FLASH_SIZE) >> PAGE_SHIFT;
         for idx in 0..self.registers.ram_virtual_page.len() {
-            self.registers.ram_virtual_page[idx].write(PAGE::ID.val(ram_virtual_page_base + idx as u32));
+            self.registers.ram_virtual_page[idx].write(
+                PAGE::ID.val(ram_virtual_page_base + idx as u32));
             self.registers.ram_ctrl_page[idx].write(
                 RAM_CTRL_PAGE::WRAP_MODE::CLEAR +
                 RAM_CTRL_PAGE::INT_LVL.val(0)
@@ -510,7 +511,8 @@ impl SpiDeviceHardware {
         }
         self.registers.eeprom_ctrl.modify(EEPROM_CTRL::RAM_DIS::CLEAR);
 
-        // Only allow addresses within EXT_FLASH_SIZE * 2 to allow space for EXT_FLASH and EEPROM mode RAM pages
+        // Only allow addresses within EXT_FLASH_SIZE * 2 to allow space for
+        // EXT_FLASH and EEPROM mode RAM pages
         self.registers.virtual_addr_filter.set((EXT_FLASH_SIZE * 2) - 1);
         self.registers.eeprom_ctrl.modify(EEPROM_CTRL::VIRTUAL_ADDR_FILTER_EN::SET);
 
@@ -530,14 +532,6 @@ impl SpiDeviceHardware {
         // Enable EEPROM mode
         self.registers.ctrl.modify(CTRL::MODE::Eeprom);
         self.enable_rx_interrupt();
-
-        // TESTING: Dump some registers
-        unsafe {
-            self.print_reg(SPI_DEVICE0_BASE_ADDR);
-            for addr in (SPI_DEVICE0_BASE_ADDR+0x520..SPI_DEVICE0_BASE_ADDR+0x538).step_by(4) {
-                self.print_reg(addr);
-            }
-        }
     }
 
     fn init_jedec(&self) {
@@ -666,12 +660,11 @@ impl SpiDeviceHardware {
 
     fn is_busy(&self) -> bool {
         let busy = self.registers.eeprom_busy_status.is_set(STATUS_BIT::VALUE);
-        debug!("is_busy: {}.", busy);
         busy
     }
 
     pub fn handle_interrupt_cmd_addr_fifo_not_empty(&self) {
-        debug!("CMD_ADDR_FIFO_EMPTY = {}", self.registers.cmd_addr_fifo_empty.get());
+        //debug!("CMD_ADDR_FIFO_EMPTY = {}", self.registers.cmd_addr_fifo_empty.get());
         if !self.registers.cmd_addr_fifo_empty.is_set(STATUS_BIT::VALUE) {
             self.client.map(|client| {
                 client.data_available(self.is_busy());
@@ -684,7 +677,7 @@ impl SpiDeviceHardware {
 
 impl SpiDevice for SpiDeviceHardware {
     fn set_client(&self, client: Option<&'static dyn SpiDeviceClient>) {
-        debug!("kernel: set_client: client={}", if client.is_some() { "Some" } else { "None" });
+        //debug!("kernel: set_client: client={}", if client.is_some() { "Some" } else { "None" });
         match client {
             None => { self.client.clear(); }
             Some(cl) => { self.client.set(cl); }
@@ -709,8 +702,10 @@ impl SpiDevice for SpiDeviceHardware {
 
         let start_addr = self.registers.cmd_mem_rptr.read(CMD_MEM_PTR::VALUE) as usize;
         let end_addr = cmd_addr_fifo_reg.read(CMD_MEM_PTR::VALUE) as usize;
-        debug!("start={:08x} end={:08x}", start_addr, end_addr);
-        debug!("fifo_full={} rptr_full={}", cmd_addr_fifo_reg.read(CMD_MEM_PTR::FULL), self.registers.cmd_mem_rptr.read(CMD_MEM_PTR::FULL));
+        //debug!("start={:08x} end={:08x}", start_addr, end_addr);
+        //debug!("fifo_full={} rptr_full={}",
+        //    cmd_addr_fifo_reg.read(CMD_MEM_PTR::FULL),
+        //    self.registers.cmd_mem_rptr.read(CMD_MEM_PTR::FULL));
         let mut length : usize = 0;
 
         if start_addr < end_addr {
@@ -722,10 +717,12 @@ impl SpiDevice for SpiDeviceHardware {
                 read_buffer[tgt_idx] = self.registers.eeprom_cmd_buf[idx].get();
                 tgt_idx += 1;
             }
-        } else if cmd_addr_fifo_reg.read(CMD_MEM_PTR::FULL) != self.registers.cmd_mem_rptr.read(CMD_MEM_PTR::FULL) {
+        } else if cmd_addr_fifo_reg.read(CMD_MEM_PTR::FULL) !=
+            self.registers.cmd_mem_rptr.read(CMD_MEM_PTR::FULL) {
             // Read data bytes from start_addr to cmd_buf.len.
             // Then append data from 0 to end_addr-1.
-            length = min(read_buffer.len(), self.registers.eeprom_cmd_buf.len() - start_addr + end_addr);
+            length = min(read_buffer.len(),
+                self.registers.eeprom_cmd_buf.len() - start_addr + end_addr);
             let mut tgt_idx : usize = 0;
             for src_idx in start_addr..self.registers.eeprom_cmd_buf.len() {
                 if tgt_idx >= length { break; }
@@ -764,7 +761,8 @@ impl SpiDevice for SpiDeviceHardware {
     }
 
     fn clear_busy(&self) {
-        // Note that this setting will not take effect until the SPI host reads out the status register
+        // Note that this setting will not take effect until the SPI host reads
+        // out the status register
         self.registers.eeprom_busy_status.set(1);
     }
 }
