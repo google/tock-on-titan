@@ -18,3 +18,5 @@ pub mod digest;
 pub mod flash;
 pub mod personality;
 pub mod rng;
+pub mod spi_host;
+pub mod spi_device;

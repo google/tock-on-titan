@@ -38,6 +38,8 @@ pub mod nvcounter;
 pub mod personality;
 pub mod pinmux;
 pub mod pmu;
+pub mod spi_host;
+pub mod spi_device;
 pub mod timels;
 pub mod timeus;
 pub mod trng;

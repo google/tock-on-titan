@@ -16,6 +16,8 @@ use cortexm3;
 use crate::crypto;
 use crate::gpio;
 use kernel::Chip;
+use crate::spi_host;
+use crate::spi_device;
 use crate::timels;
 use crate::trng;
 use crate::uart;
@@ -61,6 +63,11 @@ impl Chip for Hotel {
                     110 => crypto::sha::KEYMGR0_SHA.handle_interrupt(nvic_num),
                     111 => (), // KEYMGR0_SHA_WFIFO_FULL
 
+                    127 => spi_host::SPI_HOST0.handle_interrupt(),
+                    128 => spi_host::SPI_HOST1.handle_interrupt(),
+
+                    131 => spi_device::SPI_DEVICE0.handle_interrupt_cmd_addr_fifo_not_empty(),
+
                     159 => timels::TIMELS0.handle_interrupt(),
                     160 => timels::TIMELS1.handle_interrupt(),
 
@@ -89,7 +96,7 @@ impl Chip for Hotel {
                     98 => {
                         // GPIO Combined interrupt... why does this remain asserted?
                     }
-                    _ => panic!("Unexected ISR {}", nvic_num),
+                    _ => panic!("Unexpected ISR {}", nvic_num),
                 }
                 cortexm3::nvic::Nvic::new(nvic_num).clear_pending();
                 cortexm3::nvic::Nvic::new(nvic_num).enable();
