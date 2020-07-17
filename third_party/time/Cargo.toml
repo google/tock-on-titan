@@ -28,8 +28,6 @@ optional = true
 [dev-dependencies.log]
 version = "0.3"
 
-[target."cfg(target_os = \"redox\")".dependencies.redox_syscall]
-version = "0.1"
 [badges.appveyor]
 repository = "alexcrichton/time"
 
