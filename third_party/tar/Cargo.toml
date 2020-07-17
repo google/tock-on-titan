@@ -28,8 +28,6 @@ version = "0.3"
 
 [features]
 default = ["xattr"]
-[target."cfg(target_os = \"redox\")".dependencies.redox_syscall]
-version = "0.1"
 [target."cfg(unix)".dependencies.libc]
 version = "0.2"
 
