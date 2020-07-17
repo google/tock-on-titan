@@ -18,3 +18,6 @@
 [submodule "third_party/tock"]
 	path = third_party/tock
 	url = https://github.com/tock/tock.git
+[submodule "third_party/manticore"]
+	path = third_party/manticore
+	url = https://github.com/lowRISC/manticore.git
