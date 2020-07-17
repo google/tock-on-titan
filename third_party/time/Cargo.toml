@@ -28,12 +28,6 @@ optional = true
 [dev-dependencies.log]
 version = "0.3"
 
-[dev-dependencies.winapi]
-version = "0.3.0"
-features = ["std", "processthreadsapi", "winbase"]
-[target."cfg(windows)".dependencies.winapi]
-version = "0.3.0"
-features = ["std", "minwinbase", "minwindef", "ntdef", "profileapi", "sysinfoapi", "timezoneapi"]
 [badges.appveyor]
 repository = "alexcrichton/time"
 
