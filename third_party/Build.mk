@@ -29,8 +29,7 @@ third_party/build: build/cargo-host/release/elf2tab sandbox_setup
 .PHONY: third_party/check
 third_party/check: cargo_version_check sandbox_setup
 	cd third_party/elf2tab && \
-		CARGO_TARGET_DIR="../../build/cargo-host" \
-		$(BWRAP) cargo check --frozen --release
+		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo check --release
 	cd third_party/libtock-rs && \
 		CARGO_TARGET_DIR="../../build/userspace/cargo" \
 		$(BWRAP) cargo check --offline --release --target=thumbv7m-none-eabi --examples
@@ -49,8 +48,7 @@ third_party/devicetests:
 .PHONY: third_party/doc
 third_party/doc: cargo_version_check sandbox_setup
 	cd third_party/elf2tab && \
-		CARGO_TARGET_DIR="../../build/cargo-host" \
-		$(BWRAP) cargo doc --frozen --release
+		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo doc --release
 	cd third_party/rustc-demangle && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
 		$(BWRAP) cargo doc --offline --release
@@ -58,8 +56,7 @@ third_party/doc: cargo_version_check sandbox_setup
 .PHONY: third_party/localtests
 third_party/localtests: cargo_version_check sandbox_setup
 	cd third_party/elf2tab && \
-		CARGO_TARGET_DIR="../../build/cargo-host" \
-		$(BWRAP) cargo test --frozen --release
+		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo test --release
 	cd third_party/libtock-rs && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
 		$(BWRAP) cargo test --lib --offline --release
@@ -71,5 +68,4 @@ third_party/localtests: cargo_version_check sandbox_setup
 .PHONY: build/cargo-host/release/elf2tab
 build/cargo-host/release/elf2tab: cargo_version_check sandbox_setup
 	cd third_party/elf2tab && \
-		CARGO_TARGET_DIR="../../build/cargo-host" \
-		$(BWRAP) cargo build --frozen --release
+		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo build --release
