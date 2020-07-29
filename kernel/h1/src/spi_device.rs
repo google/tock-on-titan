@@ -1,5 +1,5 @@
 use crate::hil::spi_device::{SpiDevice, SpiDeviceClient};
-use spiutils::cmds::OpCodes;
+use spiutils::protocol::flash::OpCode;
 use core::cmp::min;
 use kernel::common::cells::OptionalCell;
 use kernel::common::registers::{register_bitfields, register_structs, ReadOnly, ReadWrite, WriteOnly};
@@ -477,9 +477,9 @@ impl SpiDeviceHardware {
             );
 
         if configure_fastread4b {
-            self.registers.fast_dual_rd_opcode.set(OpCodes::FastRead4B as u8);
+            self.registers.fast_dual_rd_opcode.set(OpCode::FastRead4B as u8);
         } else {
-            self.registers.fast_dual_rd_opcode.set(OpCodes::FastReadDualOutput as u8);
+            self.registers.fast_dual_rd_opcode.set(OpCode::FastReadDualOutput as u8);
         }
 
         // Then, configure and enable features
@@ -547,7 +547,7 @@ impl SpiDeviceHardware {
         let mut rule_idx = 0;
         self.registers.passthru_filter_rule[rule_idx].write(
                 PASSTHRU_FILTER_RULE::VALID::SET +
-                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCodes::NormalRead as u32) +
+                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::NormalRead as u32) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b0000_0000) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_1000)
             );
@@ -557,7 +557,7 @@ impl SpiDeviceHardware {
             // Match 0b0000_1XXX (0x08 - 0x0f) and force to FastRead
             self.registers.passthru_filter_rule[rule_idx].write(
                     PASSTHRU_FILTER_RULE::VALID::SET +
-                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCodes::FastRead as u32) +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::FastRead as u32) +
                     PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b0000_1000) +
                     PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_1000)
                 );
@@ -566,7 +566,7 @@ impl SpiDeviceHardware {
             // Match 0b0000_10XX (0x08 - 0x0b) and force to FastRead
             self.registers.passthru_filter_rule[rule_idx].write(
                     PASSTHRU_FILTER_RULE::VALID::SET +
-                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCodes::FastRead as u32) +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::FastRead as u32) +
                     PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b0000_1000) +
                     PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_1100)
                 );
@@ -575,7 +575,7 @@ impl SpiDeviceHardware {
             // Match 0b0000_11XX (0x0c - 0x0f) and force to FastRead4B
             self.registers.passthru_filter_rule[rule_idx].write(
                     PASSTHRU_FILTER_RULE::VALID::SET +
-                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCodes::FastRead4B as u32) +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::FastRead4B as u32) +
                     PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b0000_1100) +
                     PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_1100)
                 );
@@ -585,7 +585,7 @@ impl SpiDeviceHardware {
         // Match 0b0001_XXXX (0x10 - 0x1f) and force to NormalRead
         self.registers.passthru_filter_rule[rule_idx].write(
                 PASSTHRU_FILTER_RULE::VALID::SET +
-                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCodes::NormalRead as u32) +
+                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::NormalRead as u32) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b0001_0000) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_0000)
             );
@@ -594,7 +594,7 @@ impl SpiDeviceHardware {
         // Match 0b001X_XXXX (0x20 - 0x3f) and force to FastReadDualOutput
         self.registers.passthru_filter_rule[rule_idx].write(
                 PASSTHRU_FILTER_RULE::VALID::SET +
-                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCodes::FastReadDualOutput as u32) +
+                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::FastReadDualOutput as u32) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b0010_0000) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1110_0000)
             );
@@ -603,7 +603,7 @@ impl SpiDeviceHardware {
         // Match 0b01XX_XXXX (0x40 - 0x7f) and force to NormalRead
         self.registers.passthru_filter_rule[rule_idx].write(
                 PASSTHRU_FILTER_RULE::VALID::SET +
-                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCodes::NormalRead as u32) +
+                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::NormalRead as u32) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b0100_0000) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1100_0000)
             );
@@ -612,7 +612,7 @@ impl SpiDeviceHardware {
         // Match 0b1XXX_XXXX (0x80 - 0xff) and force to NormalRead
         self.registers.passthru_filter_rule[rule_idx].write(
                 PASSTHRU_FILTER_RULE::VALID::SET +
-                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCodes::NormalRead as u32) +
+                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::NormalRead as u32) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1000_0000) +
                 PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1000_0000)
             );
@@ -630,13 +630,13 @@ impl SpiDeviceHardware {
         let mut opcode_idx = 0;
         self.registers.busy_opcode[opcode_idx].write(
             BUSY_OPCODE::EN::SET +
-            BUSY_OPCODE::VALUE.val(OpCodes::Enter4ByteAddressMode as u32)
+            BUSY_OPCODE::VALUE.val(OpCode::Enter4ByteAddressMode as u32)
         );
         opcode_idx += 1;
 
         self.registers.busy_opcode[opcode_idx].write(
             BUSY_OPCODE::EN::SET +
-            BUSY_OPCODE::VALUE.val(OpCodes::Exit4ByteAddressMode as u32)
+            BUSY_OPCODE::VALUE.val(OpCode::Exit4ByteAddressMode as u32)
         );
         opcode_idx += 1;
 
