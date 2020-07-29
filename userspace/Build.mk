@@ -21,6 +21,7 @@ BUILD_SUBDIRS := $(addprefix userspace/,                   \
                                          low_level_debug   \
                                          nvcounter_ctest   \
                                          nvcounter_test    \
+                                         otpilot           \
                                          personality_clear \
                                          personality_test  \
                                          rng               \
