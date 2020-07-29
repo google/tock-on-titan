@@ -14,13 +14,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#![crate_type = "lib"]
-#![warn(missing_docs)]
-#![cfg_attr(not(feature = "std"), no_std)]
-
-//! Utilities for SPI
+//! SPI protocol modules.
 
 #[macro_use]
-pub mod protocol;
+pub mod wire;
 
-pub mod io;
+pub mod flash;
+pub mod payload;
