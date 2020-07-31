@@ -26,6 +26,7 @@ use crate::protocol::wire::ToWire;
 use crate::protocol::wire::WireEnum;
 
 /// SPI flash address modes.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum AddressMode {
     /// Address is represented by 3 bytes.
     ThreeByte,

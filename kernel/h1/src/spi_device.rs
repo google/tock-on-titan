@@ -1,10 +1,20 @@
-use crate::hil::spi_device::{SpiDevice, SpiDeviceClient};
-use spiutils::protocol::flash::OpCode;
+use crate::hil::spi_device::AddressConfig;
+use crate::hil::spi_device::SpiDevice;
+use crate::hil::spi_device::SpiDeviceClient;
+
 use core::cmp::min;
+
 use kernel::common::cells::OptionalCell;
-use kernel::common::registers::{register_bitfields, register_structs, ReadOnly, ReadWrite, WriteOnly};
+use kernel::common::registers::register_bitfields;
+use kernel::common::registers::register_structs;
+use kernel::common::registers::ReadOnly;
+use kernel::common::registers::ReadWrite;
+use kernel::common::registers::WriteOnly;
 use kernel::common::StaticRef;
 use kernel::ReturnCode;
+
+use spiutils::protocol::flash::AddressMode;
+use spiutils::protocol::flash::OpCode;
 
 // Registers for the SPI device controller
 register_structs! {
@@ -427,40 +437,61 @@ const PAGE_SHIFT: u8 = 9;
 #[allow(dead_code)]
 const PAGE_SIZE: u32 = 1 << PAGE_SHIFT;
 
+/// Configuration for SPI device hardware.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct SpiDeviceConfiguration {
+    /// Set to true to enable OpCode::FastRead4B.
+    /// When set to false, enables OpCode::FastReadDualOutput.
+    pub enable_fastread4b_cmd: bool,
+
+    /// Set to true to handle OpCode::Enter4ByteAddressMode and OpCode::Exit4ByteAddressMode
+    /// in software.
+    /// When set to false, these op codes are not passed to software for handling.
+    pub enable_enterexit4b_cmd: bool,
+
+    /// Startup address mode.
+    pub startup_address_mode: AddressMode,
+}
+
+impl SpiDeviceConfiguration {
+    pub const fn default() -> SpiDeviceConfiguration {
+        SpiDeviceConfiguration {
+            enable_fastread4b_cmd: false,
+            enable_enterexit4b_cmd: false,
+            startup_address_mode: AddressMode::ThreeByte,
+        }
+    }
+}
+
 /// SPI device EEPROM sector size is 4KiB, since this is the smallest erasable
 /// size.
 #[allow(dead_code)]
 const SECTOR_SIZE: u16 = 4096;
 
-/// The virtual base address of the external flash
-const EXT_FLASH_VIRTUAL_BASE: u32 = 0;
-
-/// The size of the external flash
-const EXT_FLASH_SIZE: u32 = 32 * 1024 * 1024;
-
 const SPI_DEVICE0_BASE_ADDR: u32 = 0x4051_0000;
 const SPI_DEVICE0_REGISTERS: StaticRef<Registers> =
     unsafe { StaticRef::new(SPI_DEVICE0_BASE_ADDR as *const Registers) };
 
-pub static mut SPI_DEVICE0: SpiDeviceHardware = SpiDeviceHardware::new(SPI_DEVICE0_REGISTERS);
+pub static mut SPI_DEVICE0: SpiDeviceHardware = SpiDeviceHardware::new(SPI_DEVICE0_REGISTERS,
+    SpiDeviceConfiguration::default());
 
 /// A SPI device
 pub struct SpiDeviceHardware {
     registers: StaticRef<Registers>,
     client: OptionalCell<&'static dyn SpiDeviceClient>,
+    config: SpiDeviceConfiguration,
 }
 
 impl SpiDeviceHardware {
-    const fn new(base_addr: StaticRef<Registers>) -> SpiDeviceHardware {
+    const fn new(base_addr: StaticRef<Registers>, config: SpiDeviceConfiguration) -> SpiDeviceHardware {
         SpiDeviceHardware {
             registers: base_addr,
             client: OptionalCell::empty(),
+            config: config,
         }
     }
 
-    pub fn init(&self) {
-        let configure_fastread4b = false;
-
+    pub fn init(&mut self, config: SpiDeviceConfiguration) {
         // First, disable everything
         self.registers.eeprom_int_enable.set(0);
         self.registers.ctrl.write(CTRL::MODE::Disabled);
@@ -476,58 +507,22 @@ impl SpiDeviceHardware {
                 EEPROM_CTRL::VIRTUAL_ADDR_FILTER_EN::CLEAR
             );
 
-        if configure_fastread4b {
+        // Then, configure and enable features
+        self.config = config;
+
+        if self.config.enable_fastread4b_cmd {
             self.registers.fast_dual_rd_opcode.set(OpCode::FastRead4B as u8);
         } else {
             self.registers.fast_dual_rd_opcode.set(OpCode::FastReadDualOutput as u8);
         }
 
-        // Then, configure and enable features
-
-        // Configure external flash at virtual address 0x0 with length
-        // EXT_FLASH_SIZE
-        self.registers.ext_flash_base_page.write(
-            PAGE::ID.val(EXT_FLASH_VIRTUAL_BASE >> PAGE_SHIFT));
-        self.registers.ext_flash_limit_page.write(
-            PAGE::ID.val((EXT_FLASH_VIRTUAL_BASE + (EXT_FLASH_SIZE - 1)) >> PAGE_SHIFT));
-
-        // Zero out all address bits beyond the size of the flash chip
-        self.registers.ext_flash_trans_bit_vector.set(
-            EXT_FLASH_VIRTUAL_BASE + (EXT_FLASH_SIZE - 1));
-        self.registers.ext_flash_trans_addr.set(0);
-
-        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::EXT_FLASH_DIS::CLEAR);
-
-        // Configure all available EEPROM mode RAM pages after EXT_FLASH
-        //debug!("ram_addr = 0x{:08x}", EXT_FLASH_VIRTUAL_BASE + EXT_FLASH_SIZE);
-        let ram_virtual_page_base = (EXT_FLASH_VIRTUAL_BASE + EXT_FLASH_SIZE) >> PAGE_SHIFT;
-        for idx in 0..self.registers.ram_virtual_page.len() {
-            self.registers.ram_virtual_page[idx].write(
-                PAGE::ID.val(ram_virtual_page_base + idx as u32));
-            self.registers.ram_ctrl_page[idx].write(
-                RAM_CTRL_PAGE::WRAP_MODE::CLEAR +
-                RAM_CTRL_PAGE::INT_LVL.val(0)
-            );
-        }
-        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::RAM_DIS::CLEAR);
-
-        // Only allow addresses within EXT_FLASH_SIZE * 2 to allow space for
-        // EXT_FLASH and EEPROM mode RAM pages
-        self.registers.virtual_addr_filter.set((EXT_FLASH_SIZE * 2) - 1);
-        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::VIRTUAL_ADDR_FILTER_EN::SET);
-
-
-        self.init_passthrough_filters(configure_fastread4b);
+        self.init_passthrough_filters();
 
         self.init_jedec();
 
         self.init_busy_opcodes();
 
-        if configure_fastread4b {
-            self.enter_4b_mode();
-        } else {
-            self.enter_4b_mode();
-        }
+        self.set_address_mode(self.config.startup_address_mode);
 
         // Enable EEPROM mode
         self.registers.ctrl.modify(CTRL::MODE::Eeprom);
@@ -542,7 +537,7 @@ impl SpiDeviceHardware {
         }
     }
 
-    fn init_passthrough_filters(&self, configure_fastread4b: bool) {
+    fn init_passthrough_filters(&self) {
         // Match 0b0000_0XXX (0x00 - 0x07) and force to NormalRead
         let mut rule_idx = 0;
         self.registers.passthru_filter_rule[rule_idx].write(
@@ -553,7 +548,7 @@ impl SpiDeviceHardware {
             );
         rule_idx += 1;
 
-        if !configure_fastread4b {
+        if !self.config.enable_fastread4b_cmd {
             // Match 0b0000_1XXX (0x08 - 0x0f) and force to FastRead
             self.registers.passthru_filter_rule[rule_idx].write(
                     PASSTHRU_FILTER_RULE::VALID::SET +
@@ -684,12 +679,61 @@ impl SpiDevice for SpiDeviceHardware {
         }
     }
 
-    fn enter_4b_mode(&self) {
-        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::ADDR_MODE::SET);
+    fn configure_addresses(&self, config: AddressConfig) {
+        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::EXT_FLASH_DIS::SET);
+        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::VIRTUAL_ADDR_FILTER_EN::CLEAR);
+        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::RAM_DIS::SET);
+
+        // Configure external flash at `flash_virtual_base` with length `size`
+        self.registers.ext_flash_base_page.write(
+            PAGE::ID.val(config.flash_virtual_base >> PAGE_SHIFT));
+        self.registers.ext_flash_limit_page.write(
+            PAGE::ID.val((config.flash_virtual_base + (config.flash_physical_size - 1)) >> PAGE_SHIFT));
+
+        // Zero out all address bits beyond the size of the flash chip
+        self.registers.ext_flash_trans_bit_vector.set(
+            config.flash_virtual_base + (config.flash_physical_size - 1));
+
+        // Configure mapping to `physical_base`.
+        self.registers.ext_flash_trans_addr.set(
+            config.flash_physical_base);
+
+
+        // Configure all available EEPROM mode RAM pages after EXT_FLASH
+        let ram_virtual_page_base = config.ram_virtual_base >> PAGE_SHIFT;
+        for idx in 0..self.registers.ram_virtual_page.len() {
+            self.registers.ram_virtual_page[idx].write(
+                PAGE::ID.val(ram_virtual_page_base + idx as u32));
+            self.registers.ram_ctrl_page[idx].write(
+                RAM_CTRL_PAGE::WRAP_MODE::CLEAR +
+                RAM_CTRL_PAGE::INT_LVL.val(0)
+            );
+        }
+
+
+        // Only allow addresses within the virtual_size to allow space for
+        // external flash and RAM pages
+        self.registers.virtual_addr_filter.set(config.virtual_size - 1);
+
+
+        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::EXT_FLASH_DIS::CLEAR);
+        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::RAM_DIS::CLEAR);
+        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::VIRTUAL_ADDR_FILTER_EN::SET);
     }
 
-    fn exit_4b_mode(&self) {
-        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::ADDR_MODE::CLEAR);
+    fn set_address_mode(&self, address_mode: AddressMode) {
+        match address_mode {
+            AddressMode::ThreeByte => self.registers.eeprom_ctrl.modify(EEPROM_CTRL::ADDR_MODE::CLEAR),
+            AddressMode::FourByte => self.registers.eeprom_ctrl.modify(EEPROM_CTRL::ADDR_MODE::SET),
+        }
+    }
+
+    fn get_address_mode(&self) -> AddressMode {
+        if self.registers.eeprom_ctrl.is_set(EEPROM_CTRL::ADDR_MODE) {
+            AddressMode::FourByte
+        } else {
+            AddressMode::ThreeByte
+        }
     }
 
     fn get_received_data(&self, read_buffer: &mut[u8]) -> usize {
