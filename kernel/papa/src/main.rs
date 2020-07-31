@@ -309,7 +309,11 @@ pub unsafe fn reset_handler() {
     let spi_host_syscalls = SpiSyscallComponent::new(spi_host_mux, false)
         .finalize(components::spi_syscall_component_helper!(h1::spi_host::SpiHostHardware));
 
-    h1::spi_device::SPI_DEVICE0.init();
+    h1::spi_device::SPI_DEVICE0.init(h1::spi_device::SpiDeviceConfiguration {
+        enable_fastread4b_cmd: false,
+        enable_enterexit4b_cmd: true,
+        startup_address_mode: spiutils::protocol::flash::AddressMode::FourByte,
+    });
     let h1_spi_device_syscalls = static_init!(
         h1_syscalls::spi_device::SpiDeviceSyscall<'static>,
         h1_syscalls::spi_device::SpiDeviceSyscall::new(&h1::spi_device::SPI_DEVICE0, kernel.create_grant(&grant_cap))

@@ -1,6 +1,16 @@
 use core::cell::Cell;
-use h1::hil::spi_device::{SpiDevice, SpiDeviceClient};
-use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
+
+use h1::hil::spi_device::AddressConfig;
+use h1::hil::spi_device::SpiDevice;
+use h1::hil::spi_device::SpiDeviceClient;
+
+use kernel::AppId;
+use kernel::AppSlice;
+use kernel::Callback;
+use kernel::Driver;
+use kernel::Grant;
+use kernel::ReturnCode;
+use kernel::Shared;
 
 pub const DRIVER_NUM: usize = 0x40030;
 
@@ -11,6 +21,15 @@ pub struct AppData {
     data_received_callback: Option<Callback>,
 }
 
+/// The virtual base address of the external flash
+const EXT_FLASH_VIRTUAL_BASE: u32 = 0;
+
+/// The size of the external flash
+const EXT_FLASH_SIZE: u32 = 32 * 1024 * 1024;
+
+/// The physical base address in the external flash
+const EXT_FLASH_PHYSICAL_BASE: u32 = 0;
+
 pub struct SpiDeviceSyscall<'a> {
     device: &'a dyn SpiDevice,
     apps: Grant<AppData>,
@@ -20,6 +39,16 @@ pub struct SpiDeviceSyscall<'a> {
 impl<'a> SpiDeviceSyscall<'a> {
     pub fn new(device: &'a dyn SpiDevice,
                container: Grant<AppData>) -> SpiDeviceSyscall<'a> {
+        // Temporary hard-coded address configuration
+        let address_config = AddressConfig {
+            flash_virtual_base: EXT_FLASH_VIRTUAL_BASE,
+            flash_physical_base: EXT_FLASH_PHYSICAL_BASE,
+            flash_physical_size: EXT_FLASH_SIZE,
+            ram_virtual_base: EXT_FLASH_VIRTUAL_BASE + EXT_FLASH_SIZE,
+            virtual_size: EXT_FLASH_SIZE * 2,
+        };
+        device.configure_addresses(address_config);
+
         SpiDeviceSyscall {
             device: device,
             apps: container,
