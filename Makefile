@@ -44,13 +44,13 @@ BWRAP := bwrap                                                               \
 .PHONY: sandbox_setup
 sandbox_setup:
 	mkdir -p build/Cargo.lock
-	>>build/Cargo.lock/elf2tab
-	>>kernel/Cargo.lock
-	>>runner/Cargo.lock
-	>>third_party/libtock-rs/Cargo.lock
-	>>third_party/rustc-demangle/Cargo.lock
-	>>tools/Cargo.lock
-	>>userspace/Cargo.lock
+	>build/Cargo.lock/elf2tab
+	>kernel/Cargo.lock
+	>runner/Cargo.lock
+	>third_party/libtock-rs/Cargo.lock
+	>third_party/rustc-demangle/Cargo.lock
+	>tools/Cargo.lock
+	>userspace/Cargo.lock
 
 .PHONY: build
 build: $(addsuffix /build,$(BUILD_SUBDIRS))
