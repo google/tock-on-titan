@@ -1,4 +1,5 @@
 use core::cell::Cell;
+use core::convert::TryFrom;
 
 use h1::hil::spi_device::AddressConfig;
 use h1::hil::spi_device::SpiDevice;
@@ -11,6 +12,8 @@ use kernel::Driver;
 use kernel::Grant;
 use kernel::ReturnCode;
 use kernel::Shared;
+
+use spiutils::protocol::flash::AddressMode;
 
 pub const DRIVER_NUM: usize = 0x40030;
 
@@ -79,6 +82,20 @@ impl<'a> SpiDeviceSyscall<'a> {
             ReturnCode::SUCCESS
         }).unwrap_or(ReturnCode::ENOMEM)
     }
+
+    fn set_address_mode(&self, caller_id: AppId, address_mode: AddressMode) -> ReturnCode {
+        self.apps.enter(caller_id, |_app_data, _| {
+            self.device.set_address_mode(address_mode);
+
+            ReturnCode::SUCCESS
+        }).unwrap_or(ReturnCode::ENOMEM)
+    }
+
+    fn get_address_mode(&self, caller_id: AppId) -> ReturnCode {
+        self.apps.enter(caller_id, |_app_data, _| {
+            ReturnCode::SuccessWithValue { value: self.device.get_address_mode() as usize }
+        }).unwrap_or(ReturnCode::ENOMEM)
+    }
 }
 
 impl<'a> SpiDeviceClient for SpiDeviceSyscall<'a> {
@@ -130,6 +147,17 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
             2 /* Clear busy */ => {
                 self.clear_busy(caller_id)
             },
+            3 /* Set address mode
+                 arg1: 0 = 3 byte address mode, 1 = 4 byte address mode */ => {
+                let address_mode = match AddressMode::try_from(arg1) {
+                    Ok(val) => val,
+                    Err(_) => return ReturnCode::EINVAL
+                };
+                self.set_address_mode(caller_id, address_mode)
+            },
+            4 /* Get address mode */ => {
+                self.get_address_mode(caller_id)
+            }
             _ => ReturnCode::ENOSUPPORT
         }
     }
