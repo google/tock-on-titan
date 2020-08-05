@@ -250,6 +250,9 @@ impl<'a> SpiProcessor<'a> {
             }
             OpCode::Enter4ByteAddressMode => {
                 writeln!(console, "Device: EN4B");
+                if spi_device::get().set_address_mode(AddressMode::FourByte).is_err() {
+                    return Err(FromWireError::OutOfRange)
+                }
                 self.address_mode = AddressMode::FourByte;
                 if spi_device::get().clear_busy().is_err() {
                     return Err(FromWireError::OutOfRange)
@@ -258,6 +261,9 @@ impl<'a> SpiProcessor<'a> {
             }
             OpCode::Exit4ByteAddressMode => {
                 writeln!(console, "Device: EX4B");
+                if spi_device::get().set_address_mode(AddressMode::ThreeByte).is_err() {
+                    return Err(FromWireError::OutOfRange)
+                }
                 self.address_mode = AddressMode::ThreeByte;
                 if spi_device::get().clear_busy().is_err() {
                     return Err(FromWireError::OutOfRange)
@@ -328,6 +334,8 @@ fn run() -> TockResult<()> {
         }
     }
 
+    let initial_address_mode = spi_device::get().get_address_mode()?;
+
     let mut processor = SpiProcessor {
         server: PaRot::new(Options {
             identity: &identity,
@@ -337,7 +345,7 @@ fn run() -> TockResult<()> {
             networking: NETWORKING,
             timeouts: TIMEOUTS,
         }),
-        address_mode: AddressMode::ThreeByte,
+        address_mode: initial_address_mode,
     };
 
     //////////////////////////////////////////////////////////////////////////////
