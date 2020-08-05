@@ -15,11 +15,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use core::cell::Cell;
+use core::convert::TryFrom;
 
+use libtock::result::TockError;
 use libtock::result::TockResult;
 use libtock::shared_memory::SharedMemory;
 use libtock::syscalls;
 use libtock::syscalls::raw::yieldk;
+
+use spiutils::protocol::flash::AddressMode;
 
 pub const MAX_READ_BUFFER_SIZE: usize = 512;
 
@@ -27,23 +31,29 @@ pub const MAX_READ_BUFFER_SIZE: usize = 512;
 pub const MAX_WRITE_BUFFER_SIZE: usize = 2048;
 
 pub trait SpiDevice {
-    // Check if received a transaction.
+    /// Check if received a transaction.
     fn have_transaction(&self) -> bool;
 
-    // Wait for a transaction by yielding.
+    /// Wait for a transaction by yielding.
     fn wait_for_transaction(&self);
 
-    // Get the buffer slice of received data.
+    /// Get the buffer slice of received data.
     fn get_read_buffer(&self) -> &[u8];
 
-    // Whether the transaction has the BUSY bit set.
+    /// Whether the transaction has the BUSY bit set.
     fn is_busy_set(&self) -> bool;
 
-    // Clear the BUSY bit if set.
+    /// Clear the BUSY bit if set.
     fn clear_busy(&self) -> TockResult<()>;
 
-    // Send data to be made available to the SPI host and clear the BUSY bit if requested.
+    /// Send data to be made available to the SPI host and clear the BUSY bit if requested.
     fn send_data(&self, write_buffer: &mut[u8], clear_busy: bool) -> TockResult<()>;
+
+    /// Configure the engine's address mode.
+    fn set_address_mode(&self, address_mode: AddressMode) -> TockResult<()>;
+
+    /// Get the engine's address mode.
+    fn get_address_mode(&self) -> TockResult<AddressMode>;
 }
 
 // Get the static SpiDevice object.
@@ -57,6 +67,8 @@ mod command_nr {
     pub const CHECK_IF_PRESENT: usize = 0;
     pub const SEND_DATA: usize = 1;
     pub const CLEAR_BUSY: usize = 2;
+    pub const SET_ADDRESS_MODE: usize = 3;
+    pub const GET_ADDRESS_MODE: usize = 4;
 }
 
 mod subscribe_nr {
@@ -166,5 +178,17 @@ impl SpiDevice for SpiDeviceImpl {
         syscalls::command(DRIVER_NUMBER, command_nr::SEND_DATA, if clear_busy { 1 } else { 0 }, 0)?;
 
         Ok(())
+    }
+
+    fn set_address_mode(&self, address_mode: AddressMode) -> TockResult<()> {
+        syscalls::command(DRIVER_NUMBER, command_nr::SET_ADDRESS_MODE, address_mode as usize, 0)?;
+
+        Ok(())
+    }
+
+    fn get_address_mode(&self) -> TockResult<AddressMode> {
+        let address_mode = syscalls::command(DRIVER_NUMBER, command_nr::GET_ADDRESS_MODE, 0, 0)?;
+
+        AddressMode::try_from(address_mode).map_err(|_| TockError::Format)
     }
 }
