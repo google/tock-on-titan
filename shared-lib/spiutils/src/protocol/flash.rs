@@ -25,14 +25,32 @@ use crate::protocol::wire::ToWireError;
 use crate::protocol::wire::ToWire;
 use crate::protocol::wire::WireEnum;
 
+use core::convert::TryFrom;
+use core::result::Result;
+
 /// SPI flash address modes.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum AddressMode {
     /// Address is represented by 3 bytes.
-    ThreeByte,
+    ThreeByte = 0,
 
     /// Address is represented by 4 bytes.
-    FourByte,
+    FourByte = 1,
+}
+
+/// Error for invalid address mode conversion.
+pub struct InvalidAddressMode;
+
+impl TryFrom<usize> for AddressMode {
+    type Error = InvalidAddressMode;
+
+    fn try_from(item: usize) -> Result<AddressMode, Self::Error> {
+        match item {
+            0 => Ok(AddressMode::ThreeByte),
+            1 => Ok(AddressMode::FourByte),
+            _ => Err(InvalidAddressMode),
+        }
+    }
 }
 
 wire_enum! {

@@ -21,3 +21,4 @@ edition = "2018"
 [dependencies]
 kernel = { path = "../../third_party/tock/kernel" }
 h1 = { path = "../h1" }
+spiutils = { path = "../../shared-lib/spiutils", default_features = false }
