@@ -21,7 +21,7 @@ keywords = ["messagepack", "binary", "encoding", "serialize"]
 license = "MPL-2.0"
 repository = "https://github.com/jrasky/corepack.git"
 [dependencies.byteorder]
-version = "~1.2.3"
+version = "*"
 default-features = false
 
 [dependencies.serde]
