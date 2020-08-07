@@ -23,6 +23,7 @@ use libtock::shared_memory::SharedMemory;
 use libtock::syscalls;
 use libtock::syscalls::raw::yieldk;
 
+use spiutils::driver::HandlerMode;
 use spiutils::protocol::flash::AddressMode;
 
 pub const MAX_READ_BUFFER_SIZE: usize = 512;
@@ -53,7 +54,10 @@ pub trait SpiDevice {
     fn set_address_mode(&self, address_mode: AddressMode) -> TockResult<()>;
 
     /// Get the engine's address mode.
-    fn get_address_mode(&self) -> TockResult<AddressMode>;
+    fn get_address_mode(&self) -> AddressMode;
+
+    /// Set handling mode for address mode changes.
+    fn set_address_mode_handling(&self, address_mode_handling: HandlerMode) -> TockResult<()>;
 }
 
 // Get the static SpiDevice object.
@@ -69,10 +73,12 @@ mod command_nr {
     pub const CLEAR_BUSY: usize = 2;
     pub const SET_ADDRESS_MODE: usize = 3;
     pub const GET_ADDRESS_MODE: usize = 4;
+    pub const SET_ADDRESS_MODE_HANDLING: usize = 5;
 }
 
 mod subscribe_nr {
     pub const DATA_RECEIVED: usize = 0;
+    pub const ADDRESS_MODE_CHANGED: usize = 1;
 }
 
 mod allow_nr {
@@ -81,17 +87,20 @@ mod allow_nr {
 }
 
 struct SpiDeviceImpl {
-    // The receive buffer. Should be equal or larger than HW buffer.
+    /// The receive buffer. Should be equal or larger than HW buffer.
     read_buffer: [u8; MAX_READ_BUFFER_SIZE],
 
-    // Shared memory object to allow kernel to access read_buffer.
+    /// Shared memory object to allow kernel to access read_buffer.
     read_buffer_share: Cell<Option<SharedMemory<'static>>>,
 
-    // Number of received bytes.
+    /// Number of received bytes.
     received_len: Cell<usize>,
 
-    // Whether the BUSY bit was set for the last received transaction.
+    /// Whether the BUSY bit was set for the last received transaction.
     is_busy_set: Cell<bool>,
+
+    /// The current address mode
+    address_mode: Cell<AddressMode>,
 }
 
 static mut SPI_DEVICE: SpiDeviceImpl = SpiDeviceImpl {
@@ -99,6 +108,7 @@ static mut SPI_DEVICE: SpiDeviceImpl = SpiDeviceImpl {
     read_buffer_share: Cell::new(None),
     received_len: Cell::new(0),
     is_busy_set: Cell::new(false),
+    address_mode: Cell::new(AddressMode::ThreeByte),
 };
 
 static mut IS_INITIALIZED: bool = false;
@@ -120,10 +130,22 @@ impl SpiDeviceImpl {
     // Registers buffers and callbacks in the kernel.
     fn initialize(&'static mut self) -> TockResult<()> {
         syscalls::command(DRIVER_NUMBER, command_nr::CHECK_IF_PRESENT, 0, 0)?;
+
+        syscalls::subscribe_fn(
+            DRIVER_NUMBER,
+            subscribe_nr::ADDRESS_MODE_CHANGED,
+            SpiDeviceImpl::address_mode_changed_trampoline,
+            0)?;
+
+        let address_mode_val = syscalls::command(DRIVER_NUMBER, command_nr::GET_ADDRESS_MODE, 0, 0)?;
+        self.address_mode.set(match AddressMode::try_from(address_mode_val) {
+            Ok(val) => val,
+            Err(_) => return Err(TockError::Format),
+        });
+
         self.read_buffer_share.set(Some(syscalls::allow(DRIVER_NUMBER, allow_nr::READ_BUFFER,
             &mut self.read_buffer)?));
 
-        // Register callback so that we can receive data immediately.
         syscalls::subscribe_fn(
             DRIVER_NUMBER,
             subscribe_nr::DATA_RECEIVED,
@@ -143,6 +165,19 @@ impl SpiDeviceImpl {
         // arg2: whether BUSY bit is set
         self.received_len.set(arg1);
         self.is_busy_set.set(arg2 != 0);
+    }
+
+    extern "C"
+    fn address_mode_changed_trampoline(arg1: usize, arg2: usize, arg3: usize, _data: usize) {
+        get_impl().address_mode_changed(arg1, arg2, arg3);
+    }
+
+    fn address_mode_changed(&self, arg1: usize, _: usize, _: usize) {
+        // arg1: new AddressMode
+        match AddressMode::try_from(arg1) {
+            Ok(val) => self.address_mode.set(val),
+            Err(_) => ()
+        }
     }
 }
 
@@ -182,13 +217,17 @@ impl SpiDevice for SpiDeviceImpl {
 
     fn set_address_mode(&self, address_mode: AddressMode) -> TockResult<()> {
         syscalls::command(DRIVER_NUMBER, command_nr::SET_ADDRESS_MODE, address_mode as usize, 0)?;
-
+        self.address_mode.set(address_mode);
         Ok(())
     }
 
-    fn get_address_mode(&self) -> TockResult<AddressMode> {
-        let address_mode = syscalls::command(DRIVER_NUMBER, command_nr::GET_ADDRESS_MODE, 0, 0)?;
+    fn get_address_mode(&self) -> AddressMode {
+        return self.address_mode.get()
+    }
 
-        AddressMode::try_from(address_mode).map_err(|_| TockError::Format)
+    fn set_address_mode_handling(&self, address_mode_handling: HandlerMode) -> TockResult<()> {
+        syscalls::command(DRIVER_NUMBER, command_nr::SET_ADDRESS_MODE_HANDLING, address_mode_handling as usize, 0)?;
+
+        Ok(())
     }
 }
