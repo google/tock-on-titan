@@ -20,7 +20,9 @@
 
 //! Utilities for SPI
 
-#[macro_use]
-pub mod protocol;
+pub mod driver;
 
 pub mod io;
+
+#[macro_use]
+pub mod protocol;
