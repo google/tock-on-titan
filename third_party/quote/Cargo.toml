@@ -22,7 +22,7 @@ keywords = ["syn"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/dtolnay/quote"
 [dependencies.proc-macro2]
-version = "0.4.4"
+version = "*"
 default-features = false
 
 [features]
