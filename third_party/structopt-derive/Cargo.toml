@@ -24,7 +24,7 @@ repository = "https://github.com/TeXitoi/structopt"
 [lib]
 proc-macro = true
 [dependencies.proc-macro2]
-version = "0.4"
+version = "*"
 
 [dependencies.quote]
 version = "0.6"

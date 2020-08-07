@@ -32,7 +32,7 @@ name = "dump-syntax"
 path = "examples/dump-syntax/main.rs"
 required-features = ["full", "parsing", "extra-traits"]
 [dependencies.proc-macro2]
-version = "0.4.4"
+version = "*"
 default-features = false
 
 [dependencies.quote]
