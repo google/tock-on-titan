@@ -34,6 +34,7 @@ use manticore::protocol::device_id;
 use manticore::server::pa_rot::{PaRot, Options};
 
 use spiutils::io::Cursor as SpiutilsCursor;
+use spiutils::driver::HandlerMode;
 use spiutils::protocol::flash;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::flash::OpCode;
@@ -159,7 +160,6 @@ impl rsa::Builder for NoRsa {
 
 struct SpiProcessor<'a> {
     server: PaRot<'a, Identity, Reset, NoRsa>,
-    address_mode: AddressMode,
 }
 
 const SPI_TX_BUF_SIZE : usize = 512;
@@ -248,28 +248,6 @@ impl<'a> SpiProcessor<'a> {
                 }
                 self.process_spi_write(header.get_address().unwrap(), rx_buf)
             }
-            OpCode::Enter4ByteAddressMode => {
-                writeln!(console, "Device: EN4B");
-                if spi_device::get().set_address_mode(AddressMode::FourByte).is_err() {
-                    return Err(FromWireError::OutOfRange)
-                }
-                self.address_mode = AddressMode::FourByte;
-                if spi_device::get().clear_busy().is_err() {
-                    return Err(FromWireError::OutOfRange)
-                }
-                Ok(())
-            }
-            OpCode::Exit4ByteAddressMode => {
-                writeln!(console, "Device: EX4B");
-                if spi_device::get().set_address_mode(AddressMode::ThreeByte).is_err() {
-                    return Err(FromWireError::OutOfRange)
-                }
-                self.address_mode = AddressMode::ThreeByte;
-                if spi_device::get().clear_busy().is_err() {
-                    return Err(FromWireError::OutOfRange)
-                }
-                Ok(())
-            }
             _ => {
                 Err(FromWireError::OutOfRange)
             }
@@ -278,7 +256,7 @@ impl<'a> SpiProcessor<'a> {
 
     fn process_spi_packet(&mut self, mut rx_buf: &[u8]) -> Result<(), FromWireError> {
         let mut console = Console::new();
-        match self.address_mode {
+        match spi_device::get().get_address_mode() {
             AddressMode::ThreeByte => {
                 let header = flash::Header::<ux::u24>::from_wire(&mut rx_buf)?;
                 writeln!(console, "Device: flash header (3B): {:?}", header);
@@ -334,8 +312,6 @@ fn run() -> TockResult<()> {
         }
     }
 
-    let initial_address_mode = spi_device::get().get_address_mode()?;
-
     let mut processor = SpiProcessor {
         server: PaRot::new(Options {
             identity: &identity,
@@ -345,8 +321,10 @@ fn run() -> TockResult<()> {
             networking: NETWORKING,
             timeouts: TIMEOUTS,
         }),
-        address_mode: initial_address_mode,
     };
+
+    writeln!(console, "Device: Configuring address_mode handling to KernelSpace")?;
+    spi_device::get().set_address_mode_handling(HandlerMode::KernelSpace)?;
 
     //////////////////////////////////////////////////////////////////////////////
 
