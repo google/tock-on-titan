@@ -53,6 +53,12 @@ impl TryFrom<usize> for AddressMode {
     }
 }
 
+impl From<AddressMode> for usize {
+    fn from(item: AddressMode) -> usize {
+        item as usize
+    }
+}
+
 wire_enum! {
     /// SPI flash op codes
     pub enum OpCode: u8 {
@@ -146,7 +152,7 @@ wire_enum! {
     }
 }
 
-impl OpCode {
+impl<'a> OpCode {
     /// Returns true iff the OpCode requires an address.
     pub fn has_address(&self) -> bool {
         match self {
