@@ -17,6 +17,7 @@
 #![no_std]
 
 mod spi_host;
+mod spi_host_h1;
 mod spi_device;
 
 use core::convert::TryFrom;
@@ -278,6 +279,9 @@ fn run() -> TockResult<()> {
 
     //////////////////////////////////////////////////////////////////////////////
 
+    // We cannot use the SPI host if passthrough is enabled.
+    spi_host_h1::get().disable_passthrough()?;
+
     let host_demo = SpiHostDemo {};
 
     writeln!(console, "Host: Enabling 4B mode")?;
@@ -327,6 +331,9 @@ fn run() -> TockResult<()> {
     spi_device::get().set_address_mode_handling(HandlerMode::KernelSpace)?;
 
     //////////////////////////////////////////////////////////////////////////////
+
+    // We need SPI passthrough to be fully operational.
+    spi_host_h1::get().enable_passthrough()?;
 
     loop {
         writeln!(console, "Device: Waiting for transaction")?;
