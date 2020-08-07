@@ -41,7 +41,7 @@ optional = true
 default-features = false
 
 [dependencies.unicode-xid]
-version = "0.1"
+version = "*"
 [dev-dependencies.rayon]
 version = "1.0"
 
