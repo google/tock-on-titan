@@ -29,12 +29,13 @@ use libtock::result::TockResult;
 
 use manticore::crypto::rsa;
 use manticore::hardware;
-use manticore::io::Cursor;
+use manticore::io::Cursor as ManticoreCursor;
 use manticore::protocol::capabilities::*;
 use manticore::protocol::device_id;
 use manticore::server::pa_rot::{PaRot, Options};
 
 use spiutils::io::Cursor as SpiutilsCursor;
+use spiutils::io::Write as _;
 use spiutils::driver::HandlerMode;
 use spiutils::protocol::flash;
 use spiutils::protocol::flash::AddressMode;
@@ -175,7 +176,7 @@ impl<'a> SpiProcessor<'a> {
                 return Err(FromWireError::OutOfRange);
             }
         }
-        if let Err(_) = spi_device::get().send_data(tx_buf, true) {
+        if let Err(_) = spi_device::get().send_data(tx_buf, true, true) {
             writeln!(console, "Device: Could not send data.");
             return Err(FromWireError::OutOfRange);
         }
@@ -191,7 +192,7 @@ impl<'a> SpiProcessor<'a> {
         writeln!(console, "Device: Starting processing");
         let payload_len : u16;
         {
-            let mut tx_cursor = Cursor::new(&mut tx_buf[payload::HEADER_LEN..]);
+            let mut tx_cursor = ManticoreCursor::new(&mut tx_buf[payload::HEADER_LEN..]);
             if let Err(why) = self.server.process_request(&mut data, &mut tx_cursor) {
                 writeln!(console, "Device: Could not process request: {:?}", why);
                 return Err(FromWireError::OutOfRange);
@@ -225,29 +226,116 @@ impl<'a> SpiProcessor<'a> {
         }
     }
 
-    fn process_spi_write(&mut self, addr: u32, data: &[u8]) -> Result<(), FromWireError> {
-        match addr {
-            0x02000000 => {
-                self.process_spi_payload(data)
-            }
-            _ => {
-                Err(FromWireError::OutOfRange)
-            }
-        }
+    fn spi_host_write_enable(&mut self) -> Result<(), FromWireError> {
+        let header = flash::Header::<u32> {
+            opcode: OpCode::WriteEnable,
+            address: None,
+        };
+        let data : [u8; 0] = [0; 0];
+        self.spi_host_send(&header, &data)
     }
 
-    fn process_spi_header(&mut self, mut rx_buf: &[u8], header: &dyn flash::SpiHeader)  -> Result<(), FromWireError> {
+    fn spi_write_to_buf<H>(&mut self, header: &H, data: &[u8], mut buf: &mut[u8])
+    -> Result<usize, FromWireError>
+    where H: flash::SpiHeader + ToWire {
         let mut console = Console::new();
+        let mut tx_cursor = SpiutilsCursor::new(&mut buf);
+        if let Err(why) = header.to_wire(&mut tx_cursor) {
+            writeln!(console, "Host: Could not store header: {:?}", why);
+            return Err(FromWireError::OutOfRange);
+        }
         if header.get_opcode().has_dummy_byte() {
-            // Consume dummy byte
-            rx_buf = &rx_buf[1..];
+            // Skip dummy byte
+            if let Err(why) = tx_cursor.write_bytes(&[1; 0]) {
+                writeln!(console, "Host: Could not store dummy byte: {:?}", why);
+                return Err(FromWireError::OutOfRange);
+            }
+        }
+
+        if let Err(why) = tx_cursor.write_bytes(&data) {
+            writeln!(console, "Host: Could not store data: {:?}", why);
+            return Err(FromWireError::OutOfRange);
+        }
+
+        Ok(tx_cursor.consumed_len())
+    }
+
+    fn spi_host_send<H>(&mut self, header: &H, data: &[u8]) -> Result<(), FromWireError>
+    where H: flash::SpiHeader + ToWire {
+        let mut tx_buf = [0xff; spi_host::MAX_READ_BUFFER_LENGTH];
+        let tx_len = self.spi_write_to_buf(header, data, &mut tx_buf)?;
+
+        if let Err(_) = spi_host_h1::get().set_wait_busy_clear_in_transactions(header.get_opcode().wait_busy_clear()) {
+            return Err(FromWireError::OutOfRange);
+        }
+        if let Err(_) = spi_host::get().read_write_bytes(&mut tx_buf, tx_len) {
+            return Err(FromWireError::OutOfRange);
+        }
+        spi_host::get().wait_read_write_done();
+
+        Ok(())
+    }
+
+    fn clear_device_status(&self, clear_busy: bool, clear_write_enable: bool) -> Result<(), FromWireError> {
+        spi_device::get().clear_status(clear_busy, clear_write_enable).map_err(|_| FromWireError::OutOfRange)
+    }
+
+    fn process_spi_header<H>(&mut self, header: &H, rx_buf: &[u8]) -> Result<(), FromWireError>
+    where H: flash::SpiHeader + ToWire
+    {
+        let mut data: &[u8] = rx_buf;
+        if header.get_opcode().has_dummy_byte() {
+            // Skip dummy byte
+            data = &rx_buf[1..];
         }
         match header.get_opcode() {
             OpCode::PageProgram => {
-                if header.get_address().is_none() {
-                    return Err(FromWireError::OutOfRange)
+                match header.get_address() {
+                    Some(0x02000000) => {
+                        if spi_device::get().is_write_enable_set() {
+                            self.process_spi_payload(data)?;
+                        }
+                        self.clear_device_status(true, true)
+                    }
+                    Some(x) if x < 0x02000000 => {
+                        if spi_device::get().is_write_enable_set() {
+                            // Pass through to SPI host
+                            self.spi_host_write_enable()?;
+                            self.spi_host_send(header, data)?;
+                        }
+                        self.clear_device_status(true, true)
+                    }
+                    _ => {
+                        return Err(FromWireError::OutOfRange)
+                    }
                 }
-                self.process_spi_write(header.get_address().unwrap(), rx_buf)
+            }
+            OpCode::SectorErase | OpCode::BlockErase32KB | OpCode::BlockErase64KB => {
+                match header.get_address() {
+                    Some(0x02000000) => {
+                        // Nothing to do.
+                        self.clear_device_status(true, true)
+                    }
+                    Some(x) if x < 0x02000000 => {
+                        if spi_device::get().is_write_enable_set() {
+                            // Pass through to SPI host
+                            self.spi_host_write_enable()?;
+                            self.spi_host_send(header, data)?;
+                        }
+                        self.clear_device_status(true, true)
+                    }
+                    _ => {
+                        return Err(FromWireError::OutOfRange)
+                    }
+                }
+            }
+            OpCode::ChipErase | OpCode::ChipErase2 => {
+                if spi_device::get().is_write_enable_set() {
+                    // Pass through to SPI host
+                    self.spi_host_write_enable()?;
+                    self.spi_host_send(header, data)?;
+                }
+                self.clear_device_status(true, true)
             }
             _ => {
                 Err(FromWireError::OutOfRange)
@@ -261,12 +349,12 @@ impl<'a> SpiProcessor<'a> {
             AddressMode::ThreeByte => {
                 let header = flash::Header::<ux::u24>::from_wire(&mut rx_buf)?;
                 writeln!(console, "Device: flash header (3B): {:?}", header);
-                self.process_spi_header(rx_buf, &header)
+                self.process_spi_header(&header, rx_buf)
             }
             AddressMode::FourByte => {
                 let header = flash::Header::<u32>::from_wire(&mut rx_buf)?;
                 writeln!(console, "Device: flash header (4B): {:?}", header);
-                self.process_spi_header(rx_buf, &header)
+                self.process_spi_header(&header, rx_buf)
             }
         }
     }
@@ -280,7 +368,7 @@ fn run() -> TockResult<()> {
     //////////////////////////////////////////////////////////////////////////////
 
     // We cannot use the SPI host if passthrough is enabled.
-    spi_host_h1::get().disable_passthrough()?;
+    spi_host_h1::get().set_passthrough(false)?;
 
     let host_demo = SpiHostDemo {};
 
@@ -333,7 +421,7 @@ fn run() -> TockResult<()> {
     //////////////////////////////////////////////////////////////////////////////
 
     // We need SPI passthrough to be fully operational.
-    spi_host_h1::get().enable_passthrough()?;
+    spi_host_h1::get().set_passthrough(true)?;
 
     loop {
         writeln!(console, "Device: Waiting for transaction")?;
@@ -347,7 +435,7 @@ fn run() -> TockResult<()> {
             Err(why) => {
                 writeln!(console, "Device: Error processing SPI packet: {:?}", why);
                 if spi_device::get().is_busy_set() {
-                    spi_device::get().clear_busy()?;
+                    spi_device::get().clear_status(true, false)?;
                 }
             }
         }

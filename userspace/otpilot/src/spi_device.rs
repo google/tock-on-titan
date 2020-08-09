@@ -16,7 +16,9 @@
 
 use core::cell::Cell;
 use core::convert::TryFrom;
+use core::fmt::Write;
 
+use libtock::console::Console;
 use libtock::result::TockError;
 use libtock::result::TockResult;
 use libtock::shared_memory::SharedMemory;
@@ -35,6 +37,9 @@ pub trait SpiDevice {
     /// Check if received a transaction.
     fn have_transaction(&self) -> bool;
 
+    /// Clear the current received transaction.
+    fn clear_transaction(&self);
+
     /// Wait for a transaction by yielding.
     fn wait_for_transaction(&self);
 
@@ -44,11 +49,16 @@ pub trait SpiDevice {
     /// Whether the transaction has the BUSY bit set.
     fn is_busy_set(&self) -> bool;
 
-    /// Clear the BUSY bit if set.
-    fn clear_busy(&self) -> TockResult<()>;
+    /// Whether the transaction has the WRITE ENABLE bit set.
+    fn is_write_enable_set(&self) -> bool;
 
-    /// Send data to be made available to the SPI host and clear the BUSY bit if requested.
-    fn send_data(&self, write_buffer: &mut[u8], clear_busy: bool) -> TockResult<()>;
+    /// Clear the BUSY and/or the WRITE ENABLE bits.
+    fn clear_status(&self, clear_busy: bool, clear_write_enable: bool) -> TockResult<()>;
+
+    /// Send data to be made available to the SPI host and clear the BUSY
+    /// and/or WRITE_ENABLE bits if requested.
+    fn send_data(&self, write_buffer: &mut[u8], clear_busy: bool, clear_write_enable: bool)
+    -> TockResult<()>;
 
     /// Configure the engine's address mode.
     fn set_address_mode(&self, address_mode: AddressMode) -> TockResult<()>;
@@ -70,7 +80,7 @@ const DRIVER_NUMBER: usize = 0x40030;
 mod command_nr {
     pub const CHECK_IF_PRESENT: usize = 0;
     pub const SEND_DATA: usize = 1;
-    pub const CLEAR_BUSY: usize = 2;
+    pub const CLEAR_STATUS: usize = 2;
     pub const SET_ADDRESS_MODE: usize = 3;
     pub const GET_ADDRESS_MODE: usize = 4;
     pub const SET_ADDRESS_MODE_HANDLING: usize = 5;
@@ -99,6 +109,9 @@ struct SpiDeviceImpl {
     /// Whether the BUSY bit was set for the last received transaction.
     is_busy_set: Cell<bool>,
 
+    /// Whether the WRITE ENABLE bit was set for the last received transaction.
+    is_write_enable_set: Cell<bool>,
+
     /// The current address mode
     address_mode: Cell<AddressMode>,
 }
@@ -108,6 +121,7 @@ static mut SPI_DEVICE: SpiDeviceImpl = SpiDeviceImpl {
     read_buffer_share: Cell::new(None),
     received_len: Cell::new(0),
     is_busy_set: Cell::new(false),
+    is_write_enable_set: Cell::new(false),
     address_mode: Cell::new(AddressMode::ThreeByte),
 };
 
@@ -160,11 +174,13 @@ impl SpiDeviceImpl {
         get_impl().data_received(arg1, arg2, arg3);
     }
 
-    fn data_received(&self, arg1: usize, arg2: usize, _: usize) {
+    fn data_received(&self, arg1: usize, arg2: usize, arg3: usize) {
         // arg1: number of received bytes
         // arg2: whether BUSY bit is set
+        // arg3: whether WRITE ENABLE bit is set
         self.received_len.set(arg1);
         self.is_busy_set.set(arg2 != 0);
+        self.is_write_enable_set.set(arg3 != 0);
     }
 
     extern "C"
@@ -178,6 +194,9 @@ impl SpiDeviceImpl {
             Ok(val) => self.address_mode.set(val),
             Err(_) => ()
         }
+
+        let mut console = Console::new();
+        writeln!(console, "address_mode_changed: {:?}", arg1);
     }
 }
 
@@ -186,7 +205,12 @@ impl SpiDevice for SpiDeviceImpl {
         self.received_len.get() != 0
     }
 
+    fn clear_transaction(&self) {
+        self.received_len.set(0);
+    }
+
     fn wait_for_transaction(&self) {
+        self.clear_transaction();
         while !self.have_transaction() { unsafe { yieldk(); } }
     }
 
@@ -198,19 +222,24 @@ impl SpiDevice for SpiDeviceImpl {
         self.is_busy_set.get()
     }
 
-    fn clear_busy(&self) -> TockResult<()> {
-        self.received_len.set(0);
-        syscalls::command(DRIVER_NUMBER, command_nr::CLEAR_BUSY, 0, 0)?;
+    fn is_write_enable_set(&self) -> bool {
+        self.is_write_enable_set.get()
+    }
+
+    fn clear_status(&self, clear_busy: bool, clear_write_enable: bool) -> TockResult<()> {
+        syscalls::command(DRIVER_NUMBER, command_nr::CLEAR_STATUS,
+            if clear_busy { 1 } else { 0 },
+            if clear_write_enable { 1 } else { 0 })?;
         Ok(())
     }
 
-    fn send_data(&self, write_buffer: &mut[u8], clear_busy: bool) -> TockResult<()> {
-        self.received_len.set(0);
-
+    fn send_data(&self, write_buffer: &mut[u8], clear_busy: bool, clear_write_enable: bool) -> TockResult<()> {
         // We want this to go out of scope after executing the command
         let _write_buffer_share = syscalls::allow(DRIVER_NUMBER, allow_nr::WRITE_BUFFER, write_buffer)?;
 
-        syscalls::command(DRIVER_NUMBER, command_nr::SEND_DATA, if clear_busy { 1 } else { 0 }, 0)?;
+        syscalls::command(DRIVER_NUMBER, command_nr::SEND_DATA,
+            if clear_busy { 1 } else { 0 },
+            if clear_write_enable { 1 } else { 0 })?;
 
         Ok(())
     }

@@ -186,6 +186,21 @@ impl<'a> OpCode {
             _ => false,
         }
     }
+
+    /// Returns true iff the OpCode requires for the BUSY bit to clear.
+    pub fn wait_busy_clear(&self) -> bool {
+        match self {
+            Self::WriteSuspend => true,
+            Self::WriteResume => true,
+            Self::SectorErase => true,
+            Self::BlockErase32KB => true,
+            Self::BlockErase64KB => true,
+            Self::ChipErase => true,
+            Self::ChipErase2 => true,
+            Self::PageProgram => true,
+            _ => false,
+        }
+    }
 }
 
 const DUMMY_BYTE_VALUE: u8 = 0xff;
