@@ -132,6 +132,12 @@ impl SpiHostHardware {
             CTRL::RXBITOR::SET +
             CTRL::RXBYTOR::CLEAR +
             CTRL::ENPASSTHRU::CLEAR);
+        self.registers.xact.write(
+            XACT::START::CLEAR +
+            XACT::BCNT.val(7) +
+            XACT::SIZE.val(0) +
+            XACT::RDY_POLL::CLEAR +
+            XACT::RDY_POLL_DLY.val(0));
     }
 
     fn enable_tx_interrupt(&self) {
@@ -224,6 +230,11 @@ impl SpiHost for SpiHostHardware {
     fn spi_device_spi_host_passthrough(&self, enabled: bool) {
         self.registers.ctrl.modify(
             if enabled { CTRL::ENPASSTHRU::SET } else { CTRL::ENPASSTHRU::CLEAR });
+    }
+
+    fn wait_busy_clear_in_transactions(&self, enabled: bool) {
+        self.registers.xact.modify(
+            if enabled { XACT::RDY_POLL::SET } else { XACT::RDY_POLL::CLEAR });
     }
 }
 

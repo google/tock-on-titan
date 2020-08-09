@@ -30,6 +30,13 @@ impl<'a> SpiHostSyscall<'a> {
             ReturnCode::SUCCESS
         }).unwrap_or(ReturnCode::ENOMEM)
     }
+
+    fn wait_busy_clear_in_transactions(&self, caller_id: AppId, enable: bool) -> ReturnCode {
+        self.apps.enter(caller_id, |_app_data, _| {
+            self.device.wait_busy_clear_in_transactions(enable);
+            ReturnCode::SUCCESS
+        }).unwrap_or(ReturnCode::ENOMEM)
+    }
 }
 
 impl<'a> Driver for SpiHostSyscall<'a> {
@@ -50,9 +57,14 @@ impl<'a> Driver for SpiHostSyscall<'a> {
         }
         match command_num {
             0 /* Check if present */ => ReturnCode::SUCCESS,
-            1 /* Enable/disable SPI device <-> SPI host passthrough
+            1 /* Enable/disable SPI device <-> SPI host passthrough.
                  arg1: 0: disable, != 0: enable) */ => {
                 self.spi_device_spi_host_passthrough(caller_id, arg1 != 0)
+            },
+            2 /* Enable/disable to wait for BUSY bit to clear before completing
+                 transactions.
+                 arg1: 0: disable, != 0: enable) */ => {
+                self.wait_busy_clear_in_transactions(caller_id, arg1 != 0)
             },
             _ => ReturnCode::ENOSUPPORT
         }
