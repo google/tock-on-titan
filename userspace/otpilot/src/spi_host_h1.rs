@@ -18,11 +18,11 @@ use libtock::result::TockResult;
 use libtock::syscalls;
 
 pub trait SpiHostH1 {
-    /// Enable SPI passthrough.
-    fn enable_passthrough(&self) -> TockResult<()>;
+    /// Enable/disable SPI passthrough.
+    fn set_passthrough(&self, enabled: bool) -> TockResult<()>;
 
-    /// Disable SPI passthrough.
-    fn disable_passthrough(&self) -> TockResult<()>;
+    /// Enable/disable wait for BUSY bit to clear before completing transactions.
+    fn set_wait_busy_clear_in_transactions(&self, enabled: bool) -> TockResult<()>;
 }
 
 // Get the static SpiHostH1 object.
@@ -35,6 +35,7 @@ const DRIVER_NUMBER: usize = 0x40020;
 mod command_nr {
     pub const CHECK_IF_PRESENT: usize = 0;
     pub const ENABLE_DISABLE_PASSTHROUGH: usize = 1;
+    pub const ENABLE_DISABLE_WAIT_BUSY_CLEAR_IN_TRANSACTIONS: usize = 2;
 }
 
 struct SpiHostH1Impl {}
@@ -61,20 +62,18 @@ impl SpiHostH1Impl {
 
         Ok(())
     }
-
-    fn enable_disable_passtrough(&self, enable: bool) -> TockResult<()> {
-        syscalls::command(DRIVER_NUMBER, command_nr::ENABLE_DISABLE_PASSTHROUGH, if enable { 1 } else { 0 }, 0)?;
-
-        Ok(())
-    }
 }
 
 impl SpiHostH1 for SpiHostH1Impl {
-    fn enable_passthrough(&self) -> TockResult<()> {
-        self.enable_disable_passtrough(true)
+    fn set_passthrough(&self, enabled: bool) -> TockResult<()> {
+        syscalls::command(DRIVER_NUMBER, command_nr::ENABLE_DISABLE_PASSTHROUGH, if enabled { 1 } else { 0 }, 0)?;
+
+        Ok(())
     }
 
-    fn disable_passthrough(&self) -> TockResult<()> {
-        self.enable_disable_passtrough(false)
+    fn set_wait_busy_clear_in_transactions(&self, enabled: bool) -> TockResult<()> {
+        syscalls::command(DRIVER_NUMBER, command_nr::ENABLE_DISABLE_WAIT_BUSY_CLEAR_IN_TRANSACTIONS, if enabled { 1 } else { 0 }, 0)?;
+
+        Ok(())
     }
 }
