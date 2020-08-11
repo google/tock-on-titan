@@ -25,6 +25,7 @@ use core::fmt::Write;
 use core::time::Duration;
 
 use libtock::console::Console;
+use libtock::result::TockError;
 use libtock::result::TockResult;
 
 use manticore::crypto::rsa;
@@ -41,9 +42,10 @@ use spiutils::protocol::flash;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::flash::OpCode;
 use spiutils::protocol::payload;
-use spiutils::protocol::wire::FromWireError;
 use spiutils::protocol::wire::FromWire;
+use spiutils::protocol::wire::FromWireError;
 use spiutils::protocol::wire::ToWire;
+use spiutils::protocol::wire::ToWireError;
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -160,73 +162,113 @@ impl rsa::Builder for NoRsa {
 
 //////////////////////////////////////////////////////////////////////////////
 
+#[derive(Copy, Clone, Debug)]
+enum SpiProcessorError {
+    FromWire(FromWireError),
+    ToWire(ToWireError),
+    Tock,
+    Manticore(manticore::server::Error),
+    UnsupportedContentType(payload::ContentType),
+    UnsupportedOpCode(OpCode),
+    InvalidAddress(Option<u32>),
+    Format(core::fmt::Error),
+}
+
+impl From<FromWireError> for SpiProcessorError {
+    fn from(err: FromWireError) -> Self {
+        SpiProcessorError::FromWire(err)
+    }
+}
+
+impl From<core::num::TryFromIntError> for SpiProcessorError {
+    fn from(_err: core::num::TryFromIntError) -> Self {
+        SpiProcessorError::FromWire(FromWireError::OutOfRange)
+    }
+}
+
+impl From<ToWireError> for SpiProcessorError {
+    fn from(err: ToWireError) -> Self {
+        SpiProcessorError::ToWire(err)
+    }
+}
+
+impl From<TockError> for SpiProcessorError {
+    fn from(_err: TockError) -> Self {
+        SpiProcessorError::Tock
+    }
+}
+
+impl From<manticore::server::Error> for SpiProcessorError {
+    fn from(err: manticore::server::Error) -> Self {
+        SpiProcessorError::Manticore(err)
+    }
+}
+
+impl From<core::fmt::Error> for SpiProcessorError {
+    fn from(err: core::fmt::Error) -> Self {
+        SpiProcessorError::Format(err)
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
 struct SpiProcessor<'a> {
     server: PaRot<'a, Identity, Reset, NoRsa>,
 }
 
 const SPI_TX_BUF_SIZE : usize = 512;
 
+type SpiProcessorResult<T> = Result<T, SpiProcessorError>;
+
 impl<'a> SpiProcessor<'a> {
-    fn send_data(&mut self, tx_header: &payload::Header, tx_buf: &mut[u8]) -> Result<(), FromWireError>{
-        let mut console = Console::new();
+
+    fn send_data(&mut self, tx_header: &payload::Header, tx_buf: &mut[u8]) -> SpiProcessorResult<()> {
         {
+            // Scope for tx_cursor (which doesn't implement Drop).
+            // We need tx_cursor to go out of scope so that we can use tx_buf further down.
             let tx_cursor = SpiutilsCursor::new(tx_buf);
-            if let Err(why) = tx_header.to_wire(tx_cursor) {
-                writeln!(console, "Device: Could not store header: {:?}", why);
-                return Err(FromWireError::OutOfRange);
-            }
+            tx_header.to_wire(tx_cursor)?;
         }
-        if let Err(_) = spi_device::get().send_data(tx_buf, true, true) {
-            writeln!(console, "Device: Could not send data.");
-            return Err(FromWireError::OutOfRange);
-        }
+        spi_device::get().send_data(tx_buf, true, true)?;
 
         Ok(())
     }
 
-    fn process_manticore(&mut self, mut data: &[u8]) -> Result<(), FromWireError> {
+    fn process_manticore(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
         let mut console = Console::new();
-        writeln!(console, "Device: Manticore!");
+        writeln!(console, "Device: Manticore!")?;
 
         let mut tx_buf : [u8; SPI_TX_BUF_SIZE] = [0xff; SPI_TX_BUF_SIZE];
-        writeln!(console, "Device: Starting processing");
         let payload_len : u16;
         {
             let mut tx_cursor = ManticoreCursor::new(&mut tx_buf[payload::HEADER_LEN..]);
-            if let Err(why) = self.server.process_request(&mut data, &mut tx_cursor) {
-                writeln!(console, "Device: Could not process request: {:?}", why);
-                return Err(FromWireError::OutOfRange);
-            }
-            writeln!(console, "Device: Done processing");
-            match u16::try_from(tx_cursor.consumed_len()) {
-                Ok(val) => payload_len = val,
-                Err(_) => return Err(FromWireError::OutOfRange),
-            }
+            self.server.process_request(&mut data, &mut tx_cursor)?;
+            payload_len = u16::try_from(tx_cursor.consumed_len())?;
         }
         let tx_header = payload::Header {
             content: payload::ContentType::Manticore,
             content_len: payload_len,
         };
         self.send_data(&tx_header, &mut tx_buf)?;
-        writeln!(console, "Device: Data sent");
+        writeln!(console, "Device: Data sent")?;
         Ok(())
     }
 
-    fn process_spi_payload(&mut self, mut data: &[u8]) -> Result<(), FromWireError> {
+    fn process_spi_payload(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
         let mut console = Console::new();
         let header = payload::Header::from_wire(&mut data)?;
-        writeln!(console, "Device: payload header: {:?}", header);
+        writeln!(console, "Device: payload header: {:?}", header)?;
         match header.content {
             payload::ContentType::Manticore => {
                 self.process_manticore(&data[..header.content_len as usize])
             }
             _ => {
-                Err(FromWireError::OutOfRange)
+                Err(SpiProcessorError::UnsupportedContentType(header.content))
             }
         }
     }
 
-    fn spi_host_write_enable(&mut self) -> Result<(), FromWireError> {
+    fn spi_host_write_enable(&mut self) -> SpiProcessorResult<()> {
         let header = flash::Header::<u32> {
             opcode: OpCode::WriteEnable,
             address: None,
@@ -236,51 +278,40 @@ impl<'a> SpiProcessor<'a> {
     }
 
     fn spi_write_to_buf<H>(&mut self, header: &H, data: &[u8], mut buf: &mut[u8])
-    -> Result<usize, FromWireError>
+    -> SpiProcessorResult<usize>
     where H: flash::SpiHeader + ToWire {
-        let mut console = Console::new();
         let mut tx_cursor = SpiutilsCursor::new(&mut buf);
-        if let Err(why) = header.to_wire(&mut tx_cursor) {
-            writeln!(console, "Host: Could not store header: {:?}", why);
-            return Err(FromWireError::OutOfRange);
-        }
+        header.to_wire(&mut tx_cursor)?;
         if header.get_opcode().has_dummy_byte() {
             // Skip dummy byte
-            if let Err(why) = tx_cursor.write_bytes(&[1; 0]) {
-                writeln!(console, "Host: Could not store dummy byte: {:?}", why);
-                return Err(FromWireError::OutOfRange);
-            }
+            tx_cursor.write_bytes(&[1; 0])
+                .map_err(|err| SpiProcessorError::ToWire(ToWireError::Io(err)))?;
         }
 
-        if let Err(why) = tx_cursor.write_bytes(&data) {
-            writeln!(console, "Host: Could not store data: {:?}", why);
-            return Err(FromWireError::OutOfRange);
-        }
+        tx_cursor.write_bytes(&data)
+            .map_err(|err| SpiProcessorError::ToWire(ToWireError::Io(err)))?;
 
         Ok(tx_cursor.consumed_len())
     }
 
-    fn spi_host_send<H>(&mut self, header: &H, data: &[u8]) -> Result<(), FromWireError>
+    fn spi_host_send<H>(&mut self, header: &H, data: &[u8]) -> SpiProcessorResult<()>
     where H: flash::SpiHeader + ToWire {
         let mut tx_buf = [0xff; spi_host::MAX_READ_BUFFER_LENGTH];
         let tx_len = self.spi_write_to_buf(header, data, &mut tx_buf)?;
 
-        if let Err(_) = spi_host_h1::get().set_wait_busy_clear_in_transactions(header.get_opcode().wait_busy_clear()) {
-            return Err(FromWireError::OutOfRange);
-        }
-        if let Err(_) = spi_host::get().read_write_bytes(&mut tx_buf, tx_len) {
-            return Err(FromWireError::OutOfRange);
-        }
+        spi_host_h1::get().set_wait_busy_clear_in_transactions(header.get_opcode().wait_busy_clear())?;
+        spi_host::get().read_write_bytes(&mut tx_buf, tx_len)?;
         spi_host::get().wait_read_write_done();
 
         Ok(())
     }
 
-    fn clear_device_status(&self, clear_busy: bool, clear_write_enable: bool) -> Result<(), FromWireError> {
-        spi_device::get().clear_status(clear_busy, clear_write_enable).map_err(|_| FromWireError::OutOfRange)
+    fn clear_device_status(&self, clear_busy: bool, clear_write_enable: bool) -> SpiProcessorResult<()> {
+        spi_device::get().clear_status(clear_busy, clear_write_enable)?;
+        Ok(())
     }
 
-    fn process_spi_header<H>(&mut self, header: &H, rx_buf: &[u8]) -> Result<(), FromWireError>
+    fn process_spi_header<H>(&mut self, header: &H, rx_buf: &[u8]) -> SpiProcessorResult<()>
     where H: flash::SpiHeader + ToWire
     {
         let mut data: &[u8] = rx_buf;
@@ -305,9 +336,7 @@ impl<'a> SpiProcessor<'a> {
                         }
                         self.clear_device_status(true, true)
                     }
-                    _ => {
-                        return Err(FromWireError::OutOfRange)
-                    }
+                    _ => return Err(SpiProcessorError::InvalidAddress(header.get_address())),
                 }
             }
             OpCode::SectorErase | OpCode::BlockErase32KB | OpCode::BlockErase64KB => {
@@ -324,9 +353,7 @@ impl<'a> SpiProcessor<'a> {
                         }
                         self.clear_device_status(true, true)
                     }
-                    _ => {
-                        return Err(FromWireError::OutOfRange)
-                    }
+                    _ => return Err(SpiProcessorError::InvalidAddress(header.get_address())),
                 }
             }
             OpCode::ChipErase | OpCode::ChipErase2 => {
@@ -337,23 +364,21 @@ impl<'a> SpiProcessor<'a> {
                 }
                 self.clear_device_status(true, true)
             }
-            _ => {
-                Err(FromWireError::OutOfRange)
-            }
+            _ => return Err(SpiProcessorError::UnsupportedOpCode(header.get_opcode())),
         }
     }
 
-    fn process_spi_packet(&mut self, mut rx_buf: &[u8]) -> Result<(), FromWireError> {
+    fn process_spi_packet(&mut self, mut rx_buf: &[u8]) -> SpiProcessorResult<()> {
         let mut console = Console::new();
         match spi_device::get().get_address_mode() {
             AddressMode::ThreeByte => {
                 let header = flash::Header::<ux::u24>::from_wire(&mut rx_buf)?;
-                writeln!(console, "Device: flash header (3B): {:?}", header);
+                writeln!(console, "Device: flash header (3B): {:?}", header)?;
                 self.process_spi_header(&header, rx_buf)
             }
             AddressMode::FourByte => {
                 let header = flash::Header::<u32>::from_wire(&mut rx_buf)?;
-                writeln!(console, "Device: flash header (4B): {:?}", header);
+                writeln!(console, "Device: flash header (4B): {:?}", header)?;
                 self.process_spi_header(&header, rx_buf)
             }
         }
@@ -428,12 +453,13 @@ fn run() -> TockResult<()> {
         spi_device::get().wait_for_transaction();
 
         let rx_buf = spi_device::get().get_read_buffer();
-        writeln!(console, "Device: RX: {:02x?} busy={}", rx_buf, spi_device::get().is_busy_set())?;
+        writeln!(console, "Device: RX: {:02x?} busy={} wel={}",
+            rx_buf, spi_device::get().is_busy_set(), spi_device::get().is_write_enable_set())?;
 
         match processor.process_spi_packet(rx_buf) {
             Ok(()) => {}
             Err(why) => {
-                writeln!(console, "Device: Error processing SPI packet: {:?}", why);
+                writeln!(console, "Device: Error processing SPI packet: {:?}", why)?;
                 if spi_device::get().is_busy_set() {
                     spi_device::get().clear_status(true, false)?;
                 }
