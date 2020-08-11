@@ -29,7 +29,9 @@ pub trait SpiDeviceClient {
     /// `is_busy`: Whether the command caused the "busy" bit to be set.
     /// If the "busy" bit has been set, then SpiDevice.clear_busy must
     /// be called to finish the transaction.
-    fn data_available(&self, is_busy: bool);
+    ///
+    /// `is_write_enabled`: Whether the "write enabled" bit is set.
+    fn data_available(&self, is_busy: bool, is_write_enabled: bool);
 }
 
 pub trait SpiDevice {
@@ -60,4 +62,7 @@ pub trait SpiDevice {
 
     /// Clear the busy bit.
     fn clear_busy(&self);
+
+    /// Clear the write enable bit.
+    fn clear_write_enable(&self);
 }
