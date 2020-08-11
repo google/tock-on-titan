@@ -94,7 +94,7 @@ register_structs! {
 
 
         /// EEPROM status register. The allocation and function of most bits are
-        /// not defined in hardware, and is left up to software insetad. The
+        /// not defined in hardware, and is left up to software instead. The
         /// only exceptions are BUSY and WEL. BUSY is hardware set and software
         /// cleared. WEL is hardware set and cleared by either hardware or
         /// software. These two bits are NOT reflected as part of a read to
@@ -445,8 +445,8 @@ pub struct SpiDeviceConfiguration {
     pub enable_fastread4b_cmd: bool,
 
     /// Set to true to handle OpCode::Enter4ByteAddressMode and OpCode::Exit4ByteAddressMode
-    /// in software.
-    /// When set to false, these op codes are not passed to software for handling.
+    /// in software and passthrough mode.
+    /// When set to false, these op codes are ignored.
     pub enable_enterexit4b_cmd: bool,
 
     /// Startup address mode.
@@ -523,6 +523,8 @@ impl SpiDeviceHardware {
         self.init_busy_opcodes();
 
         self.set_address_mode(self.config.startup_address_mode);
+
+        self.clear_send_data();
 
         // Enable EEPROM mode
         self.registers.ctrl.modify(CTRL::MODE::Eeprom);
@@ -604,14 +606,79 @@ impl SpiDeviceHardware {
             );
         rule_idx += 1;
 
-        // Match 0b1XXX_XXXX (0x80 - 0xff) and force to NormalRead
-        self.registers.passthru_filter_rule[rule_idx].write(
-                PASSTHRU_FILTER_RULE::VALID::SET +
-                PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::NormalRead as u32) +
-                PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1000_0000) +
-                PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1000_0000)
-            );
-        rule_idx += 1;
+        if !self.config.enable_enterexit4b_cmd {
+            // Match 0b1XXX_XXXX (0x80 - 0xff) and force to NormalRead
+            self.registers.passthru_filter_rule[rule_idx].write(
+                    PASSTHRU_FILTER_RULE::VALID::SET +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::NormalRead as u32) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1000_0000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1000_0000)
+                );
+            rule_idx += 1;
+        } else {
+            // Match 0b100X_XXXX (0x80 - 0x9f) and force to ReadJedec
+            self.registers.passthru_filter_rule[rule_idx].write(
+                    PASSTHRU_FILTER_RULE::VALID::SET +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::ReadJedec as u32) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1000_0000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1110_0000)
+                );
+            rule_idx += 1;
+
+            // Match 0b1010_XXXX (0xa0 - 0xaf) and force to 0xa0 (non-existing command)
+            self.registers.passthru_filter_rule[rule_idx].write(
+                    PASSTHRU_FILTER_RULE::VALID::SET +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(0b1010_0000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1010_0000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_0000)
+                );
+            rule_idx += 1;
+
+            // Match 0b1011_0XXX (0xb0 - 0xb7) and force to Enter4ByteAddressMode
+            self.registers.passthru_filter_rule[rule_idx].write(
+                    PASSTHRU_FILTER_RULE::VALID::SET +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::Enter4ByteAddressMode as u32) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1011_0000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_1000)
+                );
+            rule_idx += 1;
+
+            // Match 0b1011_1XXX (0xb8 - 0xbf) and force to 0xbf (non-existing command)
+            self.registers.passthru_filter_rule[rule_idx].write(
+                    PASSTHRU_FILTER_RULE::VALID::SET +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(0b1011_1111) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1011_0000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_1000)
+                );
+            rule_idx += 1;
+
+            // Match 0b110X_XXXX (0xc0 - 0xdf) and force to 0xc8 (non-existing command)
+            self.registers.passthru_filter_rule[rule_idx].write(
+                    PASSTHRU_FILTER_RULE::VALID::SET +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(0b1100_1000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1100_0000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1110_0000)
+                );
+            rule_idx += 1;
+
+            // Match 0b1110_XXXX (0xe0 - 0xef) and force to Exit4ByteAddressMode (0xe9)
+            self.registers.passthru_filter_rule[rule_idx].write(
+                    PASSTHRU_FILTER_RULE::VALID::SET +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(OpCode::Exit4ByteAddressMode as u32) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1110_0000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_0000)
+                );
+            rule_idx += 1;
+
+            // Match 0b1111_XXXX (0xf0 - 0xff) and force to 0xff (non-existing command)
+            self.registers.passthru_filter_rule[rule_idx].write(
+                    PASSTHRU_FILTER_RULE::VALID::SET +
+                    PASSTHRU_FILTER_RULE::FORCE_CMD.val(0b1111_1111) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH.val(0b1111_0000) +
+                    PASSTHRU_FILTER_RULE::CMD_MATCH_BIT_VECTOR.val(0b1111_0000)
+                );
+            rule_idx += 1;
+        }
 
         // Disable all remaining passthrough filter rules
         for idx in rule_idx..self.registers.passthru_filter_rule.len() {
@@ -623,20 +690,28 @@ impl SpiDeviceHardware {
 
     fn init_busy_opcodes(&self) {
         let mut opcode_idx = 0;
-        self.registers.busy_opcode[opcode_idx].write(
-            BUSY_OPCODE::EN::SET +
-            BUSY_OPCODE::VALUE.val(OpCode::Enter4ByteAddressMode as u32)
-        );
-        opcode_idx += 1;
+        if self.config.enable_enterexit4b_cmd {
+            self.registers.busy_opcode[opcode_idx].write(
+                BUSY_OPCODE::EN::SET +
+                BUSY_OPCODE::VALUE.val(OpCode::Enter4ByteAddressMode as u32)
+            );
+            opcode_idx += 1;
 
-        self.registers.busy_opcode[opcode_idx].write(
-            BUSY_OPCODE::EN::SET +
-            BUSY_OPCODE::VALUE.val(OpCode::Exit4ByteAddressMode as u32)
-        );
-        opcode_idx += 1;
+            self.registers.busy_opcode[opcode_idx].write(
+                BUSY_OPCODE::EN::SET +
+                BUSY_OPCODE::VALUE.val(OpCode::Exit4ByteAddressMode as u32)
+            );
+            opcode_idx += 1;
+        }
 
         for idx in opcode_idx..self.registers.busy_opcode.len() {
             self.registers.busy_opcode[idx].write(BUSY_OPCODE::EN::CLEAR);
+        }
+    }
+
+    fn clear_send_data(&self) {
+        for idx in 0..self.registers.generic_ram.len() {
+            self.registers.generic_ram[idx].set(0xff);
         }
     }
 
@@ -654,15 +729,18 @@ impl SpiDeviceHardware {
     }
 
     fn is_busy(&self) -> bool {
-        let busy = self.registers.eeprom_busy_status.is_set(STATUS_BIT::VALUE);
-        busy
+        self.registers.eeprom_busy_status.is_set(STATUS_BIT::VALUE)
+    }
+
+    fn is_write_enabled(&self) -> bool {
+        self.registers.eeprom_wel_status.is_set(STATUS_BIT::VALUE)
     }
 
     pub fn handle_interrupt_cmd_addr_fifo_not_empty(&self) {
         //debug!("CMD_ADDR_FIFO_EMPTY = {}", self.registers.cmd_addr_fifo_empty.get());
         if !self.registers.cmd_addr_fifo_empty.is_set(STATUS_BIT::VALUE) {
             self.client.map(|client| {
-                client.data_available(self.is_busy());
+                client.data_available(self.is_busy(), self.is_write_enabled());
             });
         }
 
@@ -726,6 +804,7 @@ impl SpiDevice for SpiDeviceHardware {
             AddressMode::ThreeByte => self.registers.eeprom_ctrl.modify(EEPROM_CTRL::ADDR_MODE::CLEAR),
             AddressMode::FourByte => self.registers.eeprom_ctrl.modify(EEPROM_CTRL::ADDR_MODE::SET),
         }
+        debug!("set_address_mode: {:?}", address_mode);
     }
 
     fn get_address_mode(&self) -> AddressMode {
@@ -807,6 +886,12 @@ impl SpiDevice for SpiDeviceHardware {
     fn clear_busy(&self) {
         // Note that this setting will not take effect until the SPI host reads
         // out the status register
-        self.registers.eeprom_busy_status.set(1);
+        self.registers.eeprom_busy_status.write(STATUS_BIT::VALUE::SET);
+    }
+
+    fn clear_write_enable(&self) {
+        // Note that this setting will not take effect until the SPI host reads
+        // out the status register
+        self.registers.eeprom_wel_status.write(STATUS_BIT::VALUE::SET);
     }
 }

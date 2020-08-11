@@ -65,13 +65,14 @@ impl<'a> SpiDeviceSyscall<'a> {
         }
     }
 
-    fn send_data(&self, caller_id: AppId, clear_busy: bool) -> ReturnCode {
+    fn send_data(&self, caller_id: AppId, clear_busy: bool, clear_write_enable: bool) -> ReturnCode {
         self.apps.enter(caller_id, |app_data, _| {
             if let Some(ref tx_buffer) = app_data.tx_buffer {
                 //debug!("send_data: clear_busy={:?}", clear_busy);
                 let return_code = self.device.put_send_data(tx_buffer.as_ref());
                 if isize::from(return_code) < 0 { return return_code; }
 
+                if clear_write_enable { self.device.clear_write_enable(); }
                 if clear_busy { self.device.clear_busy(); }
                 return ReturnCode::SUCCESS;
             }
@@ -80,10 +81,10 @@ impl<'a> SpiDeviceSyscall<'a> {
         }).unwrap_or(ReturnCode::ENOMEM)
     }
 
-    fn clear_busy(&self, caller_id: AppId) -> ReturnCode {
+    fn clear_status(&self, caller_id: AppId, clear_busy: bool, clear_write_enable: bool) -> ReturnCode {
         self.apps.enter(caller_id, |_app_data, _| {
-            //debug!("clear_busy");
-            self.device.clear_busy();
+            if clear_write_enable { self.device.clear_write_enable(); }
+            if clear_busy { self.device.clear_busy(); }
 
             ReturnCode::SUCCESS
         }).unwrap_or(ReturnCode::ENOMEM)
@@ -143,7 +144,7 @@ impl<'a> SpiDeviceSyscall<'a> {
 }
 
 impl<'a> SpiDeviceClient for SpiDeviceSyscall<'a> {
-    fn data_available(&self, is_busy: bool) {
+    fn data_available(&self, is_busy: bool, is_write_enabled: bool) {
         //debug!("data_available");
         self.current_user.get().map(|current_user| {
             let _ = self.apps.enter(current_user, move |app_data, _| {
@@ -166,15 +167,17 @@ impl<'a> SpiDeviceClient for SpiDeviceSyscall<'a> {
 
                 // Handle some special op code straight in kernel space
                 if let Some(spi_cmd) = maybe_spi_cmd {
+                    debug!("spi_cmd: {:?}", spi_cmd);
                     handler_mode = match self.process_spi_cmd(app_data, spi_cmd) {
                         Ok(mode) => mode,
                         Err(_) => HandlerMode::UserSpace,
                     }
                 }
 
+                debug!("handler_mode: {:?}", handler_mode);
                 if handler_mode == HandlerMode::UserSpace {
                     app_data.data_received_callback.map(
-                        |mut cb| cb.schedule(rx_len, usize::from(is_busy), 0));
+                        |mut cb| cb.schedule(rx_len, usize::from(is_busy), usize::from(is_write_enabled)));
                 }
             });
         });
@@ -193,7 +196,8 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
             0 /* Data received
                  Callback arguments:
                  arg1: number of received bytes
-                 arg2: whether BUSY bit is set (0: false, otherwise: true) */ => {
+                 arg2: whether BUSY bit is set (0: false, otherwise: true)
+                 arg3: whether WRITE ENABLE bit is set (0: false, otherwise: true) */ => {
                 self.apps.enter(app_id, |app_data, _| {
                     app_data.data_received_callback = callback;
                     ReturnCode::SUCCESS
@@ -211,7 +215,7 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
         }
     }
 
-    fn command(&self, command_num: usize, arg1: usize, _: usize, caller_id: AppId) -> ReturnCode {
+    fn command(&self, command_num: usize, arg1: usize, arg2: usize, caller_id: AppId) -> ReturnCode {
         //debug!("command: num={}", command_num);
         if self.current_user.get() == None {
             self.current_user.set(Some(caller_id));
@@ -219,11 +223,14 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
         match command_num {
             0 /* Check if present */ => ReturnCode::SUCCESS,
             1 /* Put send data
-                 arg1: Whether to also clear busy (0: false, != 0: true) */ => {
-                self.send_data(caller_id, arg1 != 0)
+                 arg1: Whether to clear busy (0: false, != 0: true)
+                 arg2: Whether to clear write enable (0: false, != 0: true) */ => {
+                self.send_data(caller_id, arg1 != 0, arg2 != 0)
             },
-            2 /* Clear busy */ => {
-                self.clear_busy(caller_id)
+            2 /* Clear status
+                 arg1: Whether to clear busy (0: false, != 0: true)
+                 arg2: Whether to clear write enable (0: false, != 0: true) */ => {
+                self.clear_status(caller_id, arg1 != 0, arg2 != 0)
             },
             3 /* Set address mode
                  arg1: AddressMode as usize */ => {
