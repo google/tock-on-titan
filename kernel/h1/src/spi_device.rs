@@ -16,6 +16,12 @@ use kernel::ReturnCode;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::flash::OpCode;
 
+// Helper method to improve syntax for getting a data byte from a slice
+// or a default value if the specified index is out of bounds.
+fn get_data_byte_or_default(data: &[u8], idx: usize, default: u8) -> u8 {
+    *data.get(idx).unwrap_or(&default)
+}
+
 // Registers for the SPI device controller
 register_structs! {
     Registers {
@@ -123,9 +129,9 @@ register_structs! {
 
 
         /// JEDEC ID value
-        (0x043c => jedec_id: [ReadWrite<u32>; 3]),
-        /// SFDP (Self discoverable parameter) 0..31
-        (0x0448 => sfdp: [ReadWrite<u32>; 32]),
+        (0x043c => jedec_id: [ReadWrite<u32, DATA::Register>; 3]),
+        /// SFDP (Self discoverable parameter)
+        (0x0448 => sfdp: [ReadWrite<u32, DATA::Register>; 32]),
 
 
         /// Error return value to external host if SPI virtual address does
@@ -428,6 +434,12 @@ register_bitfields![u32,
         RAM_PAGE2_LVL OFFSET(5) NUMBITS(1) [],
         /// INTR_RAM_PAGE3_LVL interrupt
         RAM_PAGE3_LVL OFFSET(6) NUMBITS(1) []
+    ],
+    DATA [
+        BYTE0 OFFSET(0) NUMBITS(8) [],
+        BYTE1 OFFSET(8) NUMBITS(8) [],
+        BYTE2 OFFSET(16) NUMBITS(8) [],
+        BYTE3 OFFSET(24) NUMBITS(8) []
     ]
 ];
 
@@ -518,7 +530,8 @@ impl SpiDeviceHardware {
 
         self.init_passthrough_filters();
 
-        self.init_jedec();
+        self.clear_jedec();
+        self.clear_sfdp();
 
         self.init_busy_opcodes();
 
@@ -531,11 +544,15 @@ impl SpiDeviceHardware {
         self.enable_rx_interrupt();
     }
 
-    fn init_jedec(&self) {
-        // Set JEDEC ID to (incorrect) OpenTitan w/ 64 MiB visible flash space.
-        self.registers.jedec_id[0].set(0x0020_3126);
-        for idx in 1..self.registers.jedec_id.len() {
-            self.registers.jedec_id[idx].set(0xffff_ffff);
+    fn clear_jedec(&self) {
+        for idx in 0..self.registers.jedec_id.len() {
+            self.registers.jedec_id[idx].set(!0);
+        }
+    }
+
+    fn clear_sfdp(&self) {
+        for idx in 0..self.registers.sfdp.len() {
+            self.registers.sfdp[idx].set(!0);
         }
     }
 
@@ -711,7 +728,7 @@ impl SpiDeviceHardware {
 
     fn clear_send_data(&self) {
         for idx in 0..self.registers.generic_ram.len() {
-            self.registers.generic_ram[idx].set(0xff);
+            self.registers.generic_ram[idx].set(!0);
         }
     }
 
@@ -745,6 +762,29 @@ impl SpiDeviceHardware {
         }
 
         self.clear_rx_interrupt();
+    }
+
+    /// Write bytes to a slice of 32-bit registers, filling missing data with 0xff.
+    fn write_register_data(&self, regs: &[ReadWrite<u32, DATA::Register>], data: &[u8]) -> kernel::ReturnCode {
+        if data.len() > regs.len()*4 {
+            debug!("h1::Sps::set_jedec_id: Invalid data length == {}", data.len());
+            return ReturnCode::ESIZE;
+        }
+
+        let mut reg = 0;
+        for idx in (0..data.len()).step_by(4) {
+            regs[reg].write(
+                DATA::BYTE0.val(get_data_byte_or_default(data, idx + 0, !0).into()) +
+                DATA::BYTE1.val(get_data_byte_or_default(data, idx + 1, !0).into()) +
+                DATA::BYTE2.val(get_data_byte_or_default(data, idx + 2, !0).into()) +
+                DATA::BYTE3.val(get_data_byte_or_default(data, idx + 3, !0).into()));
+            reg = reg + 1;
+        }
+        for reg in reg..regs.len() {
+            regs[reg].set(!0);
+        }
+
+        ReturnCode::SUCCESS
     }
 }
 
@@ -877,7 +917,7 @@ impl SpiDevice for SpiDeviceHardware {
             self.registers.generic_ram[idx].set(write_data[idx]);
         }
         for idx in write_data.len()..self.registers.generic_ram.len() {
-            self.registers.generic_ram[idx].set(0xff);
+            self.registers.generic_ram[idx].set(!0);
         }
 
         ReturnCode::SUCCESS
@@ -893,5 +933,19 @@ impl SpiDevice for SpiDeviceHardware {
         // Note that this setting will not take effect until the SPI host reads
         // out the status register
         self.registers.eeprom_wel_status.write(STATUS_BIT::VALUE::SET);
+    }
+
+    /// Configure JEDEC ID
+    fn set_jedec_id(&self, data: &[u8]) -> kernel::ReturnCode {
+        debug!("kernel: set_jedec_id (len={})", data.len());
+
+        self.write_register_data(&self.registers.jedec_id, data)
+    }
+
+    /// Configure SFDP
+    fn set_sfdp(&self, data: &[u8]) -> kernel::ReturnCode {
+        debug!("kernel: set_sfdp (len={})", data.len());
+
+        self.write_register_data(&self.registers.sfdp, data)
     }
 }

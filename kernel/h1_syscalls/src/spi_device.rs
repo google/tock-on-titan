@@ -141,6 +141,25 @@ impl<'a> SpiDeviceSyscall<'a> {
         }
     }
 
+    fn set_jedec_id(&self, caller_id: AppId) -> ReturnCode {
+        self.apps.enter(caller_id, |app_data, _| {
+            if let Some(ref tx_buffer) = app_data.tx_buffer {
+                self.device.set_jedec_id(tx_buffer.as_ref())
+            } else {
+                ReturnCode::ENOMEM
+            }
+        }).unwrap_or(ReturnCode::ENOMEM)
+    }
+
+    fn set_sfdp(&self, caller_id: AppId) -> ReturnCode {
+        self.apps.enter(caller_id, |app_data, _| {
+            if let Some(ref tx_buffer) = app_data.tx_buffer {
+                self.device.set_sfdp(tx_buffer.as_ref())
+            } else {
+                ReturnCode::ENOMEM
+            }
+        }).unwrap_or(ReturnCode::ENOMEM)
+    }
 }
 
 impl<'a> SpiDeviceClient for SpiDeviceSyscall<'a> {
@@ -222,7 +241,7 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
         }
         match command_num {
             0 /* Check if present */ => ReturnCode::SUCCESS,
-            1 /* Put send data
+            1 /* Put send data using data from TX buffer
                  arg1: Whether to clear busy (0: false, != 0: true)
                  arg2: Whether to clear write enable (0: false, != 0: true) */ => {
                 self.send_data(caller_id, arg1 != 0, arg2 != 0)
@@ -252,6 +271,12 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
                     Err(_) => return ReturnCode::EINVAL
                 };
                 self.set_address_mode_handling(caller_id, handler_mode)
+            }
+            6 /* Set JEDEC ID using data from TX buffer */ => {
+                self.set_jedec_id(caller_id)
+            }
+            7 /* Set SFDP using data from TX buffer */ => {
+                self.set_sfdp(caller_id)
             }
             _ => ReturnCode::ENOSUPPORT
         }
