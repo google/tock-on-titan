@@ -16,9 +16,7 @@
 
 use core::cell::Cell;
 use core::convert::TryFrom;
-use core::fmt::Write;
 
-use libtock::console::Console;
 use libtock::result::TockError;
 use libtock::result::TockResult;
 use libtock::shared_memory::SharedMemory;
@@ -194,9 +192,6 @@ impl SpiDeviceImpl {
             Ok(val) => self.address_mode.set(val),
             Err(_) => ()
         }
-
-        let mut console = Console::new();
-        writeln!(console, "address_mode_changed: {:?}", arg1);
     }
 }
 
