@@ -40,6 +40,8 @@ use kernel::common::dynamic_deferred_call::{DynamicDeferredCall, DynamicDeferred
 use kernel::component::Component;
 use kernel::hil;
 use kernel::hil::entropy::Entropy32;
+use kernel::hil::gpio::Configure;
+use kernel::hil::gpio::Output;
 use kernel::hil::rng::Rng;
 use kernel::mpu::MPU;
 
@@ -62,7 +64,8 @@ static mut CHIP: Option<&'static h1::chip::Hotel> = None;
 #[cfg(not(test))]
 #[panic_handler]
 pub unsafe extern "C" fn panic_fmt(pi: &core::panic::PanicInfo) -> ! {
-    let led = &mut kernel::hil::led::LedLow::new(&mut h1::gpio::PORT0.pins[0]);
+    // Use an unused GPIO
+    let led = &mut kernel::hil::led::LedLow::new(&mut h1::gpio::PORT1.pins[15]);
     let writer = &mut h1::io::WRITER;
     kernel::debug::panic(&mut [led], writer, pi, &cortexm3::support::nop, &crate::PROCESSES, &CHIP)
 }
@@ -120,21 +123,56 @@ pub unsafe fn reset_handler() {
         use h1::pmu::*;
         Clock::new(PeripheralClock::Bank0(PeripheralClock0::Gpio0)).enable();
         let pinmux = &mut *h1::pinmux::PINMUX;
-        // LED_0
+
+        const GPIO_INPUT_EN: u32 = 1 << 2;
+        const GPIO_PULLUP_EN: u32 = 1 << 4;
+
+        // BMC_SRST#
         pinmux.diob2.select.set(h1::pinmux::Function::Gpio0Gpio0);
+        pinmux.gpio0_gpio0.select.set(h1::pinmux::SelectablePin::Diob2);
+
+        // BMC_CPU_RST#
+        pinmux.diob6.select.set(h1::pinmux::Function::Gpio0Gpio1);
+        pinmux.gpio0_gpio1.select.set(h1::pinmux::SelectablePin::Diob6);
+
+        // SYS_RSTMON#
+        pinmux.diob0.select.set(h1::pinmux::Function::Gpio0Gpio2);
+        pinmux.diob0.control.set(GPIO_INPUT_EN | GPIO_PULLUP_EN);
+        pinmux.gpio0_gpio2.select.set(h1::pinmux::SelectablePin::Diob0);
+
+        // BMC_RSTMON#
+        pinmux.diob7.select.set(h1::pinmux::Function::Gpio0Gpio3);
+        pinmux.diob7.control.set(GPIO_INPUT_EN | GPIO_PULLUP_EN);
+        pinmux.gpio0_gpio3.select.set(h1::pinmux::SelectablePin::Diob7);
 
         pinmux.dioa0.select.set(h1::pinmux::Function::Uart0Tx);
-        pinmux.diom0.control.set(1 << 2 | 1 << 4);
+        pinmux.diom0.control.set(GPIO_INPUT_EN | GPIO_PULLUP_EN);
         pinmux.uart0_rx.select.set(h1::pinmux::SelectablePin::Diom0);
 
         // SPI MISO: input enable + pull-up enable
-        pinmux.dioa11.control.set(1 << 2 | 1 << 4);
+        pinmux.dioa11.control.set(GPIO_INPUT_EN | GPIO_PULLUP_EN);
 
         // SPS CLK, CS, MOSI: input enable + pull-up enable
-        pinmux.dioa6.control.set(1 << 2 | 1 << 4);
-        pinmux.dioa12.control.set(1 << 2 | 1 << 4);
-        pinmux.dioa2.control.set(1 << 2 | 1 << 4);
+        pinmux.dioa6.control.set(GPIO_INPUT_EN | GPIO_PULLUP_EN);
+        pinmux.dioa12.control.set(GPIO_INPUT_EN | GPIO_PULLUP_EN);
+        pinmux.dioa2.control.set(GPIO_INPUT_EN | GPIO_PULLUP_EN);
     }
+
+    let gpio_bmc_srst_n = &h1::gpio::PORT0.pins[0];
+    gpio_bmc_srst_n.clear();
+    let _ = gpio_bmc_srst_n.make_output();
+
+    let gpio_bmc_cpu_rst_n = &h1::gpio::PORT0.pins[1];
+    gpio_bmc_cpu_rst_n.clear();
+    let _ = gpio_bmc_cpu_rst_n.make_output();
+
+    let gpio_sys_rstmon_n = &h1::gpio::PORT0.pins[2];
+    gpio_sys_rstmon_n.clear();
+    let _ = gpio_sys_rstmon_n.make_input();
+
+    let gpio_bmc_rstmon_n = &h1::gpio::PORT0.pins[3];
+    gpio_bmc_rstmon_n.clear();
+    let _ = gpio_bmc_rstmon_n.make_input();
 
     // Create capabilities that the board needs to call certain protected kernel
     // functions.
@@ -198,8 +236,13 @@ pub unsafe fn reset_handler() {
 
     //debug!("Booting.");
     let gpio_pins = static_init!(
-        [&'static dyn kernel::hil::gpio::InterruptValuePin; 1],
-        [&h1::gpio::PORT0.pins[0]]);
+        [&'static dyn kernel::hil::gpio::InterruptValuePin; 4],
+        [
+            gpio_bmc_srst_n,
+            gpio_bmc_cpu_rst_n,
+            gpio_sys_rstmon_n,
+            gpio_bmc_rstmon_n,
+        ]);
 
     let gpio = static_init!(
         capsules::gpio::GPIO<'static>,
