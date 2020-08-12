@@ -66,6 +66,12 @@ pub trait SpiDevice {
 
     /// Set handling mode for address mode changes.
     fn set_address_mode_handling(&self, address_mode_handling: HandlerMode) -> TockResult<()>;
+
+    /// Set the JEDEC ID data.
+    fn set_jedec_id(&self, data: &mut[u8]) -> TockResult<()>;
+
+    /// Set the SFDP data.
+    fn set_sfdp(&self, data: &mut[u8]) -> TockResult<()>;
 }
 
 // Get the static SpiDevice object.
@@ -82,6 +88,8 @@ mod command_nr {
     pub const SET_ADDRESS_MODE: usize = 3;
     pub const GET_ADDRESS_MODE: usize = 4;
     pub const SET_ADDRESS_MODE_HANDLING: usize = 5;
+    pub const SET_JEDEC_ID: usize = 6;
+    pub const SET_SFDP: usize = 7;
 }
 
 mod subscribe_nr {
@@ -251,6 +259,24 @@ impl SpiDevice for SpiDeviceImpl {
 
     fn set_address_mode_handling(&self, address_mode_handling: HandlerMode) -> TockResult<()> {
         syscalls::command(DRIVER_NUMBER, command_nr::SET_ADDRESS_MODE_HANDLING, address_mode_handling as usize, 0)?;
+
+        Ok(())
+    }
+
+    fn set_jedec_id(&self, data: &mut[u8]) -> TockResult<()> {
+        // We want this to go out of scope after executing the command
+        let _write_buffer_share = syscalls::allow(DRIVER_NUMBER, allow_nr::WRITE_BUFFER, data)?;
+
+        syscalls::command(DRIVER_NUMBER, command_nr::SET_JEDEC_ID, 0, 0)?;
+
+        Ok(())
+    }
+
+    fn set_sfdp(&self, data: &mut[u8]) -> TockResult<()> {
+        // We want this to go out of scope after executing the command
+        let _write_buffer_share = syscalls::allow(DRIVER_NUMBER, allow_nr::WRITE_BUFFER, data)?;
+
+        syscalls::command(DRIVER_NUMBER, command_nr::SET_SFDP, 0, 0)?;
 
         Ok(())
     }

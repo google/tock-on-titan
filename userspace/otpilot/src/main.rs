@@ -16,6 +16,7 @@
 
 #![no_std]
 
+mod sfdp;
 mod spi_host;
 mod spi_host_h1;
 mod spi_device;
@@ -180,12 +181,6 @@ impl From<FromWireError> for SpiProcessorError {
     }
 }
 
-impl From<core::num::TryFromIntError> for SpiProcessorError {
-    fn from(_err: core::num::TryFromIntError) -> Self {
-        SpiProcessorError::FromWire(FromWireError::OutOfRange)
-    }
-}
-
 impl From<ToWireError> for SpiProcessorError {
     fn from(err: ToWireError) -> Self {
         SpiProcessorError::ToWire(err)
@@ -243,7 +238,8 @@ impl<'a> SpiProcessor<'a> {
         {
             let mut tx_cursor = ManticoreCursor::new(&mut tx_buf[payload::HEADER_LEN..]);
             self.server.process_request(&mut data, &mut tx_cursor)?;
-            payload_len = u16::try_from(tx_cursor.consumed_len())?;
+            payload_len = u16::try_from(tx_cursor.consumed_len())
+                .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
         }
         let tx_header = payload::Header {
             content: payload::ContentType::Manticore,
@@ -442,6 +438,37 @@ fn run() -> TockResult<()> {
 
     writeln!(console, "Device: Configuring address_mode handling to KernelSpace")?;
     spi_device::get().set_address_mode_handling(HandlerMode::KernelSpace)?;
+
+    // OpenTitan JEDEC ID
+    /*
+    spi_device::get().set_jedec_id(&mut [
+        0x26, // Manufacturer (Visic, should actually be
+              // 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x26)
+        0x31, // Device (OpenTitan)
+        0x19, // Size (2^25 = 256 Mb)
+        ])?;
+    */
+
+    // Legacy JEDEC ID
+    spi_device::get().set_jedec_id(&mut [
+        0x26, // Manufacturer
+        0x02, // Device
+        0x17, // Size
+        ])?;
+
+    {
+        let mut sfdp = [0xff; 128];
+        sfdp::get_table(
+            &mut sfdp,
+            0x2000000 * 8, // image_size_bits
+            spi_device::get().get_address_mode(), // startup_address_mode
+            spi_device::get().get_address_mode() == AddressMode::ThreeByte, // support_address_mode_switch
+            0x2000000, // mailbox_offset
+            spi_device::MAX_READ_BUFFER_SIZE as u32, // mailbox_size
+            0 // google_capabilities
+            ).map_err(|_| TockError::Format)?;
+        spi_device::get().set_sfdp(&mut sfdp)?;
+    }
 
     //////////////////////////////////////////////////////////////////////////////
 
