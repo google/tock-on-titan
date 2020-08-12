@@ -65,4 +65,10 @@ pub trait SpiDevice {
 
     /// Clear the write enable bit.
     fn clear_write_enable(&self);
+
+    /// Configure JEDEC ID
+    fn set_jedec_id(&self, data: &[u8]) -> kernel::ReturnCode;
+
+    /// Configure SFDP
+    fn set_sfdp(&self, data: &[u8]) -> kernel::ReturnCode;
 }
