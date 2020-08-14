@@ -25,6 +25,7 @@ use crate::protocol::wire::ToWireError;
 use crate::protocol::wire::ToWire;
 use crate::protocol::wire::WireEnum;
 
+use core::convert::Into;
 use core::convert::TryFrom;
 use core::result::Result;
 
@@ -208,6 +209,26 @@ impl<'a> OpCode {
 
 const DUMMY_BYTE_VALUE: u8 = 0xff;
 
+/// Address in SPI flash protocol header
+pub trait Address: BeInt + Into::<u32> {
+    /// Convert from a u32.
+    /// Note: This will become redundant once types from `ux` crate implement
+    /// `core::convert::TryFrom`.
+    fn try_from(val: u32) -> Result<Self, core::num::TryFromIntError>;
+}
+
+impl Address for ux::u24 {
+    fn try_from(val: u32) -> Result<Self, core::num::TryFromIntError> {
+        Ok(ux::u24::new(val))
+    }
+}
+
+impl Address for u32 {
+    fn try_from(val: u32) -> Result<Self, core::num::TryFromIntError> {
+        Ok(val)
+    }
+}
+
 /// A parsed SPI flash protocol header.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Header<AddrType> {
@@ -221,15 +242,23 @@ pub struct Header<AddrType> {
 }
 
 impl<'a, AddrType> Header<AddrType>
-where AddrType: BeInt {
-    fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
+where AddrType: Address {
+    /// Get the address as an Option<u32>
+    pub fn get_address(&self) -> Option<u32> {
+        self.address.map(|val| val.into())
+    }
+
+    /// Deserializes a `Header` from `r`.
+    pub fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
         let opcode_u8 = r.read_be::<u8>()?;
         let opcode = OpCode::from_wire_value(opcode_u8).ok_or(FromWireError::OutOfRange)?;
 
-        let mut address: Option<AddrType> = None;
-        if opcode.has_address() {
-            address = Some(r.read_be::<AddrType>()?);
-        }
+        let address =
+            if opcode.has_address() {
+                Some(r.read_be::<AddrType>()?)
+            } else {
+                None
+            };
 
         if opcode.has_dummy_byte() {
             // We don't actually care about the value, we just need to consume it.
@@ -242,7 +271,8 @@ where AddrType: BeInt {
         })
     }
 
-    fn to_wire<W: Write>(&self, mut w: W) -> Result<(), ToWireError> {
+    /// Serializes `self` into `w`.
+    pub fn to_wire<W: Write>(&self, mut w: W) -> Result<(), ToWireError> {
         w.write_be(self.opcode.to_wire_value())?;
         if self.opcode.has_address() {
             if ! self.address.is_some() {
@@ -255,29 +285,6 @@ where AddrType: BeInt {
         }
 
         Ok(())
-    }
-}
-
-/// Non-generic accessor trait for Header<AddrType>
-pub trait SpiHeader {
-    /// Get SPI op code
-    fn get_opcode(&self) -> OpCode;
-
-    /// Get address.
-    fn get_address(&self) -> Option<u32>;
-}
-
-impl SpiHeader for Header<ux::u24> {
-    fn get_opcode(&self) -> OpCode { return self.opcode }
-    fn get_address(&self) -> Option<u32> {
-        self.address.map(|val| u32::from(val))
-    }
-}
-
-impl SpiHeader for Header<u32> {
-    fn get_opcode(&self) -> OpCode { return self.opcode }
-    fn get_address(&self) -> Option<u32> {
-        self.address
     }
 }
 
