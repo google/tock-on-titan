@@ -844,7 +844,7 @@ impl SpiDevice for SpiDeviceHardware {
             AddressMode::ThreeByte => self.registers.eeprom_ctrl.modify(EEPROM_CTRL::ADDR_MODE::CLEAR),
             AddressMode::FourByte => self.registers.eeprom_ctrl.modify(EEPROM_CTRL::ADDR_MODE::SET),
         }
-        debug!("set_address_mode: {:?}", address_mode);
+        //debug!("set_address_mode: {:?}", address_mode);
     }
 
     fn get_address_mode(&self) -> AddressMode {
@@ -865,8 +865,8 @@ impl SpiDevice for SpiDeviceHardware {
 
         let start_addr = self.registers.cmd_mem_rptr.read(CMD_MEM_PTR::VALUE) as usize;
         let end_addr = cmd_addr_fifo_reg.read(CMD_MEM_PTR::VALUE) as usize;
-        //debug!("start={:08x} end={:08x}", start_addr, end_addr);
-        //debug!("fifo_full={} rptr_full={}",
+        //debug!("get_received_data: start={:08x} end={:08x}", start_addr, end_addr);
+        //debug!("get_received_data: fifo_full={} rptr_full={}",
         //    cmd_addr_fifo_reg.read(CMD_MEM_PTR::FULL),
         //    self.registers.cmd_mem_rptr.read(CMD_MEM_PTR::FULL));
         let mut length : usize = 0;
@@ -898,7 +898,7 @@ impl SpiDevice for SpiDeviceHardware {
                 tgt_idx += 1;
             }
         }
-        debug!("length={}", length);
+        //debug!("get_received_data: length={}", length);
 
         // Update rptr since we now read all the data.
         self.registers.cmd_mem_rptr.set(cmd_addr_fifo_reg.get());
@@ -908,7 +908,7 @@ impl SpiDevice for SpiDeviceHardware {
     }
 
     fn put_send_data(&self, write_data: &[u8]) -> kernel::ReturnCode {
-        debug!("kernel: put_send_data (len={})", write_data.len());
+        //debug!("kernel: put_send_data (len={})", write_data.len());
         if write_data.len() > self.registers.generic_ram.len() {
             debug!("h1::Sps::store_data: Invalid write_data length == {}", write_data.len());
             return ReturnCode::ESIZE;
@@ -937,15 +937,13 @@ impl SpiDevice for SpiDeviceHardware {
 
     /// Configure JEDEC ID
     fn set_jedec_id(&self, data: &[u8]) -> kernel::ReturnCode {
-        debug!("kernel: set_jedec_id (len={})", data.len());
-
+        //debug!("kernel: set_jedec_id (len={})", data.len());
         self.write_register_data(&self.registers.jedec_id, data)
     }
 
     /// Configure SFDP
     fn set_sfdp(&self, data: &[u8]) -> kernel::ReturnCode {
-        debug!("kernel: set_sfdp (len={})", data.len());
-
+        //debug!("kernel: set_sfdp (len={})", data.len());
         self.write_register_data(&self.registers.sfdp, data)
     }
 }
