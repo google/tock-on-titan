@@ -149,7 +149,7 @@ impl SpiHostHardware {
     }
 
     pub fn handle_interrupt(&self) {
-        //debug!("h1::Spi:handle_interrupt: ISTATE = {:08x}", self.registers.istate.get());
+        //debug!("SpiHostHardware::handle_interrupt: ISTATE = {:08x}", self.registers.istate.get());
         if self.registers.istate.is_set(ISTATE::TXDONE) {
             self.registers.istate_clr.write(ISTATE_CLR::TXDONE::SET);
             self.client.map(|client| {
@@ -175,13 +175,13 @@ impl SpiHostHardware {
         write_buffer: Option<&'static mut [u8]>,
         read_buffer: Option<&'static mut [u8]>,
         transaction_len: usize) -> ReturnCode {
-        //debug!("h1::Spi:start_transaction: transaction_len={}", transaction_len);
+        //debug!("SpiHostHardware::start_transaction: transaction_len={}", transaction_len);
         // The transaction needs at least one byte.
         // It also cannot have more bytes than tx_fifo or rx_fifo is long.
         if (transaction_len == 0) ||
-            (transaction_len >= self.registers.tx_fifo.len()) ||
-            (transaction_len >= self.registers.rx_fifo.len()) {
-            //debug!("h1::Spi::start_transaction: Invalid transaction_len={}", transaction_len);
+            (transaction_len > self.registers.tx_fifo.len()) ||
+            (transaction_len > self.registers.rx_fifo.len()) {
+            //debug!("SpiHostHardware::start_transaction: Invalid transaction_len={}", transaction_len);
             return ReturnCode::ESIZE;
         }
         self.registers.xact.modify(XACT::BCNT.val(7));
