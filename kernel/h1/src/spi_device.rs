@@ -721,6 +721,14 @@ impl SpiDeviceHardware {
             opcode_idx += 1;
         }
 
+        // It's unclear whether we need to register this explicitly. I've seen cases
+        // where the opcode was forwarded to software even though it wasn't registered.
+        self.registers.busy_opcode[opcode_idx].write(
+            BUSY_OPCODE::EN::SET +
+            BUSY_OPCODE::VALUE.val(OpCode::WriteStatusRegister as u32)
+        );
+        opcode_idx += 1;
+
         for idx in opcode_idx..self.registers.busy_opcode.len() {
             self.registers.busy_opcode[idx].write(BUSY_OPCODE::EN::CLEAR);
         }
@@ -923,10 +931,18 @@ impl SpiDevice for SpiDeviceHardware {
         ReturnCode::SUCCESS
     }
 
+    fn set_status(&self, status: u8) {
+        self.registers.eeprom_status.set(status);
+    }
+
     fn clear_busy(&self) {
         // Note that this setting will not take effect until the SPI host reads
         // out the status register
         self.registers.eeprom_busy_status.write(STATUS_BIT::VALUE::SET);
+    }
+
+    fn is_write_enable_set(&self) -> bool {
+        self.is_write_enabled()
     }
 
     fn clear_write_enable(&self) {

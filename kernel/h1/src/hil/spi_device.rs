@@ -60,8 +60,15 @@ pub trait SpiDevice {
     /// is padded with 0xFF.
     fn put_send_data(&self, write_data: &[u8]) -> kernel::ReturnCode;
 
+    /// Set the contents of the SPI flash status register.
+    /// Note that this does not include the busy bit and the write enable bit.
+    fn set_status(&self, status: u8);
+
     /// Clear the busy bit.
     fn clear_busy(&self);
+
+    /// Returns true if the write enable bit is set.
+    fn is_write_enable_set(&self) -> bool;
 
     /// Clear the write enable bit.
     fn clear_write_enable(&self);
