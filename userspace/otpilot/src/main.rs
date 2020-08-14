@@ -21,6 +21,7 @@ mod spi_host;
 mod spi_host_h1;
 mod spi_device;
 
+use core::cmp::min;
 use core::convert::TryFrom;
 use core::fmt::Write;
 use core::time::Duration;
@@ -40,6 +41,7 @@ use spiutils::io::Cursor as SpiutilsCursor;
 use spiutils::io::Write as _;
 use spiutils::driver::HandlerMode;
 use spiutils::protocol::flash;
+use spiutils::protocol::flash::Address;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::flash::OpCode;
 use spiutils::protocol::payload;
@@ -270,42 +272,75 @@ impl<'a> SpiProcessor<'a> {
         }
     }
 
-    fn spi_host_write_enable(&mut self) -> SpiProcessorResult<()> {
+    // Send data via the SPI host.
+    // The transaction is split into smaller transactions that fit into the SPI host's buffer.
+    // The write enable status bit is set before each transaction is executed.
+    // The `pre_transaction_fn` is executed prior to each transaction.
+    fn spi_host_send<AddrType, F>(&self, header: &flash::Header::<AddrType>, mut data: &[u8], pre_transaction_fn: &F) -> SpiProcessorResult<()>
+    where AddrType: Address,
+        F: Fn() -> SpiProcessorResult<()>
+    {
+        // We need to update the header so copy it.
+        let mut header = *header;
+        loop {
+            pre_transaction_fn()?;
+
+            let mut tx_buf = [0xff; spi_host::MAX_READ_BUFFER_LENGTH];
+            let tx_len : usize;
+            let data_len_to_send : usize;
+            {
+                let mut tx_cursor = SpiutilsCursor::new(&mut tx_buf);
+                header.to_wire(&mut tx_cursor)?;
+                if header.opcode.has_dummy_byte() {
+                    // Skip one dummy byte (send 0x0)
+                    tx_cursor.write_bytes(&[0x0; 1])
+                        .map_err(|err| SpiProcessorError::ToWire(ToWireError::Io(err)))?;
+                }
+
+                data_len_to_send = min(spi_host::MAX_READ_BUFFER_LENGTH - tx_cursor.consumed_len(), data.len());
+                tx_cursor.write_bytes(&data[..data_len_to_send])
+                    .map_err(|err| SpiProcessorError::ToWire(ToWireError::Io(err)))?;
+
+                tx_len = tx_cursor.consumed_len()
+            }
+
+            spi_host_h1::get().set_wait_busy_clear_in_transactions(header.opcode.wait_busy_clear())?;
+            spi_host::get().read_write_bytes(&mut tx_buf, tx_len)?;
+            spi_host::get().wait_read_write_done();
+
+            // Move data and address forward
+            data = &data[data_len_to_send..];
+            if let Some(addr) = header.address {
+                let delta : u32 = core::convert::TryFrom::<usize>::try_from(data_len_to_send)
+                    .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
+                let next_addr = addr.into() + delta;
+                header.address = Some(AddrType::try_from(next_addr)
+                    .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?);
+            }
+
+            if data.len() == 0 { break; }
+        }
+        Ok(())
+    }
+
+    // Send a "write enable" command via the SPI host.
+    fn spi_host_write_enable(&self) -> SpiProcessorResult<()> {
         let header = flash::Header::<u32> {
             opcode: OpCode::WriteEnable,
             address: None,
         };
+
+        // The command has no data.
         let data : [u8; 0] = [0; 0];
-        self.spi_host_send(&header, &data)
+        self.spi_host_send(&header, &data, &|| Ok(()))
     }
 
-    fn spi_write_to_buf<H>(&mut self, header: &H, data: &[u8], mut buf: &mut[u8])
-    -> SpiProcessorResult<usize>
-    where H: flash::SpiHeader + ToWire {
-        let mut tx_cursor = SpiutilsCursor::new(&mut buf);
-        header.to_wire(&mut tx_cursor)?;
-        if header.get_opcode().has_dummy_byte() {
-            // Skip one dummy byte (send 0x0)
-            tx_cursor.write_bytes(&[0x0; 1])
-                .map_err(|err| SpiProcessorError::ToWire(ToWireError::Io(err)))?;
-        }
-
-        tx_cursor.write_bytes(&data)
-            .map_err(|err| SpiProcessorError::ToWire(ToWireError::Io(err)))?;
-
-        Ok(tx_cursor.consumed_len())
-    }
-
-    fn spi_host_send<H>(&mut self, header: &H, data: &[u8]) -> SpiProcessorResult<()>
-    where H: flash::SpiHeader + ToWire {
-        let mut tx_buf = [0xff; spi_host::MAX_READ_BUFFER_LENGTH];
-        let tx_len = self.spi_write_to_buf(header, data, &mut tx_buf)?;
-
-        spi_host_h1::get().set_wait_busy_clear_in_transactions(header.get_opcode().wait_busy_clear())?;
-        spi_host::get().read_write_bytes(&mut tx_buf, tx_len)?;
-        spi_host::get().wait_read_write_done();
-
-        Ok(())
+    // Send a "write" type command (e.g. PageProgram, *Erase) via the SPI host.
+    // This splits the data into smaller transactions as needed and executes
+    // "enable write" for each transaction.
+    fn spi_host_write<AddrType>(&self, header: &flash::Header::<AddrType>, data: &[u8]) -> SpiProcessorResult<()>
+    where AddrType: Address {
+        self.spi_host_send(header, data, &|| self.spi_host_write_enable())
     }
 
     fn clear_device_status(&self, clear_busy: bool, clear_write_enable: bool) -> SpiProcessorResult<()> {
@@ -313,15 +348,14 @@ impl<'a> SpiProcessor<'a> {
         Ok(())
     }
 
-    fn process_spi_header<H>(&mut self, header: &H, rx_buf: &[u8]) -> SpiProcessorResult<()>
-    where H: flash::SpiHeader + ToWire
-    {
+    fn process_spi_header<AddrType>(&mut self, header: &flash::Header::<AddrType>, rx_buf: &[u8]) -> SpiProcessorResult<()>
+    where AddrType: Address {
         let mut data: &[u8] = rx_buf;
-        if header.get_opcode().has_dummy_byte() {
+        if header.opcode.has_dummy_byte() {
             // Skip dummy byte
             data = &rx_buf[1..];
         }
-        match header.get_opcode() {
+        match header.opcode {
             OpCode::PageProgram => {
                 match header.get_address() {
                     Some(0x02000000) => {
@@ -333,8 +367,7 @@ impl<'a> SpiProcessor<'a> {
                     Some(x) if x < 0x02000000 => {
                         if spi_device::get().is_write_enable_set() {
                             // Pass through to SPI host
-                            self.spi_host_write_enable()?;
-                            self.spi_host_send(header, data)?;
+                            self.spi_host_write(header, data)?;
                         }
                         self.clear_device_status(true, true)
                     }
@@ -350,8 +383,7 @@ impl<'a> SpiProcessor<'a> {
                     Some(x) if x < 0x02000000 => {
                         if spi_device::get().is_write_enable_set() {
                             // Pass through to SPI host
-                            self.spi_host_write_enable()?;
-                            self.spi_host_send(header, data)?;
+                            self.spi_host_write(header, data)?;
                         }
                         self.clear_device_status(true, true)
                     }
@@ -361,12 +393,11 @@ impl<'a> SpiProcessor<'a> {
             OpCode::ChipErase | OpCode::ChipErase2 => {
                 if spi_device::get().is_write_enable_set() {
                     // Pass through to SPI host
-                    self.spi_host_write_enable()?;
-                    self.spi_host_send(header, data)?;
+                    self.spi_host_write(header, data)?;
                 }
                 self.clear_device_status(true, true)
             }
-            _ => return Err(SpiProcessorError::UnsupportedOpCode(header.get_opcode())),
+            _ => return Err(SpiProcessorError::UnsupportedOpCode(header.opcode)),
         }
     }
 
@@ -491,8 +522,11 @@ fn run() -> TockResult<()> {
         spi_device::get().wait_for_transaction();
 
         let rx_buf = spi_device::get().get_read_buffer();
+
         writeln!(console, "Device: RX: {:02x?} busy={} wel={}",
-            rx_buf, spi_device::get().is_busy_set(), spi_device::get().is_write_enable_set())?;
+            rx_buf,
+            spi_device::get().is_busy_set(),
+            spi_device::get().is_write_enable_set())?;
 
         match processor.process_spi_packet(rx_buf) {
             Ok(()) => {}
