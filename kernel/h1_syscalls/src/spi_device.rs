@@ -111,7 +111,7 @@ impl<'a> SpiDeviceSyscall<'a> {
         }).unwrap_or(ReturnCode::ENOMEM)
     }
 
-    fn process_spi_cmd(&self, app_data: &AppData, spi_cmd: u8) -> Result<HandlerMode, FromWireError> {
+    fn process_spi_cmd(&self, app_data: &AppData, spi_cmd: u8, maybe_spi_data: Option<u8>) -> Result<HandlerMode, FromWireError> {
         let op_code = OpCode::from_wire_value(spi_cmd).ok_or(FromWireError::OutOfRange)?;
 
         match op_code {
@@ -137,6 +137,17 @@ impl<'a> SpiDeviceSyscall<'a> {
                     }
                     handler_mode => Ok(handler_mode)
                 },
+            OpCode::WriteStatusRegister =>
+                if let Some(spi_data) = maybe_spi_data {
+                    if self.device.is_write_enable_set() {
+                        self.device.set_status(spi_data);
+                        self.device.clear_write_enable();
+                    }
+                    self.device.clear_busy();
+                    Ok(HandlerMode::KernelSpace)
+                } else {
+                    Ok(HandlerMode::UserSpace)
+                }
             _ => Ok(HandlerMode::UserSpace)
         }
     }
@@ -170,24 +181,31 @@ impl<'a> SpiDeviceClient for SpiDeviceSyscall<'a> {
                 let mut rx_len = 0;
                 let mut handler_mode = HandlerMode::UserSpace;
                 let mut maybe_spi_cmd : Option<u8> = None;
+                let mut maybe_spi_data : Option<u8> = None;
                 if let Some(ref mut rx_buffer) = app_data.rx_buffer {
                     rx_len = self.device.get_received_data(rx_buffer.as_mut());
                     if rx_len > 0 {
                         maybe_spi_cmd = Some(rx_buffer.as_ref()[0]);
                     }
+                    if rx_len > 1 {
+                        maybe_spi_data = Some(rx_buffer.as_ref()[1]);
+                    }
                 } else {
-                    // Just grab the first byte
-                    let mut spi_cmd_buf = [0];
+                    // Just grab the first two bytes
+                    let mut spi_cmd_buf = [!0, !0];
                     let spi_cmd_buf_len = self.device.get_received_data(&mut spi_cmd_buf);
                     if spi_cmd_buf_len > 0 {
                         maybe_spi_cmd = Some(spi_cmd_buf[0]);
+                    }
+                    if spi_cmd_buf_len > 1 {
+                        maybe_spi_data = Some(spi_cmd_buf[1]);
                     }
                 }
 
                 // Handle some special op code straight in kernel space
                 if let Some(spi_cmd) = maybe_spi_cmd {
                     //debug!("spi_cmd: {:?}", spi_cmd);
-                    handler_mode = match self.process_spi_cmd(app_data, spi_cmd) {
+                    handler_mode = match self.process_spi_cmd(app_data, spi_cmd, maybe_spi_data) {
                         Ok(mode) => mode,
                         Err(_) => HandlerMode::UserSpace,
                     }

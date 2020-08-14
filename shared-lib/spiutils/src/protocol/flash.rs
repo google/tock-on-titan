@@ -68,6 +68,9 @@ wire_enum! {
         ////////////////////////////////////////////////////////////
         // Status commands
 
+        /// Write to eeprom_status register.
+        WriteStatusRegister = 0x01,
+
         /// Returns contents of eeprom_status register.
         /// Implemented in hardware.
         ReadStatusRegister = 0x05,
