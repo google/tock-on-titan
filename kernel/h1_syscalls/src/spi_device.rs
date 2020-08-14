@@ -186,14 +186,14 @@ impl<'a> SpiDeviceClient for SpiDeviceSyscall<'a> {
 
                 // Handle some special op code straight in kernel space
                 if let Some(spi_cmd) = maybe_spi_cmd {
-                    debug!("spi_cmd: {:?}", spi_cmd);
+                    //debug!("spi_cmd: {:?}", spi_cmd);
                     handler_mode = match self.process_spi_cmd(app_data, spi_cmd) {
                         Ok(mode) => mode,
                         Err(_) => HandlerMode::UserSpace,
                     }
                 }
 
-                debug!("handler_mode: {:?}", handler_mode);
+                //debug!("handler_mode: {:?}", handler_mode);
                 if handler_mode == HandlerMode::UserSpace {
                     app_data.data_received_callback.map(
                         |mut cb| cb.schedule(rx_len, usize::from(is_busy), usize::from(is_write_enabled)));
