@@ -32,12 +32,6 @@ pub const MAX_READ_BUFFER_SIZE: usize = 512;
 pub const MAX_WRITE_BUFFER_SIZE: usize = 2048;
 
 pub trait SpiDevice {
-    /// Check if received a transaction.
-    fn have_transaction(&self) -> bool;
-
-    /// Clear the current received transaction.
-    fn clear_transaction(&self);
-
     /// Wait for a transaction by yielding.
     fn wait_for_transaction(&self);
 
@@ -50,12 +44,12 @@ pub trait SpiDevice {
     /// Whether the transaction has the WRITE ENABLE bit set.
     fn is_write_enable_set(&self) -> bool;
 
-    /// Clear the BUSY and/or the WRITE ENABLE bits.
-    fn clear_status(&self, clear_busy: bool, clear_write_enable: bool) -> TockResult<()>;
+    /// End the transaction and clear the BUSY and/or the WRITE ENABLE bits.
+    fn end_transaction_with_status(&self, clear_busy: bool, clear_write_enable: bool) -> TockResult<()>;
 
-    /// Send data to be made available to the SPI host and clear the BUSY
-    /// and/or WRITE_ENABLE bits if requested.
-    fn send_data(&self, write_buffer: &mut[u8], clear_busy: bool, clear_write_enable: bool)
+    /// End the transaction, send data to be made available to the SPI host and clear the BUSY
+    /// and/or WRITE_ENABLE bits.
+    fn end_transaction_with_data(&self, write_buffer: &mut[u8], clear_busy: bool, clear_write_enable: bool)
     -> TockResult<()>;
 
     /// Configure the engine's address mode.
@@ -201,19 +195,20 @@ impl SpiDeviceImpl {
             Err(_) => ()
         }
     }
-}
 
-impl SpiDevice for SpiDeviceImpl {
+    /// Check if received a transaction.
     fn have_transaction(&self) -> bool {
         self.received_len.get() != 0
     }
 
+    /// Clear the current received transaction.
     fn clear_transaction(&self) {
         self.received_len.set(0);
     }
+}
 
+impl SpiDevice for SpiDeviceImpl {
     fn wait_for_transaction(&self) {
-        self.clear_transaction();
         while !self.have_transaction() { unsafe { yieldk(); } }
     }
 
@@ -229,14 +224,18 @@ impl SpiDevice for SpiDeviceImpl {
         self.is_write_enable_set.get()
     }
 
-    fn clear_status(&self, clear_busy: bool, clear_write_enable: bool) -> TockResult<()> {
+    fn end_transaction_with_status(&self, clear_busy: bool, clear_write_enable: bool) -> TockResult<()> {
+        self.clear_transaction();
+
         syscalls::command(DRIVER_NUMBER, command_nr::CLEAR_STATUS,
             if clear_busy { 1 } else { 0 },
             if clear_write_enable { 1 } else { 0 })?;
         Ok(())
     }
 
-    fn send_data(&self, write_buffer: &mut[u8], clear_busy: bool, clear_write_enable: bool) -> TockResult<()> {
+    fn end_transaction_with_data(&self, write_buffer: &mut[u8], clear_busy: bool, clear_write_enable: bool) -> TockResult<()> {
+        self.clear_transaction();
+
         // We want this to go out of scope after executing the command
         let _write_buffer_share = syscalls::allow(DRIVER_NUMBER, allow_nr::WRITE_BUFFER, write_buffer)?;
 

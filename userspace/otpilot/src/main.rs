@@ -230,7 +230,7 @@ impl<'a> SpiProcessor<'a> {
             let tx_cursor = SpiutilsCursor::new(tx_buf);
             tx_header.to_wire(tx_cursor)?;
         }
-        spi_device::get().send_data(tx_buf, true, true)?;
+        spi_device::get().end_transaction_with_data(tx_buf, true, true)?;
 
         Ok(())
     }
@@ -309,7 +309,7 @@ impl<'a> SpiProcessor<'a> {
     }
 
     fn clear_device_status(&self, clear_busy: bool, clear_write_enable: bool) -> SpiProcessorResult<()> {
-        spi_device::get().clear_status(clear_busy, clear_write_enable)?;
+        spi_device::get().end_transaction_with_status(clear_busy, clear_write_enable)?;
         Ok(())
     }
 
@@ -499,7 +499,7 @@ fn run() -> TockResult<()> {
             Err(why) => {
                 writeln!(console, "Device: Error processing SPI packet: {:?}", why)?;
                 if spi_device::get().is_busy_set() {
-                    spi_device::get().clear_status(true, false)?;
+                    spi_device::get().end_transaction_with_status(true, false)?;
                 }
             }
         }
