@@ -44,5 +44,6 @@ members = [
 	"flash_test",
 	"low_level_debug",
 	"nvcounter_test",
+	"otpilot",
 	"test_harness",
 ]

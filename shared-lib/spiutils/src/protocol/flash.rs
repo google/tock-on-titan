@@ -183,7 +183,7 @@ where AddrType: BeInt {
         let opcode_u8 = r.read_be::<u8>()?;
         let opcode = OpCode::from_wire_value(opcode_u8).ok_or(FromWireError::OutOfRange)?;
 
-        let mut address : Option<AddrType> = None;
+        let mut address: Option<AddrType> = None;
         if opcode.has_address() {
             address = Some(r.read_be::<AddrType>()?);
         }
