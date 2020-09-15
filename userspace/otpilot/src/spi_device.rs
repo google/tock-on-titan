@@ -21,10 +21,10 @@ use libtock::shared_memory::SharedMemory;
 use libtock::syscalls;
 use libtock::syscalls::raw::yieldk;
 
-pub const MAX_READ_BUFFER_SIZE : usize = 512;
+pub const MAX_READ_BUFFER_SIZE: usize = 512;
 
 #[allow(dead_code)]
-pub const MAX_WRITE_BUFFER_SIZE : usize = 2048;
+pub const MAX_WRITE_BUFFER_SIZE: usize = 2048;
 
 pub trait SpiDevice {
     // Check if received a transaction.
