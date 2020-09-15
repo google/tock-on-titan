@@ -35,7 +35,7 @@ jobs:
       - name: Update submodules
         run: |
           git submodule update --init \
-            third_party/{elf2tab,libtock-c,libtock-rs,tock}
+            third_party/{elf2tab,libtock-c,libtock-rs,manticore,tock}
 
       # Run `make setup` to install the necessary Rust toolchains.
       - name: Make setup
