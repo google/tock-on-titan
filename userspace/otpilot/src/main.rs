@@ -53,8 +53,14 @@ use spiutils::protocol::wire::ToWireError;
 struct SpiHostDemo;
 
 impl SpiHostDemo {
-    pub fn enable_4b(&self) -> TockResult<()> {
+    pub fn enter_4b(&self) -> TockResult<()> {
         spi_host::get().read_write_bytes(&mut [0xb7], 1)?;
+        spi_host::get().wait_read_write_done();
+        Ok(())
+    }
+
+    pub fn exit_4b(&self) -> TockResult<()> {
+        spi_host::get().read_write_bytes(&mut [0xe9], 1)?;
         spi_host::get().wait_read_write_done();
         Ok(())
     }
@@ -393,12 +399,17 @@ fn run() -> TockResult<()> {
 
     let host_demo = SpiHostDemo {};
 
-    writeln!(console, "Host: Enabling 4B mode")?;
-    host_demo.enable_4b()?;
+    writeln!(console, "Host: Entering 4B mode")?;
+    host_demo.enter_4b()?;
 
     writeln!(console, "Host: Reading data")?;
     host_demo.read_and_print_data(0x0)?;
     host_demo.read_and_print_data(0x1)?;
+
+    if spi_device::get().get_address_mode() == AddressMode::ThreeByte {
+        writeln!(console, "Host: Exiting 4B mode")?;
+        host_demo.exit_4b()?;
+    }
 
     let mut identity = Identity {
         version: [0; 32],
