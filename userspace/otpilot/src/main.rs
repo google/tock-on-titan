@@ -283,8 +283,8 @@ impl<'a> SpiProcessor<'a> {
         let mut tx_cursor = SpiutilsCursor::new(&mut buf);
         header.to_wire(&mut tx_cursor)?;
         if header.get_opcode().has_dummy_byte() {
-            // Skip dummy byte
-            tx_cursor.write_bytes(&[1; 0])
+            // Skip one dummy byte (send 0x0)
+            tx_cursor.write_bytes(&[0x0; 1])
                 .map_err(|err| SpiProcessorError::ToWire(ToWireError::Io(err)))?;
         }
 
