@@ -518,22 +518,19 @@ fn run() -> TockResult<()> {
     spi_host_h1::get().set_passthrough(true)?;
 
     loop {
-        writeln!(console, "Device: Waiting for transaction")?;
         spi_device::get().wait_for_transaction();
 
         let rx_buf = spi_device::get().get_read_buffer();
-
-        writeln!(console, "Device: RX: {:02x?} busy={} wel={}",
-            rx_buf,
-            spi_device::get().is_busy_set(),
-            spi_device::get().is_write_enable_set())?;
-
         match processor.process_spi_packet(rx_buf) {
             Ok(()) => {}
             Err(why) => {
-                writeln!(console, "Device: Error processing SPI packet: {:?}", why)?;
+                // Ignore error from writeln. There's nothing we can do here anyway.
+                let _ = writeln!(console, "Device: Error processing SPI packet: {:?}", why);
                 if spi_device::get().is_busy_set() {
-                    spi_device::get().end_transaction_with_status(true, false)?;
+                    if let Err(_) = spi_device::get().end_transaction_with_status(true, false) {
+                        // Ignore error from writeln. There's nothing we can do here anyway.
+                        let _ = writeln!(console, "Device: Error ending transaction.");
+                    }
                 }
             }
         }
