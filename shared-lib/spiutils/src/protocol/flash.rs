@@ -209,22 +209,32 @@ impl<'a> OpCode {
 
 const DUMMY_BYTE_VALUE: u8 = 0xff;
 
+/// Error used when address cannot be converted.
+pub struct AddressConversionError;
+
 /// Address in SPI flash protocol header
 pub trait Address: BeInt + Into::<u32> {
     /// Convert from a u32.
     /// Note: This will become redundant once types from `ux` crate implement
     /// `core::convert::TryFrom`.
-    fn try_from(val: u32) -> Result<Self, core::num::TryFromIntError>;
+    fn try_from(val: u32) -> Result<Self, AddressConversionError>;
 }
 
 impl Address for ux::u24 {
-    fn try_from(val: u32) -> Result<Self, core::num::TryFromIntError> {
-        Ok(ux::u24::new(val))
+    fn try_from(val: u32) -> Result<Self, AddressConversionError> {
+        // ux::[type]::new just assert!s that the val fits, which results
+        // in a panic if it does not. Instead explicitly check and return
+        // an error if the val does not fit.
+        if val >= u32::from(ux::u24::min_value()) && val <= u32::from(ux::u24::max_value()) {
+            Ok(ux::u24::new(val))
+        } else {
+            Err(AddressConversionError {})
+        }
     }
 }
 
 impl Address for u32 {
-    fn try_from(val: u32) -> Result<Self, core::num::TryFromIntError> {
+    fn try_from(val: u32) -> Result<Self, AddressConversionError> {
         Ok(val)
     }
 }
@@ -253,12 +263,10 @@ where AddrType: Address {
         let opcode_u8 = r.read_be::<u8>()?;
         let opcode = OpCode::from_wire_value(opcode_u8).ok_or(FromWireError::OutOfRange)?;
 
-        let address =
-            if opcode.has_address() {
-                Some(r.read_be::<AddrType>()?)
-            } else {
-                None
-            };
+        let address = match opcode.has_address() {
+            true => Some(r.read_be::<AddrType>()?),
+            false => None,
+        };
 
         if opcode.has_dummy_byte() {
             // We don't actually care about the value, we just need to consume it.
