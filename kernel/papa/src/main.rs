@@ -312,7 +312,7 @@ pub unsafe fn reset_handler() {
     h1::spi_device::SPI_DEVICE0.init(h1::spi_device::SpiDeviceConfiguration {
         enable_fastread4b_cmd: false,
         enable_enterexit4b_cmd: true,
-        startup_address_mode: spiutils::protocol::flash::AddressMode::FourByte,
+        startup_address_mode: spiutils::protocol::flash::AddressMode::ThreeByte,
     });
     let h1_spi_device_syscalls = static_init!(
         h1_syscalls::spi_device::SpiDeviceSyscall<'static>,
