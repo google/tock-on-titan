@@ -1260,7 +1260,7 @@ impl<'a> USB<'a> {
         //   * Global unmask interrupts
         //   * Interrupt on Non-Periodic TxFIFO completely empty
         // _Don't_ set:
-        //   * Periodic TxFIFO interrupt on empty (only valid in slave mode)
+        //   * Periodic TxFIFO interrupt on empty (only valid in device mode)
         //   * AHB Burst length (defaults to 1 word)
         self.registers.ahb_config.write(AhbConfig::GlobalInterruptMask::SET +
                                         AhbConfig::DmaEnable::SET +
