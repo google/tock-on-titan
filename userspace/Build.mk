@@ -130,11 +130,16 @@ build/userspace/$(APP)/$(BOARD)/full_image: \
 	arm-none-eabi-objcopy --update-section \
 		.apps=build/userspace/$(APP)/cortex-m3/cortex-m3.tbf \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
-		--key=$(TANGO_CODESIGNER_KEY) \
-		--output=build/userspace/$(APP)/$(BOARD)/signed_image
-	cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
-		> build/userspace/$(APP)/$(BOARD)/full_image
+	if [ -n "${TANGO_CODESIGNER}" -a -n "${TANGO_CODESIGNER_KEY}" ]; then \
+		$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
+			--key=$(TANGO_CODESIGNER_KEY) \
+			--output=build/userspace/$(APP)/$(BOARD)/signed_image; \
+		cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
+			> build/userspace/$(APP)/$(BOARD)/full_image; \
+	else \
+		echo "***** Can't create signed_image -- one of CODESIGNER{,_KEY} is empty "; \
+		echo "*****   -- hope that's OK."; \
+	fi
 
 endef
 
@@ -283,11 +288,16 @@ build/userspace/$(APP)/$(BOARD)/full_image: \
 	arm-none-eabi-objcopy --update-section \
 		.apps=build/userspace/$(APP)/$(BOARD)/app.tbf \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
-		--key=$(TANGO_CODESIGNER_KEY) \
-		--output=build/userspace/$(APP)/$(BOARD)/signed_image
-	cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
-		> build/userspace/$(APP)/$(BOARD)/full_image
+	if [ -n "${TANGO_CODESIGNER}" -a -n "${TANGO_CODESIGNER_KEY}" ]; then \
+		$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
+			--key=$(TANGO_CODESIGNER_KEY) \
+			--output=build/userspace/$(APP)/$(BOARD)/signed_image; \
+		cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
+			> build/userspace/$(APP)/$(BOARD)/full_image; \
+	else \
+		echo "***** Can't create signed_image -- one of CODESIGNER{,_KEY} is empty "; \
+		echo "*****   -- hope that's OK."; \
+	fi
 
 endef
 
@@ -428,11 +438,16 @@ build/userspace/$(APP)/$(BOARD)/full_image: \
 	arm-none-eabi-objcopy --update-section \
 		.apps=build/userspace/$(APP)/$(BOARD)/app.tbf \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
-		--key=$(TANGO_CODESIGNER_KEY) \
-		--output=build/userspace/$(APP)/$(BOARD)/signed_image
-	cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
-		> build/userspace/$(APP)/$(BOARD)/full_image
+	if [ -n "${TANGO_CODESIGNER}" -a -n "${TANGO_CODESIGNER_KEY}" ]; then \
+		$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
+			--key=$(TANGO_CODESIGNER_KEY) \
+			--output=build/userspace/$(APP)/$(BOARD)/signed_image; \
+		cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
+			> build/userspace/$(APP)/$(BOARD)/full_image; \
+	else \
+		echo "***** Can't create signed_image -- one of CODESIGNER{,_KEY} is empty "; \
+		echo "*****   -- hope that's OK."; \
+	fi
 
 endef
 
