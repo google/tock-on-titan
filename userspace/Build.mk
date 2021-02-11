@@ -80,6 +80,41 @@ include $(addsuffix /Build.mk,$(BUILD_SUBDIRS))
 #   userspace/app2/build: build/userspace/app2/board2/full_image
 #   userspace/app3/build: build/userspace/app3/board2/full_image
 
+
+# ------------------------------------------------------------------------------
+# Macro to define a full_image target for a specific
+# board-and-app-and-tbf-file combination.
+# Arguments:
+# - $(BOARD)
+# - $(APP)
+# - $(TBF_FILE)
+define FULL_IMAGE_TARGET
+
+build/userspace/$(APP)/$(BOARD)/full_image: \
+		build/userspace/$(APP)/$(TBF_FILE) \
+		kernel/build
+	mkdir -p build/userspace/$(APP)/$(BOARD)/
+	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image
+	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image
+	arm-none-eabi-objcopy --update-section \
+		.apps=build/userspace/$(APP)/$(TBF_FILE) \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image
+	if [ -n "${TANGO_CODESIGNER}" -a -n "${TANGO_CODESIGNER_KEY}" ]; then \
+		$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
+			--key=$(TANGO_CODESIGNER_KEY) \
+			--output=build/userspace/$(APP)/$(BOARD)/signed_image; \
+		cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
+			> build/userspace/$(APP)/$(BOARD)/full_image; \
+	else \
+		echo "***** Can't create signed_image -- one of CODESIGNER{,_KEY} is empty "; \
+		echo "*****   -- hope that's OK."; \
+	fi
+
+endef
+
+
 # ------------------------------------------------------------------------------
 # Macro to define targets for a specific board-and-app combination.
 # Arguments:
@@ -119,27 +154,8 @@ userspace/$(APP)/$(BOARD)/run: \
 		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
 		build/cargo-host/release/runner'
 
-build/userspace/$(APP)/$(BOARD)/full_image: \
-		build/userspace/$(APP)/cortex-m3/cortex-m3.tbf \
-		kernel/build
-	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	arm-none-eabi-objcopy --update-section \
-		.apps=build/userspace/$(APP)/cortex-m3/cortex-m3.tbf \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	if [ -n "${TANGO_CODESIGNER}" -a -n "${TANGO_CODESIGNER_KEY}" ]; then \
-		$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
-			--key=$(TANGO_CODESIGNER_KEY) \
-			--output=build/userspace/$(APP)/$(BOARD)/signed_image; \
-		cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
-			> build/userspace/$(APP)/$(BOARD)/full_image; \
-	else \
-		echo "***** Can't create signed_image -- one of CODESIGNER{,_KEY} is empty "; \
-		echo "*****   -- hope that's OK."; \
-	fi
+TBF_FILE := cortex-m3/cortex-m3.tbf
+$(eval $(FULL_IMAGE_TARGET))
 
 endef
 
@@ -277,27 +293,8 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		     false ; \
 		fi
 
-build/userspace/$(APP)/$(BOARD)/full_image: \
-		build/userspace/$(APP)/$(BOARD)/app.tbf \
-		kernel/build
-	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	arm-none-eabi-objcopy --update-section \
-		.apps=build/userspace/$(APP)/$(BOARD)/app.tbf \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	if [ -n "${TANGO_CODESIGNER}" -a -n "${TANGO_CODESIGNER_KEY}" ]; then \
-		$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
-			--key=$(TANGO_CODESIGNER_KEY) \
-			--output=build/userspace/$(APP)/$(BOARD)/signed_image; \
-		cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
-			> build/userspace/$(APP)/$(BOARD)/full_image; \
-	else \
-		echo "***** Can't create signed_image -- one of CODESIGNER{,_KEY} is empty "; \
-		echo "*****   -- hope that's OK."; \
-	fi
+TBF_FILE := $(BOARD)/app.tbf
+$(eval $(FULL_IMAGE_TARGET))
 
 endef
 
@@ -427,27 +424,8 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		     false ; \
 		fi
 
-build/userspace/$(APP)/$(BOARD)/full_image: \
-		build/userspace/$(APP)/$(BOARD)/app.tbf \
-		kernel/build
-	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	arm-none-eabi-objcopy --update-section \
-		.apps=build/userspace/$(APP)/$(BOARD)/app.tbf \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	if [ -n "${TANGO_CODESIGNER}" -a -n "${TANGO_CODESIGNER_KEY}" ]; then \
-		$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
-			--key=$(TANGO_CODESIGNER_KEY) \
-			--output=build/userspace/$(APP)/$(BOARD)/signed_image; \
-		cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
-			> build/userspace/$(APP)/$(BOARD)/full_image; \
-	else \
-		echo "***** Can't create signed_image -- one of CODESIGNER{,_KEY} is empty "; \
-		echo "*****   -- hope that's OK."; \
-	fi
+TBF_FILE := $(BOARD)/app.tbf
+$(eval $(FULL_IMAGE_TARGET))
 
 endef
 
