@@ -86,9 +86,12 @@ prtest: build devicetests localtests
 	git status
 	@echo '```'
 
-# Installs the necessary Rust toolchains
+# Download Rust (see https://www.rust-lang.org/learn/get-started --
+# default toolchain) and then install specific Rust toolchains needed
+# by various third_party components.
 .PHONY: setup
 setup:
+	curl https://sh.rustup.rs -sSf | sh
 	rustup toolchain add --profile minimal \
 		"$$(cat third_party/libtock-rs/rust-toolchain)"
 	rustup toolchain add --profile minimal \

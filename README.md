@@ -18,16 +18,10 @@ git clone --recursive https://github.com/google/tock-on-titan.git
 
 ### Get the tools and libs to build the code
 
-Download Rust
+Download and Configure Rust
 
 ```shell
 cd tock-on-titan
-curl https://sh.rustup.rs -sSf | sh
-```
-
-Configure Rust
-
-```shell
 make setup
 ```
 
