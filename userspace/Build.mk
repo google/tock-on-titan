@@ -154,8 +154,9 @@ userspace/$(APP)/$(BOARD)/run: \
 		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
 		build/cargo-host/release/runner'
 
-TBF_FILE := cortex-m3/cortex-m3.tbf
-$(eval $(FULL_IMAGE_TARGET))
+# `foreach` ensures that TBF_FILE has the expected value when
+# FULL_IMAGE_TARGET is expanded.
+$(foreach TBF_FILE,cortex-m3/cortex-m3.tbf,$(eval $(FULL_IMAGE_TARGET)))
 
 endef
 
@@ -293,8 +294,9 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		     false ; \
 		fi
 
-TBF_FILE := $(BOARD)/app.tbf
-$(eval $(FULL_IMAGE_TARGET))
+# `foreach` ensures that TBF_FILE has the expected value when
+# FULL_IMAGE_TARGET is expanded.
+$(foreach TBF_FILE,$(BOARD)/app.tbf,$(eval $(FULL_IMAGE_TARGET)))
 
 endef
 
@@ -424,8 +426,9 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		     false ; \
 		fi
 
-TBF_FILE := $(BOARD)/app.tbf
-$(eval $(FULL_IMAGE_TARGET))
+# `foreach` ensures that TBF_FILE has the expected value when
+# FULL_IMAGE_TARGET is expanded.
+$(foreach TBF_FILE,$(BOARD)/app.tbf,$(eval $(FULL_IMAGE_TARGET)))
 
 endef
 
