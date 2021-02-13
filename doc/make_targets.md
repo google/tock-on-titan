@@ -6,7 +6,7 @@ Common Makefile Targets
 For consistency, we want to expose the same `make` targets in each Makefile. For
 simplicity of development and testing, we want `make` commands run at the root
 of the repository to operate throughout the project. For example, running `make
-build` in `tock-on-titan/` should build all targets in the repository.
+build` in `tock-on-titan/` should build all unsigned targets in the repository.
 
 This specification defines common target names for the `tock-on-titan`
 repository. It is meant to be a reference for users of the build system (e.g.
@@ -26,10 +26,11 @@ Unless otherwise noted, the following targets operate in the directory in which
 <action> ...`. All per-directory makefiles support these targets, even if they
 do nothing (e.g. `make devicetests` in a directory with no device tests is a
 no-op but will succeed):
-
 * `all` is an alias for `build` (following Makefile tradition).
-* `build` compiles the code. This can be a library, an application image, the
-  kernel image, or the full flash image (kernel + applications).
+* `build` compiles the code, yielding unsigned artifacts. This can be a library,
+  an application image, the kernel image, or the full flash image (kernel +
+  applications).
+* `build-signed` compiles the code (via `build`), and then signs all artifacts.
 * `check` runs `cargo check`-style tests.
 * `clean` removes all build artifacts we know how to remove. It applies to the
   repository, not just the subdirectory it is called in.

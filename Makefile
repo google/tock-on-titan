@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Note that `all` does _not_ depend on `build-signed`.  Many consumers
+# of this project (especially new ones) won't be happy if they have to
+# struggle with signing from day one.
 .PHONY: all
 all: build
 
@@ -54,6 +57,9 @@ sandbox_setup:
 
 .PHONY: build
 build: $(addsuffix /build,$(BUILD_SUBDIRS))
+
+.PHONY: build-signed
+build-signed: $(addsuffix /build-signed,$(BUILD_SUBDIRS))
 
 .PHONY: check
 check: $(addsuffix /check,$(BUILD_SUBDIRS))

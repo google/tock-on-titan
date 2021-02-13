@@ -16,6 +16,9 @@
 tools/build: cargo_version_check sandbox_setup
 	cd tools && $(BWRAP) cargo build --offline --release
 
+.PHONY: tools/build-signed
+tools/build-signed: tools/build
+
 .PHONY: tools/check
 tools/check: cargo_version_check sandbox_setup
 	cd tools && $(BWRAP) cargo check --offline --release

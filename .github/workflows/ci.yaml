@@ -41,15 +41,15 @@ jobs:
       - name: Make setup
         run: make -C "${GITHUB_WORKSPACE}" setup
 
-      # Install the bubblewrap sandboxing tool.
-      - name: Install Bubblewrap
-        run: sudo apt-get install bubblewrap
+      # Install packages our build system depends on.
+      - name: Install Packages
+        run: sudo apt-get install bubblewrap gcc-arm-none-eabi
 
-      # Runs the `check` and `localtests` make actions. We cannot build this
-      # repository in GitHub Actions as building requires non-publicly-available
-      # code signing tools, so this is the best we can do (at least for now --
-      # theoretically we could build up until the code signing step but the
-      # makefiles are not structured for that yet). I use -j2 because the VMs
-      # that GitHub Actions uses have 2 logical CPUs.
-      - name: Check and local tests
-        run: make -C "${GITHUB_WORKSPACE}" -j2 check localtests
+      # Runs the `build`, `check` and `localtests` make actions.  We
+      # cannot build the `build-signed` target as doing so requires
+      # non-publicly-available code signing tools, so this is the best
+      # we can do (at least for now).
+      # We use -j2 because the VMs that GitHub Actions uses have 2
+      # logical CPUs.
+      - name: Build, check and local tests
+        run: make -C "${GITHUB_WORKSPACE}" -j2 build check localtests

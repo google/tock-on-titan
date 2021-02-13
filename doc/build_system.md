@@ -16,6 +16,7 @@ for instance, `userspace/h1_tests/Build.mk` should implement the following
 actions:
 
 * `userspace/h1_tests/build`
+* `userspace/h1_tests/build-signed`
 * `userspace/h1_tests/check`
 * `userspace/h1_tests/devicetests`
 * `userspace/h1_tests/doc`
@@ -38,6 +39,7 @@ exceptions to this (documented below).
 Each Build.mk should support the following targets:
 
 * `$PATH/build`
+* `$PATH/build-signed`
 * `$PATH/check`
 * `$PATH/devicetests`
 * `$PATH/doc`

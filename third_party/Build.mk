@@ -26,6 +26,9 @@ third_party/build: build/cargo-host/release/elf2tab sandbox_setup
 		CARGO_TARGET_DIR="../../build/userspace/cargo" \
 		$(BWRAP) cargo build --offline --release --target=thumbv7m-none-eabi --examples
 
+.PHONY: third_party/build-signed
+third_party/build-signed: third_party/build
+
 .PHONY: third_party/check
 third_party/check: cargo_version_check sandbox_setup
 	cd third_party/elf2tab && \
