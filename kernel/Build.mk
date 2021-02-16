@@ -16,6 +16,9 @@
 kernel/build: sandbox_setup
 	cd kernel && $(BWRAP) cargo build --release
 
+.PHONY: kernel/build-signed
+kernel/build-signed: kernel/build
+
 .PHONY: kernel/check
 kernel/check: sandbox_setup
 	cd kernel && $(BWRAP) cargo check --release

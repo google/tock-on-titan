@@ -40,6 +40,10 @@ TANGO_BOARD_FOR_TEST ?= golf2
 .PHONY: userspace/build
 userspace/build: $(addsuffix /build,$(BUILD_SUBDIRS))
 
+.PHONY: userspace/build-signed
+userspace/build-signed: userspace/build
+userspace/build-signed: $(addsuffix /build-signed,$(BUILD_SUBDIRS))
+
 .PHONY: userspace/check
 userspace/check: sandbox_setup
 	cd userspace && TOCK_KERNEL_VERSION=h1_tests $(BWRAP) cargo check --release
@@ -82,15 +86,15 @@ include $(addsuffix /Build.mk,$(BUILD_SUBDIRS))
 
 
 # ------------------------------------------------------------------------------
-# Macro to define a full_image target for a specific
+# Macro to define unsigned_image and full_image targets for a specific
 # board-and-app-and-tbf-file combination.
 # Arguments:
 # - $(BOARD)
 # - $(APP)
 # - $(TBF_FILE)
-define FULL_IMAGE_TARGET
+define IMAGE_TARGETS
 
-build/userspace/$(APP)/$(BOARD)/full_image: \
+build/userspace/$(APP)/$(BOARD)/unsigned_image: \
 		build/userspace/$(APP)/$(TBF_FILE) \
 		kernel/build
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
@@ -101,16 +105,14 @@ build/userspace/$(APP)/$(BOARD)/full_image: \
 	arm-none-eabi-objcopy --update-section \
 		.apps=build/userspace/$(APP)/$(TBF_FILE) \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	if [ -n "${TANGO_CODESIGNER}" -a -n "${TANGO_CODESIGNER_KEY}" ]; then \
-		$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
-			--key=$(TANGO_CODESIGNER_KEY) \
-			--output=build/userspace/$(APP)/$(BOARD)/signed_image; \
-		cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
-			> build/userspace/$(APP)/$(BOARD)/full_image; \
-	else \
-		echo "***** Can't create signed_image -- one of CODESIGNER{,_KEY} is empty "; \
-		echo "*****   -- hope that's OK."; \
-	fi
+
+build/userspace/$(APP)/$(BOARD)/full_image: \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image
+	$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
+		--key=$(TANGO_CODESIGNER_KEY) \
+		--output=build/userspace/$(APP)/$(BOARD)/signed_image;
+	cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
+		> build/userspace/$(APP)/$(BOARD)/full_image;
 
 endef
 
@@ -122,8 +124,16 @@ endef
 # - $(APP)
 define C_APP_BOARD_TARGETS
 
+# `foreach TBF_FILE` ensures that TBF_FILE has the expected value when
+# IMAGE_TARGETS is expanded.
+$(foreach TBF_FILE,cortex-m3/cortex-m3.tbf,$(eval $(IMAGE_TARGETS)))
+
 .PHONY: userspace/$(APP)/$(BOARD)/build
 userspace/$(APP)/$(BOARD)/build: \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image
+
+.PHONY: userspace/$(APP)/$(BOARD)/build-signed
+userspace/$(APP)/$(BOARD)/build-signed: \
 		build/userspace/$(APP)/$(BOARD)/full_image
 
 .PHONY: userspace/$(APP)/$(BOARD)/check
@@ -153,10 +163,6 @@ userspace/$(APP)/$(BOARD)/run: \
 		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
 		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
 		build/cargo-host/release/runner'
-
-# `foreach` ensures that TBF_FILE has the expected value when
-# FULL_IMAGE_TARGET is expanded.
-$(foreach TBF_FILE,cortex-m3/cortex-m3.tbf,$(eval $(FULL_IMAGE_TARGET)))
 
 endef
 
@@ -188,13 +194,19 @@ $(foreach APP,$(C_APPS),$(eval $(C_APP_TARGETS)))
 # - $(APP)
 define C_APP_COMBINED_TARGET
 
-# Entry target for an individual app to build app for all boards
+# Entry target for an individual app to build unsigned app for all boards
 .PHONY: userspace/$(APP)/build
 userspace/$(APP)/build: \
 		$(if $(filter $(APP),$(C_APPS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/build)) \
 		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(C_APPS_$(BOARD))),userspace/$(APP)/$(BOARD)/build))
 
-# Entry target for an individual app to build app for all boards
+# Entry target for an individual app to build signed app for all boards
+.PHONY: userspace/$(APP)/build-signed
+userspace/$(APP)/build-signed: \
+		$(if $(filter $(APP),$(C_APPS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/build-signed)) \
+		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(C_APPS_$(BOARD))),userspace/$(APP)/$(BOARD)/build-signed))
+
+# Entry target for an individual app to run check for all boards
 .PHONY: userspace/$(APP)/check
 userspace/$(APP)/check: \
 		$(if $(filter $(APP),$(C_APPS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/check)) \
@@ -233,8 +245,16 @@ $(foreach APP,$(C_APPS) $(foreach BOARD,$(BOARDS),$(C_APPS_$(BOARD))),$(eval $(C
 # - $(APP)
 define RUST_APP_BOARD_TARGETS
 
+# `foreach TBF_FILE` ensures that TBF_FILE has the expected value when
+# IMAGE_TARGETS is expanded.
+$(foreach TBF_FILE,$(BOARD)/app.tbf,$(eval $(IMAGE_TARGETS)))
+
 .PHONY: userspace/$(APP)/$(BOARD)/build
 userspace/$(APP)/$(BOARD)/build: \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image
+
+.PHONY: userspace/$(APP)/$(BOARD)/build-signed
+userspace/$(APP)/$(BOARD)/build-signed: \
 		build/userspace/$(APP)/$(BOARD)/full_image
 
 .PHONY: userspace/$(APP)/$(BOARD)/check
@@ -294,10 +314,6 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		     false ; \
 		fi
 
-# `foreach` ensures that TBF_FILE has the expected value when
-# FULL_IMAGE_TARGET is expanded.
-$(foreach TBF_FILE,$(BOARD)/app.tbf,$(eval $(FULL_IMAGE_TARGET)))
-
 endef
 
 # ------------------------------------------------------------------------------
@@ -313,11 +329,17 @@ $(foreach BOARD,$(BOARDS),$(foreach APP,$(RUST_APPS) $(RUST_APPS_$(BOARD)),$(eva
 # - $(APP)
 define RUST_APP_TARGET
 
-# Entry target for an individual app to build app for all boards
+# Entry target for an individual app to build unsigned app for all boards
 .PHONY: userspace/$(APP)/build
 userspace/$(APP)/build: \
 		$(if $(filter $(APP),$(RUST_APPS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/build)) \
 		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_APPS_$(BOARD))),userspace/$(APP)/$(BOARD)/build))
+
+# Entry target for an individual app to build signed app for all boards
+.PHONY: userspace/$(APP)/build-signed
+userspace/$(APP)/build-signed: \
+		$(if $(filter $(APP),$(RUST_APPS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/build-signed)) \
+		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_APPS_$(BOARD))),userspace/$(APP)/$(BOARD)/build-signed))
 
 # Entry target for an individual app to run check for all boards
 .PHONY: userspace/$(APP)/check
@@ -357,8 +379,16 @@ $(foreach APP,$(RUST_APPS) $(foreach BOARD,$(BOARDS),$(RUST_APPS_$(BOARD))),$(ev
 # - $(APP)
 define RUST_TEST_BOARD_TARGETS
 
+# `foreach TBF_FILE` ensures that TBF_FILE has the expected value when
+# IMAGE_TARGETS is expanded.
+$(foreach TBF_FILE,$(BOARD)/app.tbf,$(eval $(IMAGE_TARGETS)))
+
 .PHONY: userspace/$(APP)/$(BOARD)/build
 userspace/$(APP)/$(BOARD)/build: \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image
+
+.PHONY: userspace/$(APP)/$(BOARD)/build-signed
+userspace/$(APP)/$(BOARD)/build-signed: \
 		build/userspace/$(APP)/$(BOARD)/full_image
 
 .PHONY: userspace/$(APP)/$(BOARD)/check
@@ -426,10 +456,6 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		     false ; \
 		fi
 
-# `foreach` ensures that TBF_FILE has the expected value when
-# FULL_IMAGE_TARGET is expanded.
-$(foreach TBF_FILE,$(BOARD)/app.tbf,$(eval $(FULL_IMAGE_TARGET)))
-
 endef
 
 # ------------------------------------------------------------------------------
@@ -445,11 +471,17 @@ $(foreach BOARD,$(BOARDS),$(foreach APP,$(RUST_TESTS) $(RUST_TESTS_$(BOARD)),$(e
 # - $(APP)
 define RUST_TEST_TARGET
 
-# Entry target for an individual app to build app for all boards
+# Entry target for an individual app to build unsigned app for all boards
 .PHONY: userspace/$(APP)/build
 userspace/$(APP)/build: \
 		$(if $(filter $(APP),$(RUST_TESTS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/build)) \
 		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_TESTS_$(BOARD))),userspace/$(APP)/$(BOARD)/build))
+
+# Entry target for an individual app to build signed app for all boards
+.PHONY: userspace/$(APP)/build-signed
+userspace/$(APP)/build-signed: \
+		$(if $(filter $(APP),$(RUST_TESTS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/build-signed)) \
+		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_TESTS_$(BOARD))),userspace/$(APP)/$(BOARD)/build-signed))
 
 # Entry target for an individual app to run check for all boards
 .PHONY: userspace/$(APP)/check

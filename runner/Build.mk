@@ -15,12 +15,15 @@
 .PHONY: runner/build
 runner/build: build/cargo-host/release/runner
 
+.PHONY: runner/build-signed
+runner/build-signed: runner/build
+
 .PHONY: runner/check
 runner/check: sandbox_setup
 	cd runner && \
 		CARGO_TARGET_DIR="../build/cargo-host" $(BWRAP) cargo check
 
-.PHONY: kernel/clean
+.PHONY: runner/clean
 runner/clean:
 	rm -f runner/Cargo.lock
 

@@ -31,11 +31,17 @@ Configure Rust
 make setup
 ```
 
-### Build all boards and apps
+### Build all boards and apps (unsigned)
 
 ```shell
-make
+make build
 ```
 
-Note that if one of TANGO_CODESIGNER{,_KEY} is not set, then signed artifacts
-will not be created.
+### Build 'signed' versions of all artifacts
+
+```shell
+make build-signed
+```
+
+The `build-signed` target requires `TANGO_CODESIGNER` and `TANGO_CODESIGNER_KEY`
+to be set. The codesigner and keys are not publicly available.
