@@ -537,10 +537,16 @@ fn run() -> TockResult<()> {
     }
 }
 
+const BANNER: &'static str = concat!(
+    env!("CARGO_PKG_NAME"), ' ',
+    env!("CARGO_PKG_VERSION"), ' ',
+    include_str!("../../../build/gitlongtag")
+);
+
 #[libtock::main]
 async fn main() -> TockResult<()> {
     let mut console = Console::new();
-    writeln!(console, "Starting ...")?;
+    writeln!(console, "Starting {}", BANNER)?;
     let result = run();
     if result.is_ok() {
         writeln!(console, "Returned OK.")?;

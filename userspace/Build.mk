@@ -62,6 +62,12 @@ userspace/doc: sandbox_setup
 .PHONY: userspace/localtests
 userspace/localtests: $(addsuffix /localtests,$(BUILD_SUBDIRS))
 
+# .PHONY so it happens every time, even though we do write a file at the target
+.PHONY: build/gitlongtag
+build/gitlongtag:
+	mkdir -p build
+	git describe --always --dirty --long >$@
+
 include $(addsuffix /Build.mk,$(BUILD_SUBDIRS))
 
 # ------------------------------------------------------------------------------
@@ -258,7 +264,7 @@ userspace/$(APP)/$(BOARD)/build-signed: \
 		build/userspace/$(APP)/$(BOARD)/full_image
 
 .PHONY: userspace/$(APP)/$(BOARD)/check
-userspace/$(APP)/$(BOARD)/check: sandbox_setup
+userspace/$(APP)/$(BOARD)/check: sandbox_setup build/gitlongtag
 	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo check \
 		--offline --release
 
@@ -266,7 +272,7 @@ userspace/$(APP)/$(BOARD)/check: sandbox_setup
 userspace/$(APP)/$(BOARD)/devicetests:
 
 .PHONY: userspace/$(APP)/$(BOARD)/doc
-userspace/$(APP)/$(BOARD)/doc: sandbox_setup
+userspace/$(APP)/$(BOARD)/doc: sandbox_setup build/gitlongtag
 	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo doc \
 		--offline --release
 
@@ -290,7 +296,7 @@ userspace/$(APP)/$(BOARD)/run: \
 		build/cargo-host/release/runner'
 
 .PHONY: build/userspace/$(APP)/$(BOARD)/app
-build/userspace/$(APP)/$(BOARD)/app: sandbox_setup
+build/userspace/$(APP)/$(BOARD)/app: sandbox_setup build/gitlongtag
 	rm -f build/userspace/cargo/thumbv7m-none-eabi/release/$(APP)-*
 	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo build \
 		--offline --release
