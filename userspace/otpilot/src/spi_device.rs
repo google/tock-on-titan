@@ -21,7 +21,6 @@ use libtock::result::TockError;
 use libtock::result::TockResult;
 use libtock::shared_memory::SharedMemory;
 use libtock::syscalls;
-use libtock::syscalls::raw::yieldk;
 
 use spiutils::driver::HandlerMode;
 use spiutils::protocol::flash::AddressMode;
@@ -32,8 +31,8 @@ pub const MAX_READ_BUFFER_SIZE: usize = 512;
 pub const MAX_WRITE_BUFFER_SIZE: usize = 2048;
 
 pub trait SpiDevice {
-    /// Wait for a transaction by yielding.
-    fn wait_for_transaction(&self);
+    /// Check if received a transaction.
+    fn have_transaction(&self) -> bool;
 
     /// Get the buffer slice of received data.
     fn get_read_buffer(&self) -> &[u8];
@@ -196,11 +195,6 @@ impl SpiDeviceImpl {
         }
     }
 
-    /// Check if received a transaction.
-    fn have_transaction(&self) -> bool {
-        self.received_len.get() != 0
-    }
-
     /// Clear the current received transaction.
     fn clear_transaction(&self) {
         self.received_len.set(0);
@@ -208,8 +202,8 @@ impl SpiDeviceImpl {
 }
 
 impl SpiDevice for SpiDeviceImpl {
-    fn wait_for_transaction(&self) {
-        while !self.have_transaction() { unsafe { yieldk(); } }
+    fn have_transaction(&self) -> bool {
+        self.received_len.get() != 0
     }
 
     fn get_read_buffer(&self) -> &[u8] {
