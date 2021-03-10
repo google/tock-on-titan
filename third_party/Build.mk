@@ -30,8 +30,8 @@ third_party/build: build/cargo-host/release/elf2tab sandbox_setup
 third_party/build-signed: third_party/build
 
 .PHONY: third_party/check
-third_party/check: cargo_version_check sandbox_setup
-	cd third_party/elf2tab && \
+third_party/check: cargo_version_check sandbox_setup build/elf2tab
+	cd build/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo check --release
 	cd third_party/libtock-rs && \
 		CARGO_TARGET_DIR="../../build/userspace/cargo" \
@@ -49,16 +49,16 @@ third_party/clean:
 third_party/devicetests:
 
 .PHONY: third_party/doc
-third_party/doc: cargo_version_check sandbox_setup
-	cd third_party/elf2tab && \
+third_party/doc: cargo_version_check sandbox_setup build/elf2tab
+	cd build/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo doc --release
 	cd third_party/rustc-demangle && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
 		$(BWRAP) cargo doc --offline --release
 
 .PHONY: third_party/localtests
-third_party/localtests: cargo_version_check sandbox_setup
-	cd third_party/elf2tab && \
+third_party/localtests: cargo_version_check sandbox_setup build/elf2tab
+	cd build/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo test --release
 	cd third_party/libtock-rs && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
@@ -69,6 +69,12 @@ third_party/localtests: cargo_version_check sandbox_setup
 
 
 .PHONY: build/cargo-host/release/elf2tab
-build/cargo-host/release/elf2tab: cargo_version_check sandbox_setup
-	cd third_party/elf2tab && \
+build/cargo-host/release/elf2tab: cargo_version_check build/elf2tab
+	cd build/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo build --release
+
+.PHONY: build/elf2tab
+build/elf2tab:
+	rm -rf build/elf2tab && \
+	cp -rp -t build third_party/elf2tab && \
+	rm -f build/elf2tab/Cargo.lock
