@@ -28,8 +28,6 @@ BUILD_SUBDIRS := kernel runner third_party tools userspace
 BWRAP := bwrap                                                               \
          --ro-bind / /                                                       \
          --bind "$(CURDIR)/build" "$(CURDIR)/build"                          \
-         --bind "$(CURDIR)/build/Cargo.lock/elf2tab"                         \
-                "$(CURDIR)/third_party/elf2tab/Cargo.lock"                   \
          --bind "$(CURDIR)/kernel/Cargo.lock" "$(CURDIR)/kernel/Cargo.lock"  \
          --bind "$(CURDIR)/runner/Cargo.lock" "$(CURDIR)/runner/Cargo.lock"  \
          --bind "$(CURDIR)/third_party/libtock-rs/Cargo.lock"                \
@@ -46,8 +44,7 @@ BWRAP := bwrap                                                               \
 # A target that sets up directories the bwrap sandbox needs.
 .PHONY: sandbox_setup
 sandbox_setup:
-	mkdir -p build/Cargo.lock
-	>build/Cargo.lock/elf2tab
+	mkdir -p build
 	>kernel/Cargo.lock
 	>runner/Cargo.lock
 	>third_party/libtock-rs/Cargo.lock
