@@ -29,6 +29,10 @@ all: build
 build:
 	$(MAKE) -C $(TOCK_ON_TITAN) $(INVOKE_DIR)/build
 
+.PHONY: build-signed
+build-signed:
+	$(MAKE) -C $(TOCK_ON_TITAN) $(INVOKE_DIR)/build-signed
+
 .PHONY: check
 check:
 	$(MAKE) -C $(TOCK_ON_TITAN) $(INVOKE_DIR)/check
