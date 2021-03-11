@@ -182,7 +182,7 @@ define C_APP_TARGETS
 .PHONY: build/userspace/$(APP)/cortex-m3/cortex-m3.tbf
 build/userspace/$(APP)/cortex-m3/cortex-m3.tbf: \
 		build/cargo-host/release/elf2tab
-	+$(BWRAP) $(MAKE) -C userspace/$(APP) -f TockMakefile
+	+flock build/libtock_c_lock $(BWRAP) $(MAKE) -C userspace/$(APP) -f TockMakefile
 
 endef
 
