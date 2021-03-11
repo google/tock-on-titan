@@ -82,6 +82,8 @@ build/
                         # elf2tab's toolchain version.
     device_lock         # Lock file used with flock() to prevent concurrent uses
                         # of the device.
+    libtock_c_lock      # Lock file used with flock to prevent concurrent uses
+                        # of libtock-c's Makefiles.
     userspace/
         cargo/          # userspace/ Cargo workspace target tree. Uses
                         # libtock-rs's toolchain version.
