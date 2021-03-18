@@ -75,6 +75,7 @@ build/cargo-host/release/elf2tab: cargo_version_check build/elf2tab
 
 .PHONY: build/elf2tab
 build/elf2tab:
+	mkdir -p build && \
 	rm -rf build/elf2tab && \
 	cp -rp -t build third_party/elf2tab && \
 	rm -f build/elf2tab/Cargo.lock
