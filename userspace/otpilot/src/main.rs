@@ -19,6 +19,8 @@
 mod alarm;
 mod console_reader;
 mod fuse;
+mod gpio;
+mod gpio_processor;
 mod manticore_support;
 mod sfdp;
 mod spi_host;
@@ -27,6 +29,7 @@ mod spi_host_helper;
 mod spi_device;
 mod spi_processor;
 
+use crate::gpio_processor::GpioProcessor;
 use crate::spi_host_helper::SpiHostHelper;
 use crate::spi_processor::SpiProcessor;
 
@@ -103,6 +106,9 @@ fn run() -> TockResult<()> {
         print_flash_headers: false,  // Enable to print incoming SPI flash headers
     };
 
+    let gpio_processor = GpioProcessor::new();
+
+
     //////////////////////////////////////////////////////////////////////////////
 
     writeln!(console, "Device: Configuring address_mode handling to KernelSpace")?;
@@ -148,9 +154,19 @@ fn run() -> TockResult<()> {
 
     //////////////////////////////////////////////////////////////////////////////
 
+    // We assume that we've already done all boot-time checks at this point.
+
+    // Deassert BMC resets.
+    // TODO(osk): Do something with the result codes.
+    let _ = gpio_processor.set_bmc_cpu_rst(false);
+    let _ = gpio_processor.set_bmc_srst(false);
+
+    //////////////////////////////////////////////////////////////////////////////
+
     loop {
         while !spi_device::get().have_transaction()
             && !console_reader::get().have_data()
+            && !gpio::get().have_events()
             && !alarm::get().is_expired() {
 
             // Note: Do NOT use the console here, as that results in a "hidden"
@@ -183,9 +199,24 @@ fn run() -> TockResult<()> {
             console_reader::get().allow_read(1)?;
         }
 
+        if gpio::get().have_events() {
+            match gpio_processor.process_gpio_events() {
+                Ok(()) => {}
+                Err(_) => {
+                    // Ignore error from writeln. There's nothing we can do here anyway.
+                    let _ = writeln!(console, "Device: Error processing GPIO event.");
+                }
+            }
+        }
+
         if alarm::get().is_expired() {
-            writeln!(console, "Alarm expired.")?;
-            alarm::get().clear()?;
+            match gpio_processor.alarm_expired() {
+                Ok(()) => {}
+                Err(_) => {
+                    // Ignore error from writeln. There's nothing we can do here anyway.
+                    let _ = writeln!(console, "Alarm: Error processing event.");
+                }
+            }
         }
     }
 }
