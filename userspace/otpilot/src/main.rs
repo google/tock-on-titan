@@ -19,6 +19,7 @@
 mod alarm;
 mod console_processor;
 mod console_reader;
+mod flash;
 mod fuse;
 mod globalsec;
 mod gpio;
@@ -165,6 +166,13 @@ fn run() -> TockResult<()> {
     // TODO(osk): Do something with the result codes.
     let _ = gpio_processor.set_bmc_cpu_rst(false);
     let _ = gpio_processor.set_bmc_srst(false);
+
+    //////////////////////////////////////////////////////////////////////////////
+
+    let mut flash_read: [u8; flash::MAX_BUFFER_LENGTH] = [0; flash::MAX_BUFFER_LENGTH];
+    writeln!(console, "reading flash ...")?;
+    flash::get().read(0x5000, &mut flash_read, 8)?;
+    writeln!(console, "flash_read = {:?}", &flash_read[0..8])?;
 
     //////////////////////////////////////////////////////////////////////////////
 
