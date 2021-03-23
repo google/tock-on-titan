@@ -312,7 +312,7 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		-o build/userspace/$(APP)/$(BOARD)/app_tab \
 		build/userspace/$(APP)/$(BOARD)/app --stack=2048 --app-heap=4096 \
 		--kernel-heap=1024 --protected-region-size=64
-	if [ "$$(wc -c <build/userspace/$(APP)/$(BOARD)/app.tbf)" -ge 65536 ]; \
+	if [ "$$$$(wc -c build/userspace/$(APP)/$(BOARD)/app.tbf)" -ge 65536 ]; \
 		then echo "#########################################################"; \
 		     echo "# Application $(notdir $(APP)) for board $(BOARD) is too large."; \
 		     echo "# Check size of build/userspace/$(APP)/$(BOARD)/app.tbf"; \
@@ -454,7 +454,7 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		-o build/userspace/$(APP)/$(BOARD)/app_tab \
 		build/userspace/$(APP)/$(BOARD)/app --stack=2048 --app-heap=4096 \
 		--kernel-heap=1024 --protected-region-size=64
-	if [ "$$(wc -c <build/userspace/$(APP)/$(BOARD)/app.tbf)" -ge 65536 ]; \
+	if [ "$$$$(wc -c build/userspace/$(APP)/$(BOARD)/app.tbf)" -ge 65536 ]; \
 		then echo "#########################################################"; \
 		     echo "# Application $(APP) for board $(BOARD) is too large."; \
 		     echo "# Check size of build/userspace/$(APP)/$(BOARD)/app.tbf"; \
