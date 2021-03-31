@@ -19,5 +19,6 @@
 #[macro_use]
 pub mod wire;
 
+pub mod firmware;
 pub mod flash;
 pub mod payload;
