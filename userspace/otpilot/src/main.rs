@@ -17,6 +17,7 @@
 #![no_std]
 
 mod console_reader;
+mod fuse;
 mod manticore_support;
 mod sfdp;
 mod spi_host;
@@ -193,6 +194,7 @@ const BANNER: &'static str = concat!(
 async fn main() -> TockResult<()> {
     let mut console = Console::new();
     writeln!(console, "Starting {}", BANNER)?;
+    writeln!(console, "DEV ID: 0x{:x}", fuse::get().get_dev_id()?)?;
     let result = run();
     if result.is_ok() {
         writeln!(console, "Returned OK.")?;
