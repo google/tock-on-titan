@@ -99,6 +99,7 @@ pub struct Papa {
     nvcounter: &'static h1_syscalls::nvcounter_syscall::NvCounterSyscall<'static,
         FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>>,
     personality: &'static h1_syscalls::personality::PersonalitySyscall<'static>,
+    fuse_syscalls: &'static h1_syscalls::fuse::FuseSyscall<'static>,
 }
 
 #[no_mangle]
@@ -364,6 +365,10 @@ pub unsafe fn reset_handler() {
     );
     h1::spi_device::SPI_DEVICE0.set_client(Some(h1_spi_device_syscalls));
 
+    let fuse_syscalls = static_init!(
+        h1_syscalls::fuse::FuseSyscall<'static>,
+        h1_syscalls::fuse::FuseSyscall::new(&h1::fuse::FUSE, kernel.create_grant(&grant_cap))
+    );
 
     // ** GLOBALSEC **
     // TODO(alevy): refactor out
@@ -446,6 +451,7 @@ pub unsafe fn reset_handler() {
         h1_spi_host_syscalls: h1_spi_host_syscalls,
         h1_spi_device_syscalls: h1_spi_device_syscalls,
         personality: personality,
+        fuse_syscalls: fuse_syscalls,
     };
 
     // Uncomment to initialize NvCounter
@@ -496,6 +502,7 @@ impl Platform for Papa {
             h1_syscalls::digest::DRIVER_NUM            => f(Some(self.digest)),
             h1_syscalls::nvcounter_syscall::DRIVER_NUM => f(Some(self.nvcounter)),
             h1_syscalls::personality::DRIVER_NUM       => f(Some(self.personality)),
+            h1_syscalls::fuse::DRIVER_NUM              => f(Some(self.fuse_syscalls)),
             kernel::ipc::DRIVER_NUM                    => f(Some(&self.ipc)),
             _ =>  f(None),
         }

@@ -16,6 +16,7 @@ pub mod aes;
 pub mod common;
 pub mod digest;
 pub mod flash;
+pub mod fuse;
 pub mod personality;
 pub mod rng;
 pub mod spi_host;
