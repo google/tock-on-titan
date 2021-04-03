@@ -212,6 +212,7 @@ pub unsafe fn reset_handler() {
         )
     );
     hil::uart::Transmit::set_transmit_client(console_uart, console);
+    hil::uart::Receive::set_receive_client(console_uart, console);
 
     // Create virtual device for kernel debug.
     components::debug_writer::DebugWriterComponent::new(uart_mux).finalize(());
