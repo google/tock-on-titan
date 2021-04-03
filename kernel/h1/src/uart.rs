@@ -86,6 +86,9 @@ pub struct UART<'a> {
     tx_buffer: TakeCell<'static, [u8]>,
     tx_limit: Cell<usize>,
     tx_cursor: Cell<usize>,
+    rx_buffer: TakeCell<'static, [u8]>,
+    rx_limit: Cell<usize>,
+    rx_cursor: Cell<usize>,
     tx_client: OptionalCell<&'a dyn hil::uart::TransmitClient>,
     rx_client: OptionalCell<&'a dyn hil::uart::ReceiveClient>,
 }
@@ -100,6 +103,9 @@ impl<'a> UART<'a> {
             tx_buffer: TakeCell::empty(),
             tx_limit: Cell::new(0),
             tx_cursor: Cell::new(0),
+            rx_buffer: TakeCell::empty(),
+            rx_limit: Cell::new(0),
+            rx_cursor: Cell::new(0),
             tx_client: OptionalCell::empty(),
             rx_client: OptionalCell::empty(),
         }
@@ -247,6 +253,38 @@ impl<'a> UART<'a> {
 
     }
 
+    fn purge_rx_fifo(&self) {
+        let regs = unsafe { &*self.regs };
+
+        while (regs.state.get() & (1 << 7)) == 0 {
+            // While RX FIFO is not empty, continue to purge it
+            let _rx_byte = regs.read_data.get();
+        }
+    }
+
+    fn read_rx_fifo(&self) {
+        if self.rx_buffer.is_some() {
+            let regs = unsafe { &*self.regs };
+
+            self.rx_buffer.map(|rx_buffer| {
+                while self.rx_cursor.get() < self.rx_limit.get() &&
+                    (regs.state.get() & (1 << 7)) == 0 {
+                    // While RX FIFO is not empty and we have space in the buffer ...
+                    let rx_byte = regs.read_data.get() as u8;
+                    rx_buffer[self.rx_cursor.get()] = rx_byte;
+                    self.rx_cursor.set(self.rx_cursor.get() + 1);
+                }
+            });
+
+            if self.rx_limit.get() > 0 && self.rx_cursor.get() >= self.rx_limit.get() {
+                self.rx_client.map(|client| {
+                    client.received_buffer(self.rx_buffer.take().unwrap(),
+                        self.rx_limit.get(), ReturnCode::SUCCESS, hil::uart::Error::None);
+                });
+            }
+        }
+    }
+
     /// Called by the chip following a TX interrupt.
     ///
     /// If there are bytes left in the buffer to send, write another batch to the TX FIFO.
@@ -275,28 +313,13 @@ impl<'a> UART<'a> {
 
     /// Called by the chip following a RX interrupt.
     ///
-    /// This will clear the NVIC pending bit to mark that we've handled the
-    /// interrupt. Then, if there are bytes left in the buffer to send, write
-    /// another batch to the TX FIFO. Otherwise, return the buffer back to the
-    /// client (TODO: no client yet, so not yet implemented).
-    ///
-    /// # Invariants
-    ///
-    ///   * NVIC is disabled
-    ///
-    ///   * NVIC pending bit is high
-    ///
+    /// This will clear the interrupt pending bit to mark that we've handled the
+    /// interrupt. Data in the RX FIFO is then copied into the client's buffer.
     pub fn handle_rx_interrupt(&self) {
         let regs = unsafe { &*self.regs };
-        // Currently discards bytes: need to read into buffer. -pal 4/11/18
         regs.clear_interrupt_state.set(2);
-        self.rx_client.map(|_client| {
-            while regs.state.get() & 1 << 7 == 0 {
-                // While RX FIFO not empty
-                let _b = regs.read_data.get() as u8;
-//                client.receive_complete(b, hil::uart::Error::CommandComplete);
-            }
-        });
+
+        self.read_rx_fifo();
     }
 }
 
@@ -332,10 +355,27 @@ impl<'a> hil::uart::Transmit<'a> for UART<'a> {
 impl<'a> hil::uart::Receive<'a> for UART<'a> {
     fn set_receive_client(&self, client: &'a dyn hil::uart::ReceiveClient) {
         self.rx_client.replace(client);
+        self.purge_rx_fifo();
+        self.enable_rx();
     }
 
-    fn receive_buffer(&self, rx_buffer: &'static mut[u8], _rx_len: usize) -> (ReturnCode, Option<&'static mut [u8]>) {
-        (ReturnCode::FAIL, Some(rx_buffer))
+    fn receive_buffer(&self, rx_buffer: &'static mut[u8], rx_len: usize) -> (ReturnCode, Option<&'static mut [u8]>) {
+        if self.rx_buffer.is_some() {
+            return (ReturnCode::EBUSY, Some(rx_buffer));
+        }
+
+        if rx_buffer.len() < rx_len {
+            return (ReturnCode::ENOMEM, Some(rx_buffer));
+        }
+
+        self.rx_buffer.replace(rx_buffer);
+        self.rx_cursor.set(0);
+        self.rx_limit.set(rx_len);
+
+        // Handle any pending RX bytes immediately
+        self.read_rx_fifo();
+
+        return (ReturnCode::SUCCESS, None);
     }
 
     fn receive_word(&self) -> ReturnCode {
@@ -344,6 +384,13 @@ impl<'a> hil::uart::Receive<'a> for UART<'a> {
 
     // SUCCESS indicates there will be no callback
     fn receive_abort(&self) -> ReturnCode {
+        if self.rx_buffer.is_some() {
+            self.rx_client.map(|client| {
+                client.received_buffer(self.rx_buffer.take().unwrap(),
+                    self.rx_limit.get(), ReturnCode::ECANCEL, hil::uart::Error::None);
+            });
+        }
+
         ReturnCode::SUCCESS
     }
 }
