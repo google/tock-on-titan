@@ -19,6 +19,7 @@
 mod alarm;
 mod console_processor;
 mod console_reader;
+mod firmware_controller;
 mod flash;
 mod fuse;
 mod globalsec;
@@ -91,17 +92,16 @@ fn run() -> TockResult<()> {
     }
 
     {
-        let mut idx : usize = 0;
-        for val in "1234567890".as_bytes() {
-            if idx > identity.device_id.len() { break; }
-            identity.device_id[idx] = *val;
-            idx = idx + 1;
+        let dev_id_bytes = fuse::get().get_dev_id()?.to_be_bytes();
+        for idx in 0..dev_id_bytes.len() {
+            identity.device_id[idx] = dev_id_bytes[idx];
         }
     }
 
     let mut spi_processor = SpiProcessor {
         server: manticore_support::get_pa_rot(&identity),
         print_flash_headers: false,  // Enable to print incoming SPI flash headers
+        firmware: firmware_controller::FirmwareController::new(),
     };
 
     let gpio_processor = GpioProcessor::new();
@@ -237,9 +237,10 @@ async fn main() -> TockResult<()> {
     let mut console = Console::new();
     writeln!(console, "Starting {}", BANNER)?;
     writeln!(console, "Reset source: {:?}", reset::get().get_reset_source()?)?;
-    writeln!(console, "main @ 0x{:p}", main as *const())?;
-    writeln!(console, "inactive RO: {:?}", globalsec::get().get_inactive_ro())?;
-    writeln!(console, "inactive RW: {:?}", globalsec::get().get_inactive_rw())?;
+    writeln!(console, "active RO: {:?}, {:?}", globalsec::get().get_active_ro(), firmware_controller::get_build_info(globalsec::get().get_active_ro())?)?;
+    writeln!(console, "active RW: {:?}, {:?}", globalsec::get().get_active_rw(), firmware_controller::get_build_info(globalsec::get().get_active_rw())?)?;
+    writeln!(console, "inactive RO: {:?}, {:?}", globalsec::get().get_inactive_ro(), firmware_controller::get_build_info(globalsec::get().get_inactive_ro())?)?;
+    writeln!(console, "inactive RW: {:?}, {:?}", globalsec::get().get_inactive_rw(), firmware_controller::get_build_info(globalsec::get().get_inactive_rw())?)?;
     writeln!(console, "DEV ID: 0x{:x}", fuse::get().get_dev_id()?)?;
     writeln!(console, "clock_frequency: {}", alarm::get().get_clock_frequency())?;
     let result = run();

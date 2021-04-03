@@ -27,12 +27,17 @@ use core::mem;
 
 // ----------------------------------------------------------------------------
 
+/// The location of the BuildInfo from the start of the firmware segment.
+/// This location must match the original `SignedHeader` C-struct used in
+/// actual firmware images.
+pub const BUILD_INFO_OFFSET: usize = 860;
+
 /// The length of a BuildInfo on the wire, in bytes.
 pub const BUILD_INFO_LEN: usize = 3 * mem::size_of::<u32>() + mem::size_of::<u64>();
 
 /// Firmware build information.
 /// The fields and serialization of this struct must match the original
-/// C-based struct used in actual firmware images.
+/// `SignedHeader` C-struct used in actual firmware images.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct BuildInfo {
     /// Time epoch
