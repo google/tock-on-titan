@@ -51,6 +51,9 @@ use h1::hil::spi_device::SpiDevice;
 use h1::nvcounter::{FlashCounter,NvCounter};
 use h1::timels::Timels;
 
+use spiutils::driver::firmware::SegmentInfo;
+use spiutils::protocol::firmware::SegmentAndLocation;
+
 // State for loading apps
 const NUM_PROCS: usize = 1;
 
@@ -100,6 +103,18 @@ pub struct Papa {
         FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>>,
     personality: &'static h1_syscalls::personality::PersonalitySyscall<'static>,
     fuse_syscalls: &'static h1_syscalls::fuse::FuseSyscall<'static>,
+    globalsec_syscalls: &'static h1_syscalls::globalsec::GlobalSecSyscall<'static>,
+}
+
+fn get_h1_flash_segment_info(identifier: SegmentAndLocation, address: u32, size: u32) -> SegmentInfo {
+    const H1_FLASH_PAGE_SIZE: u32 = h1::hil::flash::h1_hw::H1_FLASH_PAGE_SIZE as u32;
+    SegmentInfo {
+        identifier,
+        address,
+        size,
+        start_page: address / H1_FLASH_PAGE_SIZE,
+        page_count: size / H1_FLASH_PAGE_SIZE,
+    }
 }
 
 #[no_mangle]
@@ -370,62 +385,18 @@ pub unsafe fn reset_handler() {
         h1_syscalls::fuse::FuseSyscall::new(&h1::fuse::FUSE, kernel.create_grant(&grant_cap))
     );
 
-    // ** GLOBALSEC **
-    // TODO(alevy): refactor out
-    {
-        use core::intrinsics::volatile_store as vs;
-        const GLOBALSEC_BASE:      usize = 0x40090000;
+    const H1_FLASH_BANK_SIZE: u32 = h1::hil::flash::h1_hw::H1_FLASH_BANK_SIZE as u32;
+    h1::globalsec::GLOBALSEC.init(h1::globalsec::Segments {
+        ro_a: get_h1_flash_segment_info(SegmentAndLocation::RoA, 0x0, 0x4000),
+        rw_a: get_h1_flash_segment_info(SegmentAndLocation::RwA, 0x4000, H1_FLASH_BANK_SIZE - 0x4000),
+        ro_b: get_h1_flash_segment_info(SegmentAndLocation::RoB, H1_FLASH_BANK_SIZE, 0x4000),
+        rw_b: get_h1_flash_segment_info(SegmentAndLocation::RwB, H1_FLASH_BANK_SIZE + 0x4000, H1_FLASH_BANK_SIZE - 0x4000),
+    });
 
-        const CPU0_D_REGION0_CTRL: usize = GLOBALSEC_BASE + 0x0;
-        const CPU0_D_REGION1_CTRL: usize = GLOBALSEC_BASE + 0x4;
-        const CPU0_D_REGION2_CTRL: usize = GLOBALSEC_BASE + 0x8;
-        const CPU0_D_REGION3_CTRL: usize = GLOBALSEC_BASE + 0xc;
-
-        const DDMA0_REGION0_CTRL: usize = GLOBALSEC_BASE + 0x80;
-        const DDMA0_REGION1_CTRL: usize = GLOBALSEC_BASE + 0x84;
-        const DDMA0_REGION2_CTRL: usize = GLOBALSEC_BASE + 0x88;
-        const DDMA0_REGION3_CTRL: usize = GLOBALSEC_BASE + 0x8c;
-
-        const DUSB0_REGION0_CTRL: usize = GLOBALSEC_BASE + 0xc0;
-        const DUSB0_REGION1_CTRL: usize = GLOBALSEC_BASE + 0xc4;
-        const DUSB0_REGION2_CTRL: usize = GLOBALSEC_BASE + 0xc8;
-        const DUSB0_REGION3_CTRL: usize = GLOBALSEC_BASE + 0xcc;
-
-        const FLASH_REGION2_BASE: usize = GLOBALSEC_BASE + 0x240;
-        const FLASH_REGION2_SIZE: usize = GLOBALSEC_BASE + 0x244;
-        const FLASH_REGION2_CTRL: usize = GLOBALSEC_BASE + 0x0e8;
-
-        vs(CPU0_D_REGION0_CTRL as *mut u32, !0);
-        vs(CPU0_D_REGION1_CTRL as *mut u32, !0);
-        vs(CPU0_D_REGION2_CTRL as *mut u32, !0);
-        vs(CPU0_D_REGION3_CTRL as *mut u32, !0);
-
-        // GLOBALSEC_DDMA0-DDMA3
-        vs(DDMA0_REGION0_CTRL as *mut u32, !0);
-        vs(DDMA0_REGION1_CTRL as *mut u32, !0);
-        vs(DDMA0_REGION2_CTRL as *mut u32, !0);
-        vs(DDMA0_REGION3_CTRL as *mut u32, !0);
-
-        // GLOBALSEC_DUSB_REGION0-DUSB_REGION3
-        vs(DUSB0_REGION0_CTRL as *mut u32, !0);
-        vs(DUSB0_REGION1_CTRL as *mut u32, !0);
-        vs(DUSB0_REGION2_CTRL as *mut u32, !0);
-        vs(DUSB0_REGION3_CTRL as *mut u32, !0);
-
-        // Flash region initialization. We initialize a single region for the
-        // last three pages of the second flash macro, used by Personality (n-3)
-        // and the non-volatile counter implementation (n-2, n-1).
-        const FLASH_START: usize = 0x40000;
-        const FLASH_SIZE: usize = 512 * 1024;
-        const FLASH_PAGE_SIZE: usize = 2048;
-        vs(FLASH_REGION2_BASE as *mut u32, (FLASH_START + FLASH_SIZE - 3*FLASH_PAGE_SIZE) as u32);
-        // The value of the SIZE register is one less than the size of the
-        // region, i.e. the last address within the region is the start address
-        // + the size register.
-        vs(FLASH_REGION2_SIZE as *mut u32, (3*FLASH_PAGE_SIZE - 1) as u32);
-        // Enable the region for reads and writes.
-        vs(FLASH_REGION2_CTRL as *mut u32, 0b111);
-    }
+    let globalsec_syscalls = static_init!(
+        h1_syscalls::globalsec::GlobalSecSyscall<'static>,
+        h1_syscalls::globalsec::GlobalSecSyscall::new(&h1::globalsec::GLOBALSEC, kernel.create_grant(&grant_cap))
+    );
 
     let mut _ctr = 0;
     let chip = static_init!(h1::chip::Hotel, h1::chip::Hotel::new());
@@ -452,6 +423,7 @@ pub unsafe fn reset_handler() {
         h1_spi_device_syscalls: h1_spi_device_syscalls,
         personality: personality,
         fuse_syscalls: fuse_syscalls,
+        globalsec_syscalls: globalsec_syscalls,
     };
 
     // Uncomment to initialize NvCounter
@@ -503,6 +475,7 @@ impl Platform for Papa {
             h1_syscalls::nvcounter_syscall::DRIVER_NUM => f(Some(self.nvcounter)),
             h1_syscalls::personality::DRIVER_NUM       => f(Some(self.personality)),
             h1_syscalls::fuse::DRIVER_NUM              => f(Some(self.fuse_syscalls)),
+            h1_syscalls::globalsec::DRIVER_NUM         => f(Some(self.globalsec_syscalls)),
             kernel::ipc::DRIVER_NUM                    => f(Some(&self.ipc)),
             _ =>  f(None),
         }
