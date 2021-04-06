@@ -17,6 +17,7 @@
 #![no_std]
 
 mod alarm;
+mod console_processor;
 mod console_reader;
 mod fuse;
 mod gpio;
@@ -29,6 +30,7 @@ mod spi_host_helper;
 mod spi_device;
 mod spi_processor;
 
+use crate::console_processor::ConsoleProcessor;
 use crate::gpio_processor::GpioProcessor;
 use crate::spi_host_helper::SpiHostHelper;
 use crate::spi_processor::SpiProcessor;
@@ -107,6 +109,7 @@ fn run() -> TockResult<()> {
     };
 
     let gpio_processor = GpioProcessor::new();
+    let console_processor = ConsoleProcessor::new(&gpio_processor);
 
 
     //////////////////////////////////////////////////////////////////////////////
@@ -163,6 +166,8 @@ fn run() -> TockResult<()> {
 
     //////////////////////////////////////////////////////////////////////////////
 
+    console_reader::get().allow_read(1)?;
+
     loop {
         while !spi_device::get().have_transaction()
             && !console_reader::get().have_data()
@@ -194,8 +199,13 @@ fn run() -> TockResult<()> {
         }
 
         if console_reader::get().have_data() {
-            let data = console_reader::get().get_data();
-            writeln!(console, "Have data (len={}): 0x{:x}", data.len(), data[0])?;
+            match console_processor.process_input() {
+                Ok(()) => {}
+                Err(_) => {
+                    // Ignore error from writeln. There's nothing we can do here anyway.
+                    let _ = writeln!(console, "Device: Error processing console event.");
+                }
+            }
             console_reader::get().allow_read(1)?;
         }
 
