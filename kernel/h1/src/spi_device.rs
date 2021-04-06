@@ -810,22 +810,22 @@ impl SpiDevice for SpiDeviceHardware {
         self.registers.eeprom_ctrl.modify(EEPROM_CTRL::VIRTUAL_ADDR_FILTER_EN::CLEAR);
         self.registers.eeprom_ctrl.modify(EEPROM_CTRL::RAM_DIS::SET);
 
-        // Configure external flash at `flash_virtual_base` with length `size`
+        // Configure external flash at `flash_virtual_base`
         self.registers.ext_flash_base_page.write(
             PAGE::ID.val(config.flash_virtual_base >> PAGE_SHIFT));
-        self.registers.ext_flash_limit_page.write(
-            PAGE::ID.val((config.flash_virtual_base + (config.flash_physical_size - 1)) >> PAGE_SHIFT));
 
-        // Zero out all address bits beyond the size of the flash chip
-        self.registers.ext_flash_trans_bit_vector.set(
-            config.flash_virtual_base + (config.flash_physical_size - 1));
+        // Allow any size of external flash
+        self.registers.ext_flash_limit_page.write(PAGE::ID.val(0xffffffff));
+
+        // Allow all bits to be used unmodified
+        self.registers.ext_flash_trans_bit_vector.set(0xffffffff);
 
         // Configure mapping to `physical_base`.
         self.registers.ext_flash_trans_addr.set(
             config.flash_physical_base);
 
 
-        // Configure all available EEPROM mode RAM pages after EXT_FLASH
+        // Configure all available EEPROM mode RAM pages at the desired base address.
         let ram_virtual_page_base = config.ram_virtual_base >> PAGE_SHIFT;
         for idx in 0..self.registers.ram_virtual_page.len() {
             self.registers.ram_virtual_page[idx].write(
@@ -836,15 +836,9 @@ impl SpiDevice for SpiDeviceHardware {
             );
         }
 
-
-        // Only allow addresses within the virtual_size to allow space for
-        // external flash and RAM pages
-        self.registers.virtual_addr_filter.set(config.virtual_size - 1);
-
-
         self.registers.eeprom_ctrl.modify(EEPROM_CTRL::EXT_FLASH_DIS::CLEAR);
         self.registers.eeprom_ctrl.modify(EEPROM_CTRL::RAM_DIS::CLEAR);
-        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::VIRTUAL_ADDR_FILTER_EN::SET);
+        self.registers.eeprom_ctrl.modify(EEPROM_CTRL::VIRTUAL_ADDR_FILTER_EN::CLEAR);
     }
 
     fn set_address_mode(&self, address_mode: AddressMode) {
