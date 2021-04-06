@@ -117,20 +117,11 @@ fn run() -> TockResult<()> {
     //////////////////////////////////////////////////////////////////////////////
 
     // OpenTitan JEDEC ID
-    /*
     spi_device::get().set_jedec_id(&mut [
         0x26, // Manufacturer (Visic, should actually be
               // 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x26)
         0x31, // Device (OpenTitan)
         0x19, // Size (2^25 = 256 Mb)
-        ])?;
-    */
-
-    // Legacy JEDEC ID
-    spi_device::get().set_jedec_id(&mut [
-        0x26, // Manufacturer
-        0x02, // Device
-        0x17, // Size
         ])?;
 
     //////////////////////////////////////////////////////////////////////////////
