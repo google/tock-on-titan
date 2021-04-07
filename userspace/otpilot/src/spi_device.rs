@@ -43,6 +43,9 @@ pub trait SpiDevice {
     /// Whether the transaction has the WRITE ENABLE bit set.
     fn is_write_enable_set(&self) -> bool;
 
+    /// End the transaction without changing any status bits or returning data.
+    fn end_transaction(&self);
+
     /// End the transaction and clear the BUSY and/or the WRITE ENABLE bits.
     fn end_transaction_with_status(&self, clear_busy: bool, clear_write_enable: bool) -> TockResult<()>;
 
@@ -216,6 +219,10 @@ impl SpiDevice for SpiDeviceImpl {
 
     fn is_write_enable_set(&self) -> bool {
         self.is_write_enable_set.get()
+    }
+
+    fn end_transaction(&self) {
+        self.clear_transaction();
     }
 
     fn end_transaction_with_status(&self, clear_busy: bool, clear_write_enable: bool) -> TockResult<()> {

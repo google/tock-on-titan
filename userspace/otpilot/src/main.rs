@@ -163,6 +163,8 @@ fn run() -> TockResult<()> {
                             // Ignore error from writeln. There's nothing we can do here anyway.
                             let _ = writeln!(console, "Device: Error ending transaction.");
                         }
+                    } else {
+                        spi_device::get().end_transaction();
                     }
                 }
             }
