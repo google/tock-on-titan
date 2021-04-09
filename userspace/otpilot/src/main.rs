@@ -147,7 +147,9 @@ fn run() -> TockResult<()> {
 
     loop {
         while !spi_device::get().have_transaction() {
-            let _ = writeln!(console, "yieldk()");
+
+            // Note: Do NOT use the console here, as that results in a "hidden"
+            // yieldk() which causes us to lose track of the conditions above.
             unsafe { yieldk(); }
         }
 
