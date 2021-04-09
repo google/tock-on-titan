@@ -16,6 +16,7 @@
 
 #![no_std]
 
+mod console_reader;
 mod manticore_support;
 mod sfdp;
 mod spi_host;
@@ -147,7 +148,8 @@ fn run() -> TockResult<()> {
     //////////////////////////////////////////////////////////////////////////////
 
     loop {
-        while !spi_device::get().have_transaction() {
+        while !spi_device::get().have_transaction()
+            && !console_reader::get().have_data() {
 
             // Note: Do NOT use the console here, as that results in a "hidden"
             // yieldk() which causes us to lose track of the conditions above.
@@ -171,6 +173,12 @@ fn run() -> TockResult<()> {
                     }
                 }
             }
+        }
+
+        if console_reader::get().have_data() {
+            let data = console_reader::get().get_data();
+            writeln!(console, "Have data (len={}): 0x{:x}", data.len(), data[0])?;
+            console_reader::get().allow_read(1)?;
         }
     }
 }
