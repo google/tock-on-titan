@@ -14,9 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use byteorder::ByteOrder;
 use core::cell::Cell;
-use core::mem;
 use h1::hil::fuse::Fuse;
 use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
 
@@ -47,12 +45,12 @@ impl<'a> FuseSyscall<'a> {
         self.apps.enter(caller_id, |app_data, _| {
             if let Some(ref mut dev_id_buffer) = app_data.dev_id_buffer {
                 let dev_id = self.fuse.get_dev_id();
-                let val_size = mem::size_of::<u64>();
-                if dev_id_buffer.len() < val_size {
-                    return ReturnCode::ENOMEM;
+                for (idx, &byte) in dev_id.to_be_bytes().iter().enumerate() {
+                    match dev_id_buffer.as_mut().get_mut(idx) {
+                        None => return ReturnCode::ENOMEM,
+                        Some(value) => *value = byte,
+                    }
                 }
-
-                byteorder::BE::write_u64(&mut dev_id_buffer.as_mut(), dev_id);
             }
             ReturnCode::SUCCESS
         }).unwrap_or(ReturnCode::ENOMEM)

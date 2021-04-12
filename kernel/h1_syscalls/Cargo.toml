@@ -19,7 +19,6 @@ authors = ["Philip Levis <plevis@google.com>", "Oskar Senft <osk@google.com"]
 edition = "2018"
 
 [dependencies]
-byteorder = { path = "../../third_party/byteorder-1.3.4", default_features = false }
 kernel = { path = "../../third_party/tock/kernel" }
 h1 = { path = "../h1" }
 spiutils = { path = "../../shared-lib/spiutils", default_features = false }

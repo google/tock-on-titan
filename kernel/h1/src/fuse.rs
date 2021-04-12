@@ -16,8 +16,6 @@
 
 use crate::hil::fuse::Fuse;
 
-use core::mem;
-
 use kernel::common::registers::register_structs;
 use kernel::common::registers::ReadOnly;
 use kernel::common::StaticRef;
@@ -56,7 +54,7 @@ impl FuseController {
 
 impl Fuse for FuseController {
     fn get_dev_id(&self) -> u64 {
-        ((self.registers.dev_id0.get() as u64) << (mem::size_of::<u32>() * 8))
+        ((self.registers.dev_id0.get() as u64) << 32)
             | (self.registers.dev_id1.get() as u64)
     }
 }
