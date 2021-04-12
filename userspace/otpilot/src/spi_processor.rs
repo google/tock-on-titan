@@ -88,7 +88,11 @@ impl From<core::fmt::Error> for SpiProcessorError {
 //////////////////////////////////////////////////////////////////////////////
 
 pub struct SpiProcessor<'a> {
+    // The Manticore protocol server.
     pub server: PaRot<'a, Identity, Reset, NoRsa>,
+
+    // Whether to print incoming flash headers.
+    pub print_flash_headers: bool,
 }
 
 const SPI_TX_BUF_SIZE : usize = 512;
@@ -278,12 +282,16 @@ impl<'a> SpiProcessor<'a> {
         match spi_device::get().get_address_mode() {
             AddressMode::ThreeByte => {
                 let header = flash::Header::<ux::u24>::from_wire(&mut rx_buf)?;
-                writeln!(console, "Device: flash header (3B): {:?}", header)?;
+                if self.print_flash_headers {
+                    writeln!(console, "Device: flash header (3B): {:?}", header)?;
+                }
                 self.process_spi_header(&header, rx_buf)
             }
             AddressMode::FourByte => {
                 let header = flash::Header::<u32>::from_wire(&mut rx_buf)?;
-                writeln!(console, "Device: flash header (4B): {:?}", header)?;
+                if self.print_flash_headers {
+                    writeln!(console, "Device: flash header (4B): {:?}", header)?;
+                }
                 self.process_spi_header(&header, rx_buf)
             }
         }

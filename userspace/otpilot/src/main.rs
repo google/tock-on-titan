@@ -96,6 +96,7 @@ fn run() -> TockResult<()> {
 
     let mut spi_processor = SpiProcessor {
         server: manticore_support::get_pa_rot(&identity),
+        print_flash_headers: false,  // Enable to print incoming SPI flash headers
     };
 
     //////////////////////////////////////////////////////////////////////////////
