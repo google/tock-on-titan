@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use byteorder::ByteOrder;
 use core::mem;
 use libtock::result::TockResult;
 use libtock::syscalls;
@@ -68,7 +67,7 @@ impl FuseImpl {
 
 impl Fuse for FuseImpl {
     fn get_dev_id(&self) -> TockResult<u64> {
-        let mut dev_id_buffer: [u8; mem::size_of::<u64>()] = [0; mem::size_of::<u64>()];
+        let mut dev_id_buffer = [0u8; mem::size_of::<u64>()];
 
         {
             // We want this to go out of scope after executing the command
@@ -77,6 +76,6 @@ impl Fuse for FuseImpl {
             syscalls::command(DRIVER_NUMBER, command_nr::GET_DEV_ID, 0, 0)?;
         }
 
-        Ok(byteorder::BE::read_u64(&dev_id_buffer))
+        Ok(u64::from_be_bytes(dev_id_buffer))
     }
 }
