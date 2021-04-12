@@ -87,8 +87,6 @@ impl<'a> Driver for FuseSyscall<'a> {
              minor_num: usize,
              slice: Option<AppSlice<Shared, u8>>
     ) -> ReturnCode {
-        //debug!("allow: num={}, slice={}",
-        //    minor_num, if slice.is_some() { "Some" } else { "None" });
         match minor_num {
             0 => {
                 // Buffer for Dev ID (64 bit in BE notation)
