@@ -33,6 +33,8 @@ third_party/build-signed: third_party/build
 third_party/check: cargo_version_check sandbox_setup build/elf2tab
 	cd build/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo check --release
+	cd third_party/libc && \
+		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo check --release
 	cd third_party/libtock-rs && \
 		CARGO_TARGET_DIR="../../build/userspace/cargo" \
 		$(BWRAP) cargo check --offline --release --target=thumbv7m-none-eabi --examples
