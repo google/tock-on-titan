@@ -76,7 +76,7 @@ doc: $(addsuffix /doc,$(BUILD_SUBDIRS))
 localtests: $(addsuffix /localtests,$(BUILD_SUBDIRS))
 
 .PHONY: prtest
-prtest: build devicetests localtests
+prtest: build check devicetests localtests
 	@echo '------------------------------------------------------'
 	@echo 'prtest successful. When you open a PR, paste the below'
 	@echo 'block (not the output above) into the PR description:'
