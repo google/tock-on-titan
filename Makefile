@@ -25,6 +25,12 @@ BUILD_SUBDIRS := kernel runner third_party tools userspace
 # installing things during builds. We don't like that. This is a sandbox we can
 # run commands in that denies network access as well as write access outside the
 # build/ directory.
+#
+# The mount order of /tmp and CURDIR is important. It is reasonable for someone
+# to check this repository out under /tmp and try to build it. If this only has
+# `--ro-bind / / --tmpfs /tmp` without `--ro-bind "$(CURDIR)" "$(CURDIR)"`,
+# the sandbox will not contain any source code and the build will fail. Mounting
+# in this order leaves the source code available and /tmp writable.
 BWRAP := bwrap                                                               \
          --ro-bind / /                                                       \
          --tmpfs /tmp                                                        \
