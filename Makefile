@@ -27,6 +27,8 @@ BUILD_SUBDIRS := kernel runner third_party tools userspace
 # build/ directory.
 BWRAP := bwrap                                                               \
          --ro-bind / /                                                       \
+         --tmpfs /tmp                                                        \
+         --ro-bind "$(CURDIR)" "$(CURDIR)"                                   \
          --bind "$(CURDIR)/build" "$(CURDIR)/build"                          \
          --bind "$(CURDIR)/kernel/Cargo.lock" "$(CURDIR)/kernel/Cargo.lock"  \
          --bind "$(CURDIR)/runner/Cargo.lock" "$(CURDIR)/runner/Cargo.lock"  \
@@ -38,7 +40,6 @@ BWRAP := bwrap                                                               \
          --bind "$(CURDIR)/userspace/Cargo.lock"                             \
                 "$(CURDIR)/userspace/Cargo.lock"                             \
          --dev /dev                                                          \
-         --tmpfs /tmp                                                        \
          --unshare-all
 
 # A target that sets up directories the bwrap sandbox needs.
