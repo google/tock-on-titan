@@ -43,6 +43,18 @@ use spiutils::protocol::wire::FromWireError;
 use spiutils::protocol::wire::ToWire;
 use spiutils::protocol::wire::ToWireError;
 
+// Size of the SPI flash chip.
+// Hard-coded to 64 MiB for now.
+// TODO: Modify this to be read from the actual SPI flash chip at runtime.
+pub const SPI_FLASH_SIZE: u32 = 0x4000000;
+
+// The location of the mailbox.
+// TODO: Make this configurable, possibly by reading it from the SPI flash chip.
+pub const SPI_MAILBOX_ADDRESS: u32 = 0xf00000;
+
+// The size of the mailbox.
+const SPI_MAILBOX_SIZE: u32 = spi_device::MAX_READ_BUFFER_SIZE as u32;
+
 #[derive(Copy, Clone, Debug)]
 pub enum SpiProcessorError {
     FromWire(FromWireError),
@@ -234,13 +246,13 @@ impl<'a> SpiProcessor<'a> {
         match header.opcode {
             OpCode::PageProgram => {
                 match header.get_address() {
-                    Some(0x02000000) => {
+                    Some(x) if x >= SPI_MAILBOX_ADDRESS && x < SPI_MAILBOX_ADDRESS + SPI_MAILBOX_SIZE => {
                         if spi_device::get().is_write_enable_set() {
                             self.process_spi_payload(data)?;
                         }
                         self.clear_device_status(true, true)
                     }
-                    Some(x) if x < 0x02000000 => {
+                    Some(x) if x < SPI_MAILBOX_ADDRESS || x >= SPI_MAILBOX_ADDRESS + SPI_MAILBOX_SIZE => {
                         if spi_device::get().is_write_enable_set() {
                             // Pass through to SPI host
                             self.spi_host_write(header, data)?;
@@ -252,11 +264,11 @@ impl<'a> SpiProcessor<'a> {
             }
             OpCode::SectorErase | OpCode::BlockErase32KB | OpCode::BlockErase64KB => {
                 match header.get_address() {
-                    Some(0x02000000) => {
+                    Some(x) if x >= SPI_MAILBOX_ADDRESS && x < SPI_MAILBOX_ADDRESS + SPI_MAILBOX_SIZE => {
                         // Nothing to do.
                         self.clear_device_status(true, true)
                     }
-                    Some(x) if x < 0x02000000 => {
+                    Some(x) if x < SPI_MAILBOX_ADDRESS || x >= SPI_MAILBOX_ADDRESS + SPI_MAILBOX_SIZE => {
                         if spi_device::get().is_write_enable_set() {
                             // Pass through to SPI host
                             self.spi_host_write(header, data)?;

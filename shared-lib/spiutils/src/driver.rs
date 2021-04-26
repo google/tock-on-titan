@@ -25,6 +25,7 @@ use crate::protocol::wire::ToWire;
 
 use core::convert::TryFrom;
 use core::default::Default;
+use core::mem;
 
 /// Handler mode.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -58,6 +59,9 @@ impl TryFrom<usize> for HandlerMode {
         }
     }
 }
+
+/// The length of an AddressConfig on the wire, in bytes.
+pub const ADDRESS_CONFIG_LEN: usize = 5 * mem::size_of::<u32>();
 
 /// Address configuration for SPI device hardware.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
