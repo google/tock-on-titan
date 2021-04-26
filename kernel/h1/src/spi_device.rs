@@ -1,4 +1,3 @@
-use crate::hil::spi_device::AddressConfig;
 use crate::hil::spi_device::SpiDevice;
 use crate::hil::spi_device::SpiDeviceClient;
 
@@ -13,6 +12,7 @@ use kernel::common::registers::WriteOnly;
 use kernel::common::StaticRef;
 use kernel::ReturnCode;
 
+use spiutils::driver::AddressConfig;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::flash::OpCode;
 

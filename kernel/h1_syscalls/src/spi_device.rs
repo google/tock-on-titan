@@ -1,7 +1,6 @@
 use core::cell::Cell;
 use core::convert::TryFrom;
 
-use h1::hil::spi_device::AddressConfig;
 use h1::hil::spi_device::SpiDevice;
 use h1::hil::spi_device::SpiDeviceClient;
 
@@ -13,9 +12,11 @@ use kernel::Grant;
 use kernel::ReturnCode;
 use kernel::Shared;
 
+use spiutils::driver::AddressConfig;
 use spiutils::driver::HandlerMode;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::flash::OpCode;
+use spiutils::protocol::wire::FromWire;
 use spiutils::protocol::wire::FromWireError;
 use spiutils::protocol::wire::WireEnum;
 
@@ -30,15 +31,6 @@ pub struct AppData {
     address_mode_changed_callback: Option<Callback>,
 }
 
-/// The virtual base address of the external flash
-const EXT_FLASH_VIRTUAL_BASE: u32 = 0;
-
-/// The size of the external flash
-const EXT_FLASH_SIZE: u32 = 32 * 1024 * 1024;
-
-/// The physical base address in the external flash
-const EXT_FLASH_PHYSICAL_BASE: u32 = 0;
-
 pub struct SpiDeviceSyscall<'a> {
     device: &'a dyn SpiDevice,
     apps: Grant<AppData>,
@@ -48,16 +40,6 @@ pub struct SpiDeviceSyscall<'a> {
 impl<'a> SpiDeviceSyscall<'a> {
     pub fn new(device: &'a dyn SpiDevice,
                container: Grant<AppData>) -> SpiDeviceSyscall<'a> {
-        // Temporary hard-coded address configuration
-        let address_config = AddressConfig {
-            flash_virtual_base: EXT_FLASH_VIRTUAL_BASE,
-            flash_physical_base: EXT_FLASH_PHYSICAL_BASE,
-            flash_physical_size: EXT_FLASH_SIZE,
-            ram_virtual_base: EXT_FLASH_VIRTUAL_BASE + EXT_FLASH_SIZE,
-            virtual_size: EXT_FLASH_SIZE * 2,
-        };
-        device.configure_addresses(address_config);
-
         SpiDeviceSyscall {
             device: device,
             apps: container,
@@ -166,6 +148,23 @@ impl<'a> SpiDeviceSyscall<'a> {
         self.apps.enter(caller_id, |app_data, _| {
             if let Some(ref tx_buffer) = app_data.tx_buffer {
                 self.device.set_sfdp(tx_buffer.as_ref())
+            } else {
+                ReturnCode::ENOMEM
+            }
+        }).unwrap_or(ReturnCode::ENOMEM)
+    }
+
+    fn configure_addresses(&self, caller_id: AppId) -> ReturnCode {
+        self.apps.enter(caller_id, |app_data, _| {
+            if let Some(ref tx_buffer) = app_data.tx_buffer {
+                let maybe_address_config = AddressConfig::from_wire(tx_buffer.as_ref());
+                if maybe_address_config.is_err() {
+                    return ReturnCode::EINVAL;
+                }
+
+                self.device.configure_addresses(maybe_address_config.unwrap());
+
+                ReturnCode::SUCCESS
             } else {
                 ReturnCode::ENOMEM
             }
@@ -295,6 +294,9 @@ impl<'a> Driver for SpiDeviceSyscall<'a> {
             }
             7 /* Set SFDP using data from TX buffer */ => {
                 self.set_sfdp(caller_id)
+            }
+            8 /* Configure addresses using data from TX buffer */ => {
+                self.configure_addresses(caller_id)
             }
             _ => ReturnCode::ENOSUPPORT
         }
