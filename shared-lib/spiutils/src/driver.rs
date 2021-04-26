@@ -16,6 +16,13 @@
 
 //! Kernel interface
 
+use crate::io::Read;
+use crate::io::Write;
+use crate::protocol::wire::FromWireError;
+use crate::protocol::wire::FromWire;
+use crate::protocol::wire::ToWireError;
+use crate::protocol::wire::ToWire;
+
 use core::convert::TryFrom;
 use core::default::Default;
 
@@ -49,5 +56,54 @@ impl TryFrom<usize> for HandlerMode {
             2 => Ok(HandlerMode::KernelSpace),
             _ => Err(InvalidHandlerMode),
         }
+    }
+}
+
+/// Address configuration for SPI device hardware.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct AddressConfig {
+    /// The address on the SPI device bus that the external flash is accessible at.
+    pub flash_virtual_base: u32,
+
+    /// The base address in the external flash device on the SPI host bus.
+    pub flash_physical_base: u32,
+
+    /// The size of the external flash device.
+    /// This must be a 2^N.
+    pub flash_physical_size: u32,
+
+    /// The address on the SPI device bus that the RAM (mailbox) is accessible at.
+    pub ram_virtual_base: u32,
+
+    /// The total size available on the SPI device bus.
+    /// This must be a 2^N.
+    pub virtual_size: u32,
+}
+
+impl<'a> FromWire<'a> for AddressConfig {
+    fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
+        let flash_virtual_base = r.read_be::<u32>()?;
+        let flash_physical_base = r.read_be::<u32>()?;
+        let flash_physical_size = r.read_be::<u32>()?;
+        let ram_virtual_base = r.read_be::<u32>()?;
+        let virtual_size = r.read_be::<u32>()?;
+        Ok(Self {
+            flash_virtual_base,
+            flash_physical_base,
+            flash_physical_size,
+            ram_virtual_base,
+            virtual_size,
+        })
+    }
+}
+
+impl ToWire for AddressConfig {
+    fn to_wire<W: Write>(&self, mut w: W) -> Result<(), ToWireError> {
+        w.write_be(self.flash_virtual_base)?;
+        w.write_be(self.flash_physical_base)?;
+        w.write_be(self.flash_physical_size)?;
+        w.write_be(self.ram_virtual_base)?;
+        w.write_be(self.virtual_size)?;
+        Ok(())
     }
 }
