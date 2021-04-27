@@ -45,7 +45,7 @@ userspace/build-signed: userspace/build
 userspace/build-signed: $(addsuffix /build-signed,$(BUILD_SUBDIRS))
 
 .PHONY: userspace/check
-userspace/check: sandbox_setup
+userspace/check: build/gitlongtag sandbox_setup
 	cd userspace && TOCK_KERNEL_VERSION=h1_tests $(BWRAP) cargo check --release
 
 .PHONY: userspace/clean
