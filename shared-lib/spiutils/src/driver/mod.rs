@@ -16,4 +16,5 @@
 
 //! SPI protocol modules.
 
+pub mod firmware;
 pub mod spi_device;
