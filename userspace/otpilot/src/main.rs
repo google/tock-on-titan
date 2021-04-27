@@ -20,6 +20,7 @@ mod alarm;
 mod console_processor;
 mod console_reader;
 mod fuse;
+mod globalsec;
 mod gpio;
 mod gpio_processor;
 mod manticore_support;
@@ -241,6 +242,9 @@ const BANNER: &'static str = concat!(
 async fn main() -> TockResult<()> {
     let mut console = Console::new();
     writeln!(console, "Starting {}", BANNER)?;
+    writeln!(console, "main @ 0x{:p}", main as *const())?;
+    writeln!(console, "inactive RO: {:?}", globalsec::get().get_inactive_ro())?;
+    writeln!(console, "inactive RW: {:?}", globalsec::get().get_inactive_rw())?;
     writeln!(console, "DEV ID: 0x{:x}", fuse::get().get_dev_id()?)?;
     writeln!(console, "clock_frequency: {}", alarm::get().get_clock_frequency())?;
     let result = run();
