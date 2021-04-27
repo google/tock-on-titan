@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2021 lowRISC contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,14 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
 
-pub mod aes;
-pub mod common;
-pub mod digest;
-pub mod flash;
-pub mod fuse;
-pub mod globalsec;
-pub mod personality;
-pub mod rng;
-pub mod spi_host;
-pub mod spi_device;
+//! Interface for Fuse Controller on H1
+
+use spiutils::driver::firmware::RuntimeSegmentInfo;
+
+pub trait GlobalSec {
+    /// Get runtime information about firmware segments.
+    fn get_runtime_segment_info(&self) -> RuntimeSegmentInfo;
+}

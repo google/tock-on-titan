@@ -23,6 +23,7 @@ pub mod aes;
 pub mod dcrypto;
 pub mod dcrypto_test;
 pub mod fuse;
+pub mod globalsec;
 pub mod nvcounter_syscall;
 pub mod personality;
 pub mod spi_host;
