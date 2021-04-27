@@ -16,7 +16,6 @@
 
 use core::cell::Cell;
 use core::convert::TryFrom;
-use core::mem;
 
 use libtock::result::TockError;
 use libtock::result::TockResult;
@@ -302,7 +301,8 @@ impl SpiDevice for SpiDeviceImpl {
             }
         }
 
-        // We want this to go out of scope after executing the command
+        // We want this to go out of scope only AFTER executing the command,
+        // so assign it to an unused variable to keep the result object around.
         let _write_buffer_share = syscalls::allow(DRIVER_NUMBER, allow_nr::WRITE_BUFFER, &mut buf)?;
 
         syscalls::command(DRIVER_NUMBER, command_nr::CONFIGURE_ADDRESSES, 0, 0)?;
