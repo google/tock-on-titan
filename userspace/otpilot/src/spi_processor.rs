@@ -43,6 +43,18 @@ use spiutils::protocol::wire::FromWireError;
 use spiutils::protocol::wire::ToWire;
 use spiutils::protocol::wire::ToWireError;
 
+// Size of the SPI flash chip.
+// Hard-coded to 64 MiB for now.
+// TODO(osenft): Modify this to be read from the actual SPI flash chip at runtime.
+pub const SPI_FLASH_SIZE: u32 = 0x4000000;
+
+// The location of the mailbox.
+// TODO(osenft): Make this configurable, possibly by reading it from the SPI flash chip.
+pub const SPI_MAILBOX_ADDRESS: u32 = 0xf00000;
+
+// The size of the mailbox.
+const SPI_MAILBOX_SIZE: u32 = spi_device::MAX_READ_BUFFER_SIZE as u32;
+
 #[derive(Copy, Clone, Debug)]
 pub enum SpiProcessorError {
     FromWire(FromWireError),
@@ -224,6 +236,11 @@ impl<'a> SpiProcessor<'a> {
         Ok(())
     }
 
+    // Check if the specified address is within the mailbox address space.
+    fn is_mailbox_address(&self, addr: u32) -> bool {
+        addr >= SPI_MAILBOX_ADDRESS && addr < SPI_MAILBOX_ADDRESS + SPI_MAILBOX_SIZE
+    }
+
     fn process_spi_header<AddrType>(&mut self, header: &flash::Header::<AddrType>, rx_buf: &[u8]) -> SpiProcessorResult<()>
     where AddrType: Address {
         let mut data: &[u8] = rx_buf;
@@ -234,13 +251,13 @@ impl<'a> SpiProcessor<'a> {
         match header.opcode {
             OpCode::PageProgram => {
                 match header.get_address() {
-                    Some(0x02000000) => {
+                    Some(addr) if self.is_mailbox_address(addr) => {
                         if spi_device::get().is_write_enable_set() {
                             self.process_spi_payload(data)?;
                         }
                         self.clear_device_status(true, true)
                     }
-                    Some(x) if x < 0x02000000 => {
+                    Some(addr) if !self.is_mailbox_address(addr) => {
                         if spi_device::get().is_write_enable_set() {
                             // Pass through to SPI host
                             self.spi_host_write(header, data)?;
@@ -252,11 +269,11 @@ impl<'a> SpiProcessor<'a> {
             }
             OpCode::SectorErase | OpCode::BlockErase32KB | OpCode::BlockErase64KB => {
                 match header.get_address() {
-                    Some(0x02000000) => {
+                    Some(addr) if self.is_mailbox_address(addr) => {
                         // Nothing to do.
                         self.clear_device_status(true, true)
                     }
-                    Some(x) if x < 0x02000000 => {
+                    Some(addr) if !self.is_mailbox_address(addr) => {
                         if spi_device::get().is_write_enable_set() {
                             // Pass through to SPI host
                             self.spi_host_write(header, data)?;

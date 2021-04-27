@@ -36,6 +36,7 @@ use libtock::result::TockError;
 use libtock::result::TockResult;
 use libtock::syscalls::raw::yieldk;
 
+use spiutils::driver::AddressConfig;
 use spiutils::driver::HandlerMode;
 use spiutils::protocol::flash::AddressMode;
 
@@ -105,6 +106,13 @@ fn run() -> TockResult<()> {
 
     writeln!(console, "Device: Configuring address_mode handling to KernelSpace")?;
     spi_device::get().set_address_mode_handling(HandlerMode::KernelSpace)?;
+    spi_device::get().configure_addresses(AddressConfig {
+        flash_virtual_base: 0x0,
+        flash_physical_base: 0x0,
+        flash_physical_size: spi_processor::SPI_FLASH_SIZE,
+        ram_virtual_base: spi_processor::SPI_MAILBOX_ADDRESS,
+        virtual_size: spi_processor::SPI_FLASH_SIZE,
+    })?;
 
     //////////////////////////////////////////////////////////////////////////////
 
@@ -131,10 +139,10 @@ fn run() -> TockResult<()> {
         let mut sfdp = [0xff; 128];
         sfdp::get_table(
             &mut sfdp,
-            0x2000000 * 8, // image_size_bits
+            spi_processor::SPI_FLASH_SIZE * 8, // image_size_bits
             spi_device::get().get_address_mode(), // startup_address_mode
             spi_device::get().get_address_mode() == AddressMode::ThreeByte, // support_address_mode_switch
-            0x2000000, // mailbox_offset
+            spi_processor::SPI_MAILBOX_ADDRESS, // mailbox_offset
             spi_device::MAX_READ_BUFFER_SIZE as u32, // mailbox_size
             0 // google_capabilities
             ).map_err(|_| TockError::Format)?;

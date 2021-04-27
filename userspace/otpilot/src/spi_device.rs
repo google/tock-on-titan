@@ -22,8 +22,12 @@ use libtock::result::TockResult;
 use libtock::shared_memory::SharedMemory;
 use libtock::syscalls;
 
+use spiutils::driver::AddressConfig;
+use spiutils::driver::ADDRESS_CONFIG_LEN;
 use spiutils::driver::HandlerMode;
+use spiutils::io::Cursor;
 use spiutils::protocol::flash::AddressMode;
+use spiutils::protocol::wire::ToWire;
 
 pub const MAX_READ_BUFFER_SIZE: usize = 512;
 
@@ -68,6 +72,9 @@ pub trait SpiDevice {
 
     /// Set the SFDP data.
     fn set_sfdp(&self, data: &mut[u8]) -> TockResult<()>;
+
+    /// Configure SPI addresses.
+    fn configure_addresses(&self, address_config: AddressConfig) -> TockResult<()>;
 }
 
 // Get the static SpiDevice object.
@@ -86,6 +93,7 @@ mod command_nr {
     pub const SET_ADDRESS_MODE_HANDLING: usize = 5;
     pub const SET_JEDEC_ID: usize = 6;
     pub const SET_SFDP: usize = 7;
+    pub const CONFIGURE_ADDRESSES: usize = 8;
 }
 
 mod subscribe_nr {
@@ -277,6 +285,27 @@ impl SpiDevice for SpiDeviceImpl {
         let _write_buffer_share = syscalls::allow(DRIVER_NUMBER, allow_nr::WRITE_BUFFER, data)?;
 
         syscalls::command(DRIVER_NUMBER, command_nr::SET_SFDP, 0, 0)?;
+
+        Ok(())
+    }
+
+    fn configure_addresses(&self, address_config: AddressConfig) -> TockResult<()> {
+        let mut buf = [0u8; ADDRESS_CONFIG_LEN];
+
+        {
+            // Scope for cursor (which doesn't implement Drop).
+            // We need cursor to go out of scope so that we can use buf further down.
+            let cursor = Cursor::new(&mut buf);
+            if address_config.to_wire(cursor).is_err() {
+                return Err(TockError::Format);
+            }
+        }
+
+        // We want this to go out of scope only AFTER executing the command,
+        // so assign it to an unused variable to keep the result object around.
+        let _write_buffer_share = syscalls::allow(DRIVER_NUMBER, allow_nr::WRITE_BUFFER, &mut buf)?;
+
+        syscalls::command(DRIVER_NUMBER, command_nr::CONFIGURE_ADDRESSES, 0, 0)?;
 
         Ok(())
     }
