@@ -12,7 +12,7 @@ use kernel::common::registers::WriteOnly;
 use kernel::common::StaticRef;
 use kernel::ReturnCode;
 
-use spiutils::driver::AddressConfig;
+use spiutils::driver::spi_device::AddressConfig;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::flash::OpCode;
 

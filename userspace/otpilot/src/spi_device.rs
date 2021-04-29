@@ -22,9 +22,9 @@ use libtock::result::TockResult;
 use libtock::shared_memory::SharedMemory;
 use libtock::syscalls;
 
-use spiutils::driver::AddressConfig;
-use spiutils::driver::ADDRESS_CONFIG_LEN;
-use spiutils::driver::HandlerMode;
+use spiutils::driver::spi_device::AddressConfig;
+use spiutils::driver::spi_device::ADDRESS_CONFIG_LEN;
+use spiutils::driver::spi_device::HandlerMode;
 use spiutils::io::Cursor;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::wire::ToWire;
