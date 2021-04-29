@@ -16,6 +16,7 @@
 
 #![no_std]
 
+mod alarm;
 mod console_reader;
 mod fuse;
 mod manticore_support;
@@ -149,7 +150,8 @@ fn run() -> TockResult<()> {
 
     loop {
         while !spi_device::get().have_transaction()
-            && !console_reader::get().have_data() {
+            && !console_reader::get().have_data()
+            && !alarm::get().is_expired() {
 
             // Note: Do NOT use the console here, as that results in a "hidden"
             // yieldk() which causes us to lose track of the conditions above.
@@ -180,6 +182,11 @@ fn run() -> TockResult<()> {
             writeln!(console, "Have data (len={}): 0x{:x}", data.len(), data[0])?;
             console_reader::get().allow_read(1)?;
         }
+
+        if alarm::get().is_expired() {
+            writeln!(console, "Alarm expired.")?;
+            alarm::get().clear()?;
+        }
     }
 }
 
@@ -194,6 +201,7 @@ async fn main() -> TockResult<()> {
     let mut console = Console::new();
     writeln!(console, "Starting {}", BANNER)?;
     writeln!(console, "DEV ID: 0x{:x}", fuse::get().get_dev_id()?)?;
+    writeln!(console, "clock_frequency: {}", alarm::get().get_clock_frequency())?;
     let result = run();
     if result.is_ok() {
         writeln!(console, "Returned OK.")?;
