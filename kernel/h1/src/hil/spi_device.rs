@@ -1,6 +1,6 @@
 //! Interfaces for SPI device on H1
 
-use spiutils::driver::AddressConfig;
+use spiutils::driver::spi_device::AddressConfig;
 use spiutils::protocol::flash::AddressMode;
 
 pub trait SpiDeviceClient {

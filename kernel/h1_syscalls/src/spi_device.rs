@@ -12,8 +12,8 @@ use kernel::Grant;
 use kernel::ReturnCode;
 use kernel::Shared;
 
-use spiutils::driver::AddressConfig;
-use spiutils::driver::HandlerMode;
+use spiutils::driver::spi_device::AddressConfig;
+use spiutils::driver::spi_device::HandlerMode;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::flash::OpCode;
 use spiutils::protocol::wire::FromWire;

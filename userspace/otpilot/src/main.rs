@@ -36,8 +36,8 @@ use libtock::result::TockError;
 use libtock::result::TockResult;
 use libtock::syscalls::raw::yieldk;
 
-use spiutils::driver::AddressConfig;
-use spiutils::driver::HandlerMode;
+use spiutils::driver::spi_device::AddressConfig;
+use spiutils::driver::spi_device::HandlerMode;
 use spiutils::protocol::flash::AddressMode;
 
 //////////////////////////////////////////////////////////////////////////////
