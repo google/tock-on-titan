@@ -73,6 +73,22 @@ impl ToWire for Header {
 
 // ----------------------------------------------------------------------------
 
+/// A message.
+///
+/// A message is identified by a [`ContentType`]:
+///
+/// This trait is not implemented by any of the message types
+///
+/// [`ContentType`]: enum.ContentType.html
+pub trait Message<'req>: FromWire<'req> + ToWire {
+    /// The unique [`ContentType`] for this `Message`.
+    ///
+    /// [`ContentType`]: enum.ContentType.html
+    const TYPE: ContentType;
+}
+
+// ----------------------------------------------------------------------------
+
 wire_enum! {
     /// The content type.
     pub enum SegmentAndLocation: u8 {
@@ -104,6 +120,10 @@ pub struct UpdatePrepareRequest {
 
 /// The length of a update prepare request on the wire, in bytes.
 pub const UPDATE_PREPARE_REQUEST_LEN: usize = 1;
+
+impl Message<'_> for UpdatePrepareRequest {
+    const TYPE: ContentType = ContentType::UpdatePrepareRequest;
+}
 
 impl<'a> FromWire<'a> for UpdatePrepareRequest {
     fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
@@ -157,6 +177,10 @@ pub struct UpdatePrepareResponse {
 /// The length of a update prepare response on the wire, in bytes.
 pub const UPDATE_PREPARE_RESPONSE_LEN: usize = 4;
 
+impl Message<'_> for UpdatePrepareResponse {
+    const TYPE: ContentType = ContentType::UpdatePrepareResponse;
+}
+
 impl<'a> FromWire<'a> for UpdatePrepareResponse {
     fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
         let sal_u8 = r.read_be::<u8>()?;
@@ -195,6 +219,10 @@ pub struct WriteChunkRequest {
 
 /// The length of a write chunk request on the wire, in bytes.
 pub const WRITE_CHUNK_REQUEST_LEN: usize = 5;
+
+impl Message<'_> for WriteChunkRequest {
+    const TYPE: ContentType = ContentType::WriteChunkRequest;
+}
 
 impl<'a> FromWire<'a> for WriteChunkRequest {
     fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
@@ -259,6 +287,10 @@ pub struct WriteChunkResponse {
 
 /// The length of an update prepare response on the wire, in bytes.
 pub const WRITE_CHUNK_RESPONSE_LEN: usize = 6;
+
+impl Message<'_> for WriteChunkResponse {
+    const TYPE: ContentType = ContentType::WriteChunkResponse;
+}
 
 impl<'a> FromWire<'a> for WriteChunkResponse {
     fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
