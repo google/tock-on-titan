@@ -34,6 +34,9 @@ BUILD_SUBDIRS := $(addprefix userspace/,                   \
 BOARDS += golf2
 BOARDS += papa
 
+# If requested, build both an A and a B image.
+IMAGES=_a _b
+
 # The board we should run tests on
 TANGO_BOARD_FOR_TEST ?= golf2
 
@@ -98,27 +101,28 @@ include $(addsuffix /Build.mk,$(BUILD_SUBDIRS))
 # - $(BOARD)
 # - $(APP)
 # - $(TBF_FILE)
+# - $(IMAGE) [optional suffix to build A/B images]
 define IMAGE_TARGETS
 
-build/userspace/$(APP)/$(BOARD)/unsigned_image: \
+build/userspace/$(APP)/$(BOARD)/unsigned_image$(IMAGE): \
 		build/userspace/$(APP)/$(TBF_FILE) \
-		kernel/build
+		kernel/build$(IMAGE)
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp build/kernel/cargo/thumbv7m-none-eabi/release/$(BOARD) \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
+	cp build/kernel/cargo$(IMAGE)/thumbv7m-none-eabi/release/$(BOARD) \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image$(IMAGE)
 	arm-none-eabi-objcopy --set-section-flags .apps=alloc,code,contents \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
+		build/userspace/$(APP)/$(BOARD)/unsigned_image$(IMAGE)
 	arm-none-eabi-objcopy --update-section \
 		.apps=build/userspace/$(APP)/$(TBF_FILE) \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
+		build/userspace/$(APP)/$(BOARD)/unsigned_image$(IMAGE)
 
-build/userspace/$(APP)/$(BOARD)/full_image: \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-	$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image \
+build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE): \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image$(IMAGE)
+	$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image$(IMAGE) \
 		--key=$(TANGO_CODESIGNER_KEY) \
-		--output=build/userspace/$(APP)/$(BOARD)/signed_image;
-	cat $(TANGO_BOOTLOADER) build/userspace/$(APP)/$(BOARD)/signed_image \
-		> build/userspace/$(APP)/$(BOARD)/full_image;
+		--output=build/userspace/$(APP)/$(BOARD)/signed_image$(IMAGE);
+	cat $(TANGO_BOOTLOADER$(IMAGE)) build/userspace/$(APP)/$(BOARD)/signed_image$(IMAGE) \
+		> build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE);
 
 endef
 
@@ -251,18 +255,6 @@ $(foreach APP,$(C_APPS) $(foreach BOARD,$(BOARDS),$(C_APPS_$(BOARD))),$(eval $(C
 # - $(APP)
 define RUST_APP_BOARD_TARGETS
 
-# `foreach TBF_FILE` ensures that TBF_FILE has the expected value when
-# IMAGE_TARGETS is expanded.
-$(foreach TBF_FILE,$(BOARD)/app.tbf,$(eval $(IMAGE_TARGETS)))
-
-.PHONY: userspace/$(APP)/$(BOARD)/build
-userspace/$(APP)/$(BOARD)/build: \
-		build/userspace/$(APP)/$(BOARD)/unsigned_image
-
-.PHONY: userspace/$(APP)/$(BOARD)/build-signed
-userspace/$(APP)/$(BOARD)/build-signed: \
-		build/userspace/$(APP)/$(BOARD)/full_image
-
 .PHONY: userspace/$(APP)/$(BOARD)/check
 userspace/$(APP)/$(BOARD)/check: sandbox_setup build/gitlongtag
 	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo check \
@@ -279,42 +271,68 @@ userspace/$(APP)/$(BOARD)/doc: sandbox_setup build/gitlongtag
 .PHONY: userspace/$(APP)/$(BOARD)/localtests
 userspace/$(APP)/$(BOARD)/localtests:
 
-.PHONY: userspace/$(APP)/$(BOARD)/program
-userspace/$(APP)/$(BOARD)/program: \
+endef
+
+# ------------------------------------------------------------------------------
+# Macro to define targets for a specific board-app-and-image combination.
+# Arguments:
+# - $(BOARD)
+# - $(APP)
+# - $(IMAGE) [optional suffix to build A/B images]
+define RUST_APP_BOARD_IMAGE_TARGETS
+
+# `foreach TBF_FILE` ensures that TBF_FILE has the expected value when
+# IMAGE_TARGETS is expanded.
+$(foreach TBF_FILE,$(BOARD)/app$(IMAGE).tbf,$(eval $(IMAGE_TARGETS)))
+
+.PHONY: userspace/$(APP)/$(BOARD)/build$(IMAGE)
+userspace/$(APP)/$(BOARD)/build$(IMAGE): \
+		build/userspace/$(APP)/$(BOARD)/unsigned_image$(IMAGE)
+
+.PHONY: userspace/$(APP)/$(BOARD)/build-signed$(IMAGE)
+userspace/$(APP)/$(BOARD)/build-signed$(IMAGE): \
+		build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE)
+
+.PHONY: userspace/$(APP)/$(BOARD)/program$(IMAGE)
+userspace/$(APP)/$(BOARD)/program$(IMAGE): \
 		build/userspace/$(APP)/$(BOARD)/full_image
 	flock build/device_lock -c '$(TANGO_SPIFLASH) --verbose \
-		--input=build/userspace/$(APP)/$(BOARD)/full_image'
+		--input=build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE)'
 
-.PHONY: userspace/$(APP)/$(BOARD)/run
-userspace/$(APP)/$(BOARD)/run: \
-		build/cargo-host/release/runner build/userspace/$(APP)/$(BOARD)/full_image
+.PHONY: userspace/$(APP)/$(BOARD)/run$(IMAGE)
+userspace/$(APP)/$(BOARD)/run$(IMAGE): \
+		build/cargo-host/release/runner build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE)
 	flock build/device_lock -c ' \
 		$(TANGO_SPIFLASH) --verbose \
-				  --input=build/userspace/$(APP)/$(BOARD)/full_image ; \
+				  --input=build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE) ; \
 		stty -F /dev/ttyUltraConsole3 115200 -echo ; \
 		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
 		build/cargo-host/release/runner'
 
-.PHONY: build/userspace/$(APP)/$(BOARD)/app
-build/userspace/$(APP)/$(BOARD)/app: sandbox_setup build/gitlongtag
-	rm -f build/userspace/cargo/thumbv7m-none-eabi/release/$(APP)-*
-	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) $(BWRAP) cargo build \
+.PHONY: build/userspace/$(APP)/$(BOARD)/app$(IMAGE)
+build/userspace/$(APP)/$(BOARD)/app$(IMAGE): sandbox_setup build/gitlongtag
+	rm -f build/userspace/cargo$(IMAGE)/thumbv7m-none-eabi/release/$(APP)-*
+	cd userspace/$(APP) && \
+		CARGO_TARGET_DIR="../../build/userspace/cargo$(IMAGE)" \
+		RUSTFLAGS="-C link-arg=-T./layout$(IMAGE).ld -C relocation-model=static -C linker-flavor=ld.lld" \
+		TOCK_KERNEL_VERSION=$(APP) \
+		$(BWRAP) cargo build \
 		--offline --release
 	mkdir -p build/userspace/$(APP)/$(BOARD)/
-	cp "build/userspace/cargo/thumbv7m-none-eabi/release/$(APP)" \
-		"build/userspace/$(APP)/$(BOARD)/app"
+	cp "build/userspace/cargo$(IMAGE)/thumbv7m-none-eabi/release/$(APP)" \
+		"build/userspace/$(APP)/$(BOARD)/app$(IMAGE)"
 
 # We want to detect when an application's size is larger than 64 KiB.
-build/userspace/$(APP)/$(BOARD)/app.tbf: \
-		build/cargo-host/release/elf2tab build/userspace/$(APP)/$(BOARD)/app
+build/userspace/$(APP)/$(BOARD)/app$(IMAGE).tbf: \
+		build/cargo-host/release/elf2tab build/userspace/$(APP)/$(BOARD)/app$(IMAGE)
 	build/cargo-host/release/elf2tab -n $(APP) \
-		-o build/userspace/$(APP)/$(BOARD)/app_tab \
-		build/userspace/$(APP)/$(BOARD)/app --stack=2048 --app-heap=4096 \
+		-o build/userspace/$(APP)/$(BOARD)/app_tab$(IMAGE) \
+		build/userspace/$(APP)/$(BOARD)/app$(IMAGE) --stack=2048 --app-heap=4096 \
 		--kernel-heap=1024 --protected-region-size=64
-	if [ "$$$$(wc -c < build/userspace/$(APP)/$(BOARD)/app.tbf)" -gt 65536 ]; \
+	if [ "$$$$(wc -c < build/userspace/$(APP)/$(BOARD)/app$(IMAGE).tbf)" -gt 65536 ]; \
 		then echo "#########################################################"; \
 		     echo "# Application $(notdir $(APP)) for board $(BOARD) is too large."; \
-		     echo "# Check size of build/userspace/$(APP)/$(BOARD)/app.tbf"; \
+		     echo "# Check size of build/userspace/$(APP)/$(BOARD)/app$(IMAGE).tbf"; \
 		     echo "#########################################################"; \
 		     false ; \
 		fi
@@ -325,6 +343,9 @@ endef
 # Generate the targets for all board-and-app combinations.
 $(foreach BOARD,$(BOARDS),$(foreach APP,$(RUST_APPS) $(RUST_APPS_$(BOARD)),$(eval $(RUST_APP_BOARD_TARGETS))))
 
+# ------------------------------------------------------------------------------
+# Generate the targets for all board-app-and-image combinations.
+$(foreach BOARD,$(BOARDS),$(foreach APP,$(RUST_APPS) $(RUST_APPS_$(BOARD)),$(foreach IMAGE,$(RUST_IMAGES_$(APP)),$(eval $(RUST_APP_BOARD_IMAGE_TARGETS)))))
 
 # ------------------------------------------------------------------------------
 # Macro to define target for a specific app.
@@ -337,14 +358,14 @@ define RUST_APP_TARGET
 # Entry target for an individual app to build unsigned app for all boards
 .PHONY: userspace/$(APP)/build
 userspace/$(APP)/build: \
-		$(if $(filter $(APP),$(RUST_APPS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/build)) \
-		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_APPS_$(BOARD))),userspace/$(APP)/$(BOARD)/build))
+		$(if $(filter $(APP),$(RUST_APPS)),$(foreach BOARD,$(BOARDS),$(foreach IMAGE,$(RUST_IMAGES_$(APP)),userspace/$(APP)/$(BOARD)/build$(IMAGE)))) \
+		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_APPS_$(BOARD))),$(foreach IMAGE,$(RUST_IMAGES_$(APP)),userspace/$(APP)/$(BOARD)/build$(IMAGE))))
 
 # Entry target for an individual app to build signed app for all boards
 .PHONY: userspace/$(APP)/build-signed
 userspace/$(APP)/build-signed: \
-		$(if $(filter $(APP),$(RUST_APPS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/build-signed)) \
-		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_APPS_$(BOARD))),userspace/$(APP)/$(BOARD)/build-signed))
+		$(if $(filter $(APP),$(RUST_APPS)),$(foreach BOARD,$(BOARDS),$(foreach IMAGE,$(RUST_IMAGES_$(APP)),userspace/$(APP)/$(BOARD)/build-signed$(IMAGE)))) \
+		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_APPS_$(BOARD))),$(foreach IMAGE,$(RUST_IMAGES_$(APP)),userspace/$(APP)/$(BOARD)/build-signed$(IMAGE))))
 
 # Entry target for an individual app to run check for all boards
 .PHONY: userspace/$(APP)/check
