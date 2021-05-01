@@ -304,15 +304,14 @@ build/userspace/$(APP)/$(BOARD)/app: sandbox_setup build/gitlongtag
 	cp "build/userspace/cargo/thumbv7m-none-eabi/release/$(APP)" \
 		"build/userspace/$(APP)/$(BOARD)/app"
 
-# Due to b/139156455, we want to detect the case where an application's size is
-# rounded up to 64 KiB.
+# We want to detect when an application's size is larger than 64 KiB.
 build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		build/cargo-host/release/elf2tab build/userspace/$(APP)/$(BOARD)/app
 	build/cargo-host/release/elf2tab -n $(APP) \
 		-o build/userspace/$(APP)/$(BOARD)/app_tab \
 		build/userspace/$(APP)/$(BOARD)/app --stack=2048 --app-heap=4096 \
 		--kernel-heap=1024 --protected-region-size=64
-	if [ "$$$$(wc -c build/userspace/$(APP)/$(BOARD)/app.tbf)" -ge 65536 ]; \
+	if [ "$$$$(wc -c < build/userspace/$(APP)/$(BOARD)/app.tbf)" -gt 65536 ]; \
 		then echo "#########################################################"; \
 		     echo "# Application $(notdir $(APP)) for board $(BOARD) is too large."; \
 		     echo "# Check size of build/userspace/$(APP)/$(BOARD)/app.tbf"; \
