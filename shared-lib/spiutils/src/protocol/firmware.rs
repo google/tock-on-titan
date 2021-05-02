@@ -209,37 +209,44 @@ impl ToWire for UpdatePrepareResponse {
 
 /// A parsed write chunk request.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct WriteChunkRequest {
+pub struct WriteChunkRequest<'a> {
     /// The segment and location.
     pub segment_and_location: SegmentAndLocation,
 
-    /// The offset within the segment,
+    /// The offset within the segment.
     pub offset: u32,
+
+    /// The data to write
+    pub data: &'a [u8],
 }
 
 /// The length of a write chunk request on the wire, in bytes.
 pub const WRITE_CHUNK_REQUEST_LEN: usize = 5;
 
-impl Message<'_> for WriteChunkRequest {
+impl<'a> Message<'a> for WriteChunkRequest<'a> {
     const TYPE: ContentType = ContentType::WriteChunkRequest;
 }
 
-impl<'a> FromWire<'a> for WriteChunkRequest {
+impl<'a> FromWire<'a> for WriteChunkRequest<'a> {
     fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
         let sal_u8 = r.read_be::<u8>()?;
         let segment_and_location = SegmentAndLocation::from_wire_value(sal_u8).ok_or(FromWireError::OutOfRange)?;
         let offset = r.read_be::<u32>()?;
+        let data_len = r.remaining_data();
+        let data = r.read_bytes(data_len)?;
         Ok(Self {
             segment_and_location,
             offset,
+            data,
         })
     }
 }
 
-impl ToWire for WriteChunkRequest {
+impl ToWire for WriteChunkRequest<'_> {
     fn to_wire<W: Write>(&self, mut w: W) -> Result<(), ToWireError> {
         w.write_be(self.segment_and_location.to_wire_value())?;
         w.write_be(self.offset)?;
+        w.write_bytes(self.data)?;
         Ok(())
     }
 }
