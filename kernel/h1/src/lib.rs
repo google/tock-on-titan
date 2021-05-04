@@ -33,6 +33,7 @@ pub mod io;
 pub mod chip;
 pub mod crypto;
 pub mod fuse;
+pub mod globalsec;
 pub mod gpio;
 pub mod hil;
 pub mod nvcounter;
