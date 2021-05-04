@@ -32,6 +32,9 @@ wire_enum! {
 
         /// Manticore
         Manticore = 0x01,
+
+        /// Firmware
+        Firmware = 0x02,
     }
 }
 
