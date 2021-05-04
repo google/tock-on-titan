@@ -1,4 +1,4 @@
-// Copyright 2020 lowRISC contributors.
+// Copyright 2021 lowRISC contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,16 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#![crate_type = "lib"]
-#![warn(missing_docs)]
-#![cfg_attr(not(feature = "std"), no_std)]
+//! Compatibility modules to interface with C-structs.
 
-//! Utilities for inter-component communication.
-
-pub mod compat;
-pub mod driver;
-
-pub mod io;
-
-#[macro_use]
-pub mod protocol;
+pub mod firmware;

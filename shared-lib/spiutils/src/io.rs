@@ -243,6 +243,58 @@ impl BeInt for u64 {
     }
 }
 
+/// A big-endian integer, which can be read and written.
+///
+/// This trait can be used for operating generically over big-endian integer
+/// I/O.
+pub trait LeInt: Sized + Copy {
+    /// Reads a value of type `Self`, in big-endian order.
+    fn read_from<'a, R: Read<'a>>(r: R) -> Result<Self, Error>;
+
+    /// Writes a value of type `Self`, in big-endian order.
+    fn write_to<W: Write>(self, w: W) -> Result<(), Error>;
+}
+
+impl LeInt for u32 {
+    #[inline]
+    fn read_from<'a, R: Read<'a>>(mut r: R) -> Result<Self, Error> {
+        use byteorder::ByteOrder as _;
+
+        Ok(byteorder::LE::read_u32(
+            r.read_bytes(mem::size_of::<Self>())?,
+        ))
+    }
+
+    #[inline]
+    fn write_to<W: Write>(self, mut w: W) -> Result<(), Error> {
+        use byteorder::ByteOrder as _;
+
+        let mut bytes = [0; mem::size_of::<Self>()];
+        byteorder::LE::write_u32(&mut bytes, self);
+        w.write_bytes(&bytes)
+    }
+}
+
+impl LeInt for u64 {
+    #[inline]
+    fn read_from<'a, R: Read<'a>>(mut r: R) -> Result<Self, Error> {
+        use byteorder::ByteOrder as _;
+
+        Ok(byteorder::LE::read_u64(
+            r.read_bytes(mem::size_of::<Self>())?,
+        ))
+    }
+
+    #[inline]
+    fn write_to<W: Write>(self, mut w: W) -> Result<(), Error> {
+        use byteorder::ByteOrder as _;
+
+        let mut bytes = [0; mem::size_of::<Self>()];
+        byteorder::LE::write_u64(&mut bytes, self);
+        w.write_bytes(&bytes)
+    }
+}
+
 /// Represents a place that bytes can be read from, such as a `&[u8]`.
 ///
 /// Types which implement this trait enable *zero copy reads*, that is,
@@ -282,6 +334,20 @@ pub trait Read<'a> {
         Self: Sized,
     {
         I::read_from(self)
+    }
+
+    /// Reads a little-endian integer.
+    ///
+    /// # Note
+    /// Do not implement this function yourself. Callers are not required to
+    /// call it in order to actually perform a read, so whether or not it is
+    /// called is an implementation detail.
+    #[inline]
+    fn read_le<I: LeInt>(&mut self) -> Result<I, Error>
+    where
+        Self: Sized,
+    {
+         I::read_from(self)
     }
 }
 
@@ -355,6 +421,20 @@ pub trait Write {
     /// called is an implementation detail.
     #[inline]
     fn write_be<I: BeInt>(&mut self, val: I) -> Result<(), Error>
+    where
+        Self: Sized,
+    {
+        val.write_to(self)
+    }
+
+    /// Writes a little-endian integer.
+    ///
+    /// # Note
+    /// Do not implement this function yourself. Callers are not required to
+    /// call it in order to actually perform a write, so whether or not it is
+    /// called is an implementation detail.
+    #[inline]
+    fn write_le<I: LeInt>(&mut self, val: I) -> Result<(), Error>
     where
         Self: Sized,
     {
