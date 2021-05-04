@@ -74,7 +74,7 @@ impl<'a> Driver for GlobalSecSyscall<'a> {
         }
         match command_num {
             0 /* Check if present */ => ReturnCode::SUCCESS,
-            1 /* Get runtime segmenet info */ => self.get_runtime_segment_info(caller_id),
+            1 /* Get runtime segment info */ => self.get_runtime_segment_info(caller_id),
             _ => ReturnCode::ENOSUPPORT
         }
     }
@@ -89,11 +89,7 @@ impl<'a> Driver for GlobalSecSyscall<'a> {
                 // Buffer for data exchange
                 self.apps
                     .enter(app_id, |app_data, _| {
-                        if let Some(s) = slice {
-                            app_data.buffer = Some(s);
-                        } else {
-                            app_data.buffer = slice;
-                        }
+                        app_data.buffer = slice;
                         ReturnCode::SUCCESS
                     })
                     .unwrap_or(ReturnCode::FAIL)
