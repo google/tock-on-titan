@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-//! SPI protocol modules.
+//! Compatibility modules to interface with C-structs.
 
 pub mod firmware;
-pub mod spi_device;

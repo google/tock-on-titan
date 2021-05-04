@@ -18,8 +18,9 @@
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-//! Utilities for SPI
+//! Utilities for inter-component communication.
 
+pub mod compat;
 pub mod driver;
 
 pub mod io;
