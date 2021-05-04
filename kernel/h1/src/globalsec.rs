@@ -101,12 +101,10 @@ pub struct GlobalSecHardware {
 
 impl GlobalSecHardware {
     const fn new(base_addr: StaticRef<Registers>) -> GlobalSecHardware {
-        let globalsec = GlobalSecHardware {
+        GlobalSecHardware {
             registers: base_addr,
             runtime_segment_info: UNKNOWN_RUNTIME_SEGMENT_INFO,
-        };
-
-        globalsec
+        }
     }
 
     pub fn init(&mut self, segments: Segments) {
