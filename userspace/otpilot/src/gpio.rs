@@ -120,24 +120,30 @@ fn get_impl() -> &'static GpioControlImpl {
 }
 
 
+/// Adds one event.
+/// If the maximum number of events would be exceeded, do nothing.
 fn add_event(events: &Cell<usize>) {
     let val = events.get();
-    events.set(val + 1);
+    if val < core::usize::MAX - 1 {
+        events.set(val + 1);
+    }
 }
 
+/// Consumes one event.
+/// Returns the number of events to consume before consuming one.
 fn delete_event(events: &Cell<usize>) -> usize {
     let val = events.get();
-    if val > 0 {
+    if val > core::usize::MIN {
         events.set(val - 1);
     }
     val
 }
 
+/// Clears all events.
+/// Returns the number of events to consume before clearing them.
 fn clear_event(events: &Cell<usize>) -> usize {
     let val = events.get();
-    if val > 0 {
-        events.set(0);
-    }
+    events.set(core::usize::MIN);
     val
 }
 
