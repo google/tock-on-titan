@@ -90,7 +90,7 @@ pub trait Message<'req>: FromWire<'req> + ToWire {
 // ----------------------------------------------------------------------------
 
 wire_enum! {
-    /// The content type.
+    /// Identifier for a segment and location.
     pub enum SegmentAndLocation: u8 {
         /// Unknown message type.
         Unknown = 0xff,
@@ -247,7 +247,7 @@ impl ToWire for WriteChunkRequest {
 // ----------------------------------------------------------------------------
 
 wire_enum! {
-    /// The result of an update prepare request.
+    /// The result of a write chunk request.
     pub enum WriteChunkResult: u8 {
         /// Unknown result type.
         Unknown = 0xff,
@@ -272,7 +272,7 @@ wire_enum! {
     }
 }
 
-/// A parsed update prepare response.
+/// A parsed write chunk response.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct WriteChunkResponse {
     /// The segment and location.
@@ -285,7 +285,7 @@ pub struct WriteChunkResponse {
     pub result: WriteChunkResult,
 }
 
-/// The length of an update prepare response on the wire, in bytes.
+/// The length of an write chunk response on the wire, in bytes.
 pub const WRITE_CHUNK_RESPONSE_LEN: usize = 6;
 
 impl Message<'_> for WriteChunkResponse {
