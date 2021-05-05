@@ -16,6 +16,7 @@
 
 use crate::console_reader;
 use crate::gpio_processor::GpioProcessor;
+use crate::reset;
 
 use core::fmt::Write;
 
@@ -42,6 +43,7 @@ impl<'a> ConsoleProcessor<'a> {
         writeln!(console, "! : Deassert BMC_CPU_RST.")?;
         writeln!(console, "2 : Assert BMC_SRST.")?;
         writeln!(console, "@ : Deassert BMC_SRST.")?;
+        writeln!(console, "R : Reset chip.")?;
 
         Ok(())
     }
@@ -72,6 +74,10 @@ impl<'a> ConsoleProcessor<'a> {
                 writeln!(console, "Deasserting BMC_SRST")?;
                 self.gpio_processor.set_bmc_srst(false)?;
             },
+            'R' => {
+                writeln!(console, "resetting ...")?;
+                reset::get().reset()?;
+            }
             _ => (),
         }
 

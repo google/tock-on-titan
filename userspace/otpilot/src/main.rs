@@ -24,6 +24,7 @@ mod globalsec;
 mod gpio;
 mod gpio_processor;
 mod manticore_support;
+mod reset;
 mod sfdp;
 mod spi_host;
 mod spi_host_h1;
@@ -242,6 +243,7 @@ const BANNER: &'static str = concat!(
 async fn main() -> TockResult<()> {
     let mut console = Console::new();
     writeln!(console, "Starting {}", BANNER)?;
+    writeln!(console, "Reset source: {:?}", reset::get().get_reset_source()?)?;
     writeln!(console, "main @ 0x{:p}", main as *const())?;
     writeln!(console, "inactive RO: {:?}", globalsec::get().get_inactive_ro())?;
     writeln!(console, "inactive RW: {:?}", globalsec::get().get_inactive_rw())?;
