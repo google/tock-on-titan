@@ -104,6 +104,7 @@ pub struct Papa {
     personality: &'static h1_syscalls::personality::PersonalitySyscall<'static>,
     fuse_syscalls: &'static h1_syscalls::fuse::FuseSyscall<'static>,
     globalsec_syscalls: &'static h1_syscalls::globalsec::GlobalSecSyscall<'static>,
+    reset_syscalls: &'static h1_syscalls::reset::ResetSyscall<'static>,
 }
 
 fn get_h1_flash_segment_info(identifier: SegmentAndLocation, address: u32, size: u32) -> SegmentInfo {
@@ -398,6 +399,12 @@ pub unsafe fn reset_handler() {
         h1_syscalls::globalsec::GlobalSecSyscall::new(&h1::globalsec::GLOBALSEC, kernel.create_grant(&grant_cap))
     );
 
+    h1::pmu::RESET.init();
+    let reset_syscalls = static_init!(
+        h1_syscalls::reset::ResetSyscall<'static>,
+        h1_syscalls::reset::ResetSyscall::new(&h1::pmu::RESET, kernel.create_grant(&grant_cap))
+    );
+
     let mut _ctr = 0;
     let chip = static_init!(h1::chip::Hotel, h1::chip::Hotel::new());
     chip.mpu().enable_mpu();
@@ -424,6 +431,7 @@ pub unsafe fn reset_handler() {
         personality: personality,
         fuse_syscalls: fuse_syscalls,
         globalsec_syscalls: globalsec_syscalls,
+        reset_syscalls: reset_syscalls,
     };
 
     // Uncomment to initialize NvCounter
@@ -476,6 +484,7 @@ impl Platform for Papa {
             h1_syscalls::personality::DRIVER_NUM       => f(Some(self.personality)),
             h1_syscalls::fuse::DRIVER_NUM              => f(Some(self.fuse_syscalls)),
             h1_syscalls::globalsec::DRIVER_NUM         => f(Some(self.globalsec_syscalls)),
+            h1_syscalls::reset::DRIVER_NUM             => f(Some(self.reset_syscalls)),
             kernel::ipc::DRIVER_NUM                    => f(Some(&self.ipc)),
             _ =>  f(None),
         }
