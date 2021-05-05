@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 lowRISC contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,24 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
 
-#![no_std]
+//! Interfaces for reset monitor and execution on H1
 
-extern crate h1;
-#[macro_use(static_init, debug)]
-extern crate kernel;
+pub trait Reset {
+    /// Immediately reset chip.
+    fn reset(&self) -> !;
 
-pub mod digest;
-pub mod aes;
-pub mod dcrypto;
-pub mod dcrypto_test;
-pub mod fuse;
-pub mod globalsec;
-pub mod nvcounter_syscall;
-pub mod personality;
-pub mod reset;
-pub mod spi_host;
-pub mod spi_device;
-
-pub unsafe fn init() {
+    /// Get source of last reset.
+    fn get_reset_source(&self) -> u8;
 }

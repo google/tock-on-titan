@@ -19,6 +19,7 @@ pub mod flash;
 pub mod fuse;
 pub mod globalsec;
 pub mod personality;
+pub mod reset;
 pub mod rng;
 pub mod spi_host;
 pub mod spi_device;

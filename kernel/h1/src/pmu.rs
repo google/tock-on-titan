@@ -41,8 +41,13 @@
 //!     * Designed for 1.8-3.6V
 //!
 
+use crate::hil::reset;
+
 use core::mem::transmute;
 use kernel::common::cells::VolatileCell;
+
+/// Value to write into global_reset register to initiate a reset.
+const GLOBAL_RESET_VALUE: u32 = 0x7041776;
 
 /// Registers for the Power Management Unit (PMU)
 // Non-public fields prefixed with "_" mark unused registers
@@ -52,7 +57,7 @@ pub struct PMURegisters {
     _set_reset: VolatileCell<u32>,
 
     /// Clear register for the reset source
-    pub clear_reset: VolatileCell<u32>,
+    clear_reset: VolatileCell<u32>,
 
     /// Status for source of last reset event
     ///
@@ -69,13 +74,13 @@ pub struct PMURegisters {
     /// | 6   | Fast burnout circuit                              |
     /// | 7   | Security breach reset                             |
     ///
-    pub reset_source: VolatileCell<u32>,
+    reset_source: VolatileCell<u32>,
 
     /// Global chip reset
     ///
     /// Initiates a reset of the system similar to toggling the external reset
     /// pin. To initiate a reset, write the key 0x7041776 to this register.
-    pub global_reset: VolatileCell<u32>,
+    global_reset: VolatileCell<u32>,
 
     pub low_power_disable: VolatileCell<u32>,
 
@@ -149,19 +154,21 @@ pub struct PMURegisters {
 
     pub _gate_on_sleep_set1: VolatileCell<u32>,
     pub _gate_on_sleep_clr1: VolatileCell<u32>,
-    
+
     pub _clock0: VolatileCell<u32>,
     pub _reset0_write_enable: VolatileCell<u32>,
     pub reset0: VolatileCell<u32>,
 
     pub _reset1_write_enable: VolatileCell<u32>,
     pub _reset1: VolatileCell<u32>
-    
+
 }
 
 const PMU_BASE: isize = 0x40000000;
 
-static mut PMU: *mut PMURegisters = PMU_BASE as *mut PMURegisters;
+pub static mut PMU: *mut PMURegisters = PMU_BASE as *mut PMURegisters;
+
+pub static mut RESET: Reset = Reset::new();
 
 #[derive(Clone,Copy)]
 pub enum PeripheralClock0 {
@@ -268,4 +275,46 @@ pub fn reset_dcrypto() {
     let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
     // Clear the DCRYPTO bit, which is 0x2
     unsafe {pmu.reset.set(pmu.reset0.get() & !(0x2));}
+}
+
+pub struct Reset {
+    // The last reset source.
+    reset_source: u8,
+}
+
+impl Reset {
+    const fn new() -> Reset {
+        Reset {
+            reset_source: 0,
+        }
+    }
+
+    pub fn init(&mut self) {
+        let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
+
+        // Read and reset the reset source
+        self.reset_source = unsafe{(pmu.reset_source.get() & 0xff) as u8};
+        unsafe{pmu.clear_reset.set(1)};
+    }
+}
+
+impl reset::Reset for Reset {
+    fn reset(&self) -> ! {
+        let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
+
+        unsafe {pmu.global_reset.set(GLOBAL_RESET_VALUE)};
+
+        // Wait for reboot; should never return
+        loop {
+            unsafe {
+                asm!("dsb" :::: "volatile");
+                asm!("wfi" :::: "volatile");
+            }
+        }
+    }
+
+    /// Get source of last reset.
+    fn get_reset_source(&self) -> u8 {
+        self.reset_source
+    }
 }
