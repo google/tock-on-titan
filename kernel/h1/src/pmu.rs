@@ -46,8 +46,9 @@ use crate::hil::reset;
 use core::mem::transmute;
 use kernel::common::cells::VolatileCell;
 
-/// Value to write into global_reset register to initiate a reset.
-const GLOBAL_RESET_VALUE: u32 = 0x7041776;
+/// Magic value (as defined by the H1 spec) to initiate a reset
+/// via the global_reset register .
+const GLOBAL_RESET_KEY: u32 = 0x7041776;
 
 /// Registers for the Power Management Unit (PMU)
 // Non-public fields prefixed with "_" mark unused registers
@@ -164,11 +165,12 @@ pub struct PMURegisters {
 
 }
 
+/// PMU base address
 const PMU_BASE: isize = 0x40000000;
 
 pub static mut PMU: *mut PMURegisters = PMU_BASE as *mut PMURegisters;
 
-pub static mut RESET: Reset = Reset::new();
+pub static mut RESET: ResetImpl = ResetImpl::new();
 
 #[derive(Clone,Copy)]
 pub enum PeripheralClock0 {
@@ -277,14 +279,14 @@ pub fn reset_dcrypto() {
     unsafe {pmu.reset.set(pmu.reset0.get() & !(0x2));}
 }
 
-pub struct Reset {
+pub struct ResetImpl {
     // The last reset source.
     reset_source: u8,
 }
 
-impl Reset {
-    const fn new() -> Reset {
-        Reset {
+impl ResetImpl {
+    const fn new() -> ResetImpl {
+        ResetImpl {
             reset_source: 0,
         }
     }
@@ -298,11 +300,11 @@ impl Reset {
     }
 }
 
-impl reset::Reset for Reset {
-    fn reset(&self) -> ! {
+impl reset::Reset for ResetImpl {
+    fn reset_chip(&self) -> ! {
         let pmu: &mut PMURegisters = unsafe { transmute(PMU) };
 
-        unsafe {pmu.global_reset.set(GLOBAL_RESET_VALUE)};
+        unsafe {pmu.global_reset.set(GLOBAL_RESET_KEY)};
 
         // Wait for reboot; should never return
         loop {

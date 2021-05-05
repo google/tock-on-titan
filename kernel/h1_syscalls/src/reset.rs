@@ -30,10 +30,11 @@ impl<'a> ResetSyscall<'a> {
         }
     }
 
-    fn reset(&self) -> ReturnCode {
-        self.reset.reset();
+    fn reset_chip(&self) -> ReturnCode {
+        self.reset.reset_chip();
 
-        // This should never return. If it did, something went wrong.
+        // The above call never returns (return type "!"), so there's
+        // no ReturnCode to provide here.
     }
 
     fn get_reset_source(&self) -> ReturnCode {
@@ -54,7 +55,7 @@ impl<'a> Driver for ResetSyscall<'a> {
         -> ReturnCode {
         match command_num {
             0 /* Check if present */ => ReturnCode::SUCCESS,
-            1 /* Reset chip. */ => self.reset(),
+            1 /* Reset chip. */ => self.reset_chip(),
             2 /* Get reset source */ => self.get_reset_source(),
             _ => ReturnCode::ENOSUPPORT
         }

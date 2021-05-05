@@ -18,7 +18,7 @@
 
 pub trait Reset {
     /// Immediately reset chip.
-    fn reset(&self) -> !;
+    fn reset_chip(&self) -> !;
 
     /// Get source of last reset.
     fn get_reset_source(&self) -> u8;
