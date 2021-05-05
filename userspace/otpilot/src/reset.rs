@@ -14,35 +14,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+use libtock::result::TockError;
 use libtock::result::TockResult;
 use libtock::syscalls;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct ResetSource {
-    /// Power on reset
-    power_on_reset: bool,
-
-    /// Low power exit
-    low_power_reset: bool,
-
-    /// Watchdog reset
-    watchdog_reset: bool,
-
-    /// Lockup reset
-    lockup_reset: bool,
-
-    /// SYSRESET
-    sysreset: bool,
-
-    /// Software initiated reset through PMU_GLOBAL_RESET
-    software_reset: bool,
-
-    /// Fast burnout circuit
-    fast_burnour_circuit: bool,
-
-    /// Security breach reset
-    security_breach_reset: bool,
-}
+use spiutils::driver::reset::ResetSource;
+use spiutils::driver::reset::RESET_SOURCE_LEN;
+use spiutils::protocol::wire::FromWire;
 
 pub trait Reset {
     /// Execute immediate chip reset.
@@ -63,6 +41,10 @@ mod command_nr {
     pub const CHECK_IF_PRESENT: usize = 0;
     pub const RESET: usize = 1;
     pub const GET_RESET_SOURCE: usize = 2;
+}
+
+mod allow_nr {
+    pub const BUFFER: usize = 0;
 }
 
 struct ResetImpl {}
@@ -99,17 +81,21 @@ impl Reset for ResetImpl {
     }
 
     fn get_reset_source(&self) -> TockResult<ResetSource> {
-        let reset_bits = syscalls::command(DRIVER_NUMBER, command_nr::GET_RESET_SOURCE, 0, 0)?;
-        Ok(ResetSource {
-            power_on_reset: (reset_bits & 0x1) != 0,
-            low_power_reset: (reset_bits & 0x2) != 0,
-            watchdog_reset: (reset_bits & 0x4) != 0,
-            lockup_reset: (reset_bits & 0x8) != 0,
-            sysreset: (reset_bits & 0x10) != 0,
-            software_reset: (reset_bits & 0x20) != 0,
-            fast_burnour_circuit: (reset_bits & 0x40) != 0,
-            security_breach_reset: (reset_bits & 0x80) != 0,
-        })
+        let mut buffer = [0u8; RESET_SOURCE_LEN];
+
+        {
+            // We want this to go out of scope after executing the command
+            let _buffer_share = syscalls::allow(DRIVER_NUMBER, allow_nr::BUFFER, &mut buffer)?;
+
+            syscalls::command(DRIVER_NUMBER, command_nr::GET_RESET_SOURCE, 0, 0)?;
+        }
+
+        let maybe_reset_source = ResetSource::from_wire(buffer.as_ref());
+        if maybe_reset_source.is_err() {
+            return Err(TockError::Format);
+        }
+
+        Ok(maybe_reset_source.unwrap())
     }
 
 }
