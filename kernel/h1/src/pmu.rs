@@ -45,6 +45,7 @@ use crate::hil::reset;
 
 use core::mem::transmute;
 use kernel::common::cells::VolatileCell;
+use spiutils::driver::reset::ResetSource;
 
 /// Magic value (as defined by the H1 spec) to initiate a reset
 /// via the global_reset register .
@@ -316,7 +317,17 @@ impl reset::Reset for ResetImpl {
     }
 
     /// Get source of last reset.
-    fn get_reset_source(&self) -> u8 {
-        self.reset_source
+    fn get_reset_source(&self) -> ResetSource {
+        ResetSource {
+            // The individual bits are defined in the H1 spec.
+            power_on_reset: (self.reset_source & 0x1) != 0,
+            low_power_reset: (self.reset_source & 0x2) != 0,
+            watchdog_reset: (self.reset_source & 0x4) != 0,
+            lockup_reset: (self.reset_source & 0x8) != 0,
+            sysreset: (self.reset_source & 0x10) != 0,
+            software_reset: (self.reset_source & 0x20) != 0,
+            fast_burnout_circuit: (self.reset_source & 0x40) != 0,
+            security_breach_reset: (self.reset_source & 0x80) != 0,
+        }
     }
 }

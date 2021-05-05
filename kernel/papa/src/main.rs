@@ -402,7 +402,7 @@ pub unsafe fn reset_handler() {
     h1::pmu::RESET.init();
     let reset_syscalls = static_init!(
         h1_syscalls::reset::ResetSyscall<'static>,
-        h1_syscalls::reset::ResetSyscall::new(&h1::pmu::RESET)
+        h1_syscalls::reset::ResetSyscall::new(&h1::pmu::RESET, kernel.create_grant(&grant_cap))
     );
 
     let mut _ctr = 0;

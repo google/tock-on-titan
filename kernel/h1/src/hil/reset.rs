@@ -16,10 +16,12 @@
 
 //! Interfaces for reset monitor and execution on H1
 
+use spiutils::driver::reset::ResetSource;
+
 pub trait Reset {
     /// Immediately reset chip.
     fn reset_chip(&self) -> !;
 
-    /// Get source of last reset.
-    fn get_reset_source(&self) -> u8;
+    /// Get source of the last reset.
+    fn get_reset_source(&self) -> ResetSource;
 }

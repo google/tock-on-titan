@@ -14,19 +14,32 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+use core::cell::Cell;
 use h1::hil::reset::Reset;
-use kernel::{AppId, AppSlice, Callback, Driver, ReturnCode, Shared};
+use kernel::{AppId, Callback, Driver, Grant, ReturnCode, Shared, AppSlice};
+use spiutils::io::Cursor;
+use spiutils::protocol::wire::ToWire;
 
 pub const DRIVER_NUM: usize = 0x40070;
 
+#[derive(Default)]
+pub struct AppData {
+    buffer: Option<AppSlice<Shared, u8>>,
+}
+
 pub struct ResetSyscall<'a> {
     reset: &'a dyn Reset,
+    apps: Grant<AppData>,
+    current_user: Cell<Option<AppId>>,
 }
 
 impl<'a> ResetSyscall<'a> {
-    pub fn new(reset: &'a dyn Reset) -> ResetSyscall<'a> {
+    pub fn new(reset: &'a dyn Reset,
+               container: Grant<AppData>) -> ResetSyscall<'a> {
         ResetSyscall {
             reset: reset,
+            apps: container,
+            current_user: Cell::new(None),
         }
     }
 
@@ -37,8 +50,16 @@ impl<'a> ResetSyscall<'a> {
         // no ReturnCode to provide here.
     }
 
-    fn get_reset_source(&self) -> ReturnCode {
-        ReturnCode::SuccessWithValue { value: self.reset.get_reset_source() as usize }
+    fn get_reset_source(&self, caller_id: AppId) -> ReturnCode {
+        self.apps.enter(caller_id, |app_data, _| {
+            if let Some(ref mut buffer) = app_data.buffer {
+                let cursor = Cursor::new(buffer.as_mut());
+                if self.reset.get_reset_source().to_wire(cursor).is_err() {
+                    return ReturnCode::ENOMEM;
+                }
+            }
+            ReturnCode::SUCCESS
+        }).unwrap_or(ReturnCode::ENOMEM)
     }
 }
 
@@ -51,21 +72,35 @@ impl<'a> Driver for ResetSyscall<'a> {
         ReturnCode::ENOSUPPORT
     }
 
-    fn command(&self, command_num: usize, _arg1: usize, _arg2: usize, _caller_id: AppId)
+    fn command(&self, command_num: usize, _arg1: usize, _arg2: usize, caller_id: AppId)
         -> ReturnCode {
+        if self.current_user.get() == None {
+            self.current_user.set(Some(caller_id));
+        }
         match command_num {
             0 /* Check if present */ => ReturnCode::SUCCESS,
             1 /* Reset chip. */ => self.reset_chip(),
-            2 /* Get reset source */ => self.get_reset_source(),
+            2 /* Get reset source */ => self.get_reset_source(caller_id),
             _ => ReturnCode::ENOSUPPORT
         }
     }
 
     fn allow(&self,
-             _app_id: AppId,
-             _minor_num: usize,
-             _slice: Option<AppSlice<Shared, u8>>
+             app_id: AppId,
+             minor_num: usize,
+             slice: Option<AppSlice<Shared, u8>>
     ) -> ReturnCode {
-        ReturnCode::ENOSUPPORT
+        match minor_num {
+            0 => {
+                // Buffer for data exchange
+                self.apps
+                    .enter(app_id, |app_data, _| {
+                        app_data.buffer = slice;
+                        ReturnCode::SUCCESS
+                    })
+                    .unwrap_or(ReturnCode::FAIL)
+            }
+            _ => ReturnCode::ENOSUPPORT,
+        }
     }
 }
