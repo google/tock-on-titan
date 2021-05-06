@@ -50,7 +50,7 @@ pub const SPI_FLASH_SIZE: u32 = 0x4000000;
 
 // The location of the mailbox.
 // TODO(osenft): Make this configurable, possibly by reading it from the SPI flash chip.
-pub const SPI_MAILBOX_ADDRESS: u32 = 0xf00000;
+pub const SPI_MAILBOX_ADDRESS: u32 = 0x80000;
 
 // The size of the mailbox.
 const SPI_MAILBOX_SIZE: u32 = spi_device::MAX_READ_BUFFER_SIZE as u32;
