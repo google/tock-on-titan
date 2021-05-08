@@ -16,6 +16,10 @@
 
 //! Firmware protocol payload.
 
+use crate::compat::firmware::BuildInfo;
+use crate::compat::firmware::BUILD_INFO_LEN;
+use crate::driver::firmware::SegmentInfo;
+use crate::driver::firmware::SEGMENT_INFO_LEN;
 use crate::io::Read;
 use crate::io::Write;
 use crate::protocol::wire::FromWireError;
@@ -36,11 +40,23 @@ wire_enum! {
         /// Response to PrepareRequest
         UpdatePrepareResponse = 0x02,
 
-        /// Request to rrite a chunk of firmware
+        /// Request to write a chunk of firmware
         WriteChunkRequest = 0x03,
 
         /// Response to WriteChunkRequest
         WriteChunkResponse = 0x04,
+
+        /// Request information on inactive segments
+        InactiveSegmentsInfoRequest = 0x05,
+
+        /// Response to InactiveSegmentsInfoRequest
+        InactiveSegmentsInfoResponse = 0x06,
+
+        /// Request to reboot
+        RebootRequest = 0x07,
+
+        /// Response to RebootRequest
+        RebootResponse = 0x08,
     }
 }
 
@@ -106,6 +122,105 @@ wire_enum! {
 
         /// RW in location B
         RwB = 0x04,
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+/// A parsed inactive segments info request.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct InactiveSegmentsInfoRequest {
+}
+
+/// The length of an inactive segments info request on the wire, in bytes.
+pub const INACTIVE_SEGMENTS_INFO_REQUEST_LEN: usize = 0;
+
+impl Message<'_> for InactiveSegmentsInfoRequest {
+    const TYPE: ContentType = ContentType::InactiveSegmentsInfoRequest;
+}
+
+impl<'a> FromWire<'a> for InactiveSegmentsInfoRequest {
+    fn from_wire<R: Read<'a>>(mut _r: R) -> Result<Self, FromWireError> {
+        Ok(Self {})
+    }
+}
+
+impl ToWire for InactiveSegmentsInfoRequest {
+    fn to_wire<W: Write>(&self, mut _w: W) -> Result<(), ToWireError> {
+        Ok(())
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+/// A parsed inactive segments info response.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct InactiveSegmentsInfoResponse {
+    /// The inactive RO.
+    pub ro: SegmentInfo,
+
+    /// The inactive RW.
+    pub rw: SegmentInfo,
+}
+
+/// The length of an inactive segments info response on the wire, in bytes.
+pub const INACTIVE_SEGMENTS_INFO_RESPONSE_LEN: usize = 2 * SEGMENT_INFO_LEN;
+
+impl Message<'_> for InactiveSegmentsInfoResponse {
+    const TYPE: ContentType = ContentType::InactiveSegmentsInfoResponse;
+}
+
+impl<'a> FromWire<'a> for InactiveSegmentsInfoResponse {
+    fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
+        let ro = SegmentInfo::from_wire(&mut r)?;
+        let rw = SegmentInfo::from_wire(&mut r)?;
+        Ok(Self {
+            ro,
+            rw,
+        })
+    }
+}
+
+impl ToWire for InactiveSegmentsInfoResponse {
+    fn to_wire<W: Write>(&self, mut w: W) -> Result<(), ToWireError> {
+        self.ro.to_wire(&mut w)?;
+        self.rw.to_wire(&mut w)?;
+        Ok(())
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+/// A parsed firmware info message.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct FirmwareInfo {
+    /// The segment and location.
+    pub segment_and_location: SegmentAndLocation,
+
+    /// The build information.
+    pub build_info: BuildInfo,
+}
+
+/// The length of a firmware info struct on the wire, in bytes.
+pub const FIRMWARE_INFO_LEN: usize = 1 + BUILD_INFO_LEN;
+
+impl<'a> FromWire<'a> for FirmwareInfo {
+    fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
+        let sal_u8 = r.read_be::<u8>()?;
+        let segment_and_location = SegmentAndLocation::from_wire_value(sal_u8).ok_or(FromWireError::OutOfRange)?;
+        let build_info = BuildInfo::from_wire(r)?;
+        Ok(Self {
+            segment_and_location,
+            build_info,
+        })
+    }
+}
+
+impl ToWire for FirmwareInfo {
+    fn to_wire<W: Write>(&self, mut w: W) -> Result<(), ToWireError> {
+        w.write_be(self.segment_and_location.to_wire_value())?;
+        self.build_info.to_wire(w)?;
+        Ok(())
     }
 }
 
@@ -318,6 +433,107 @@ impl ToWire for WriteChunkResponse {
     fn to_wire<W: Write>(&self, mut w: W) -> Result<(), ToWireError> {
         w.write_be(self.segment_and_location.to_wire_value())?;
         w.write_be(self.offset)?;
+        w.write_be(self.result.to_wire_value())?;
+        Ok(())
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+wire_enum! {
+    /// When to perform the reboot.
+    pub enum RebootTime: u8 {
+        /// Unknown result type.
+        Unknown = 0xff,
+
+        /// Reboot immediately
+        Immediate = 0x00,
+
+        /// Reboot after a delay or when the BMC resets.
+        Delayed = 0x01,
+    }
+}
+
+/// A parsed reboot request.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct RebootRequest {
+    /// When to reboot.
+    pub time: RebootTime,
+}
+
+/// The length of a reboot request on the wire, in bytes.
+pub const REBOOT_REQUEST_LEN: usize = 1;
+
+impl Message<'_> for RebootRequest {
+    const TYPE: ContentType = ContentType::RebootRequest;
+}
+
+impl<'a> FromWire<'a> for RebootRequest {
+    fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
+        let time_u8 = r.read_be::<u8>()?;
+        let time = RebootTime::from_wire_value(time_u8).ok_or(FromWireError::OutOfRange)?;
+        Ok(Self {
+            time,
+        })
+    }
+}
+
+impl ToWire for RebootRequest {
+    fn to_wire<W: Write>(&self, mut w: W) -> Result<(), ToWireError> {
+        w.write_be(self.time.to_wire_value())?;
+        Ok(())
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+wire_enum! {
+    /// The result of a reboot request.
+    pub enum RebootResult: u8 {
+        /// Unknown result type.
+        Unknown = 0xff,
+
+        /// Success
+        Success = 0x00,
+
+        /// Unspecified error
+        Error = 0x01,
+    }
+}
+
+/// A parsed reboot response.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct RebootResponse {
+    /// When to reboot from the request.
+    pub time: RebootTime,
+
+    /// The result of the reboot request.
+    pub result: RebootResult,
+}
+
+/// The length of a reboot response on the wire, in bytes.
+pub const REBOOT_RESPONSE_LEN: usize = 2;
+
+impl Message<'_> for RebootResponse {
+    const TYPE: ContentType = ContentType::RebootResponse;
+}
+
+impl<'a> FromWire<'a> for RebootResponse {
+    fn from_wire<R: Read<'a>>(mut r: R) -> Result<Self, FromWireError> {
+        let time_u8 = r.read_be::<u8>()?;
+        let time = RebootTime::from_wire_value(time_u8).ok_or(FromWireError::OutOfRange)?;
+        let result_u8 = r.read_be::<u8>()?;
+        let result = RebootResult::from_wire_value(result_u8).ok_or(FromWireError::OutOfRange)?;
+        Ok(Self {
+            time,
+            result,
+        })
+    }
+}
+
+impl ToWire for RebootResponse {
+    fn to_wire<W: Write>(&self, mut w: W) -> Result<(), ToWireError> {
+        w.write_be(self.time.to_wire_value())?;
         w.write_be(self.result.to_wire_value())?;
         Ok(())
     }
