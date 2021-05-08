@@ -49,11 +49,20 @@ const DEVICE_ID: device_id::DeviceIdentifier =
 
 pub struct Identity {
     pub version: [u8; 32],
+    pub ro_version: [u8; 32],
+    pub rw_version: [u8; 32],
     pub device_id: [u8; 64],
 }
 impl hardware::Identity for Identity {
     fn firmware_version(&self) -> &[u8; 32] {
         &self.version
+    }
+    fn vendor_firmware_version(&self, slot: u8) -> Option<&[u8; 32]> {
+        match slot {
+            1 => Some(&self.ro_version),
+            2 => Some(&self.rw_version),
+            _ => None
+        }
     }
     fn unique_device_identity(&self) -> &[u8] {
         &self.device_id
