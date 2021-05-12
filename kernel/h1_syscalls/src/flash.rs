@@ -210,11 +210,7 @@ impl<'a> Driver for FlashSyscalls<'a> {
                     // Write Buffer
                     self.apps
                         .enter(app_id, |app_data, _| {
-                            if let Some(s) = slice {
-                                app_data.write_buffer = Some(s);
-                            } else {
-                                app_data.write_buffer = slice;
-                            }
+                            app_data.write_buffer = slice;
                             ReturnCode::SUCCESS
                         })
                         .unwrap_or(ReturnCode::FAIL)
@@ -223,11 +219,7 @@ impl<'a> Driver for FlashSyscalls<'a> {
                     // Read Buffer
                     self.apps
                         .enter(app_id, |app_data, _| {
-                            if let Some(s) = slice {
-                                app_data.read_buffer = Some(s);
-                            } else {
-                                app_data.read_buffer = slice;
-                            }
+                            app_data.read_buffer = slice;
                             ReturnCode::SUCCESS
                         })
                         .unwrap_or(ReturnCode::FAIL)
