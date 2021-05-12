@@ -129,6 +129,11 @@ impl GpioProcessor {
             }
         }
 
+        let sys_rstmon_n = gpio::get().consume_event(GpioPin::SYS_RSTMON_N);
+        if sys_rstmon_n {
+            writeln!(console, "Ignored sys_rstmon_n")?;
+        }
+
         Ok(())
     }
 
