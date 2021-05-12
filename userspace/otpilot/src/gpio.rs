@@ -147,6 +147,12 @@ fn clear_event(events: &Cell<usize>) -> usize {
     val
 }
 
+/// Checks if we have an event.
+/// Returns true if there's at least one event to be consumed.
+fn have_event(events: &Cell<usize>) -> bool {
+    events.get() > core::usize::MIN
+}
+
 impl GpioControlImpl {
     fn initialize(&'static mut self) -> TockResult<()> {
         self.bmc_srst_n = Some(GpioPinUnitialized::new(GpioPin::BMC_SRST_N as usize).open_for_write()?);
@@ -192,7 +198,7 @@ impl GpioControlImpl {
 impl GpioControl for GpioControlImpl {
 
     fn have_events(&self) -> bool {
-        self.sys_rstmon_n_events.get() != 0 || self.bmc_rstmon_n_events.get() != 0
+        have_event(&self.sys_rstmon_n_events) || have_event(&self.bmc_rstmon_n_events)
     }
 
     fn consume_event(&self, pin: GpioPin) -> bool {
