@@ -30,12 +30,12 @@ pub trait Hardware {
     /// Set flash transaction parameters (word offset and size). The word offset
     /// is relative to the start of flash and the size is one less than the
     /// number of words to copy.
-    fn set_transaction(&self, offset: usize, size: usize);
+    fn set_transaction(&self, offset: usize, size: usize) -> ReturnCode;
 
     /// Fill the flash controller's write buffer. data must have a length no
     /// larger than 32.
-    fn set_write_data(&self, data: &[u32]);
+    fn set_write_data(&self, data: &[u32]) -> ReturnCode;
 
     /// Kick off a smart program execution.
-    fn trigger(&self, opcode: u32);
+    fn trigger(&self, opcode: u32, offset: usize) -> ReturnCode;
 }

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use kernel::ReturnCode;
+
 #[derive(Clone,Copy,Default)]
 struct LogEntry {
     /// The value of the operation. u32::MAX indicates this was an erase,
@@ -151,16 +153,26 @@ impl super::hardware::Hardware for FakeHw {
         out
     }
 
-    fn set_transaction(&self, offset: usize, size: usize) {
+    fn set_transaction(&self, offset: usize, size: usize) -> ReturnCode {
         self.transaction_offset.set(offset);
         self.transaction_size.set(size + 1);
+
+        ReturnCode::SUCCESS
     }
 
-    fn set_write_data(&self, data: &[u32]) {
+    fn set_write_data(&self, data: &[u32]) -> ReturnCode {
         for (i, &v) in data.iter().enumerate() { self.write_data[i].set(v); }
+
+        ReturnCode::SUCCESS
     }
 
-    fn trigger(&self, opcode: u32) {
+    fn trigger(&self, opcode: u32, offset: usize) -> ReturnCode {
+        if self.transaction_offset.get() != offset {
+            return ReturnCode::EINVAL
+        }
+
         self.opcode.set(opcode);
+
+        ReturnCode::SUCCESS
     }
 }

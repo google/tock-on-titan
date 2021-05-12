@@ -67,9 +67,11 @@ const MAX_WRITE_SIZE: usize = 32; // Maximum single write is 32 words
 impl<'d, A: Alarm<'d>, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> {
     fn erase(&self, page: usize) -> ReturnCode {
         if self.program_in_progress() { return ReturnCode::EBUSY; }
+        let target: usize = page * super::WORDS_PER_PAGE;
+        self.write_target.set(target);
         self.smart_program(ERASE_OPCODE, /*max_attempts*/ 45, /*final_pulse_needed*/ false,
                            /*timeout_nanoseconds*/ 3_353_267,
-                           /*target*/ page * super::WORDS_PER_PAGE, /*size*/ 1);
+                           /*target*/ target, /*size*/ 1);
         ReturnCode::SUCCESS
     }
 
@@ -80,7 +82,7 @@ impl<'d, A: Alarm<'d>, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A,
     fn write(&self, target: usize, data: &'d mut [u32]) -> (ReturnCode, Option<&'d mut [u32]>) {
         let write_len = cmp::min(data.len(), MAX_WRITE_SIZE);
 
-        //if data.len() > 32 { return (ReturnCode::ESIZE, Some(data)); }
+        if data.len() > MAX_WRITE_SIZE { return (ReturnCode::ESIZE, Some(data)); }
         if self.program_in_progress() { return (ReturnCode::EBUSY, Some(data)); }
         self.write_pos.set(0);
         self.write_target.set(target);
@@ -110,7 +112,7 @@ impl<'d, A: Alarm<'d>, H: Hardware> ::kernel::hil::time::AlarmClient for FlashIm
     fn fired(&self) {
         if let Some(state) = self.smart_program_state.take() {
             let state = state.step(
-                self.alarm, self.hw, self.opcode.get());
+                self.alarm, self.hw, self.opcode.get(), self.write_target.get());
             if let Some(code) = state.return_code() {
                 if let Some(client) = self.client.get() {
                     if self.opcode.get() == WRITE_OPCODE {
@@ -161,7 +163,7 @@ impl<'d, A: Alarm<'d>, H: Hardware> FlashImpl<'d, A, H> {
         self.hw.set_transaction(target, size - 1);
         self.smart_program_state.set(Some(
             SmartProgramState::init(max_attempts, final_pulse_needed, timeout_nanoseconds)
-                .step(self.alarm, self.hw, opcode)));
+                .step(self.alarm, self.hw, opcode, target)));
         self.opcode.set(opcode);
     }
 }
