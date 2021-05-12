@@ -63,6 +63,17 @@ impl<'d, A: Alarm<'d>, H: Hardware> FlashImpl<'d, A, H> {
 }
 
 const MAX_WRITE_SIZE: usize = 32; // Maximum single write is 32 words
+const WORDS_PER_BANK: usize = 0x10000; // 64ki words per bank
+
+// Computes the flash Bank for the specified target location in words
+// from the beginning of flash.
+fn get_bank_from_target(target: usize) -> super::hardware::Bank {
+    if target < WORDS_PER_BANK {
+        super::hardware::Bank::Zero
+    } else {
+        super::hardware::Bank::One
+    }
+}
 
 impl<'d, A: Alarm<'d>, H: Hardware> super::flash::Flash<'d> for FlashImpl<'d, A, H> {
     fn erase(&self, page: usize) -> ReturnCode {
@@ -112,7 +123,7 @@ impl<'d, A: Alarm<'d>, H: Hardware> ::kernel::hil::time::AlarmClient for FlashIm
     fn fired(&self) {
         if let Some(state) = self.smart_program_state.take() {
             let state = state.step(
-                self.alarm, self.hw, self.opcode.get(), self.write_target.get());
+                self.alarm, self.hw, self.opcode.get(), get_bank_from_target(self.write_target.get()));
             if let Some(code) = state.return_code() {
                 if let Some(client) = self.client.get() {
                     if self.opcode.get() == WRITE_OPCODE {
@@ -160,10 +171,11 @@ impl<'d, A: Alarm<'d>, H: Hardware> FlashImpl<'d, A, H> {
     fn smart_program(&self, opcode: u32, max_attempts: u8, final_pulse_needed: bool,
                      timeout_nanoseconds: u32, target: usize, size: usize)
     {
-        self.hw.set_transaction(target, size - 1);
+        // Use the offset relative to the flash bank.
+        self.hw.set_transaction(target % WORDS_PER_BANK, size - 1);
         self.smart_program_state.set(Some(
             SmartProgramState::init(max_attempts, final_pulse_needed, timeout_nanoseconds)
-                .step(self.alarm, self.hw, opcode, target)));
+                .step(self.alarm, self.hw, opcode, get_bank_from_target(target))));
         self.opcode.set(opcode);
     }
 }

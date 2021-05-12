@@ -266,56 +266,24 @@ impl super::hardware::Hardware for H1bHw {
         self.error_code.get() as u16
     }
 
-    fn set_transaction(&self, offset: usize, size: usize) -> ReturnCode {
+    fn set_transaction(&self, bank_offset: usize, size: usize) {
         use self::TransactionParameters::{Offset,Size};
-        // The offset is relative to the beginning of the flash module.
-        if offset > H1_FLASH_SIZE / BYTES_PER_WORD {
-           return ReturnCode::EINVAL
-        }
 
-        if size > H1_FLASH_BANK_SIZE / BYTES_PER_WORD {
-            return ReturnCode::EINVAL
-        }
-
-        // Compute the offset relative to the flash bank.
-        let relative_offset: usize;
-        if offset < H1_FLASH_BANK_SIZE / BYTES_PER_WORD {
-            relative_offset = offset;
-        } else {
-            relative_offset = offset - H1_FLASH_BANK_SIZE / BYTES_PER_WORD;
-        }
-
-        if relative_offset + size > H1_FLASH_BANK_SIZE / BYTES_PER_WORD {
-            return ReturnCode::EINVAL
-        }
-
-        self.transaction_parameters.write(Offset.val(relative_offset as u32) + Size.val(size as u32));
-
-        ReturnCode::SUCCESS
+        self.transaction_parameters.write(Offset.val(bank_offset as u32) + Size.val(size as u32));
     }
 
-    fn set_write_data(&self, data: &[u32]) -> ReturnCode {
-        if data.len() > self.write_data.len() {
-            return ReturnCode::EINVAL
-        }
+    fn set_write_data(&self, data: &[u32]) {
         for (i, &v) in data.iter().enumerate() { self.write_data[i].set(v); }
-
-        ReturnCode::SUCCESS
     }
 
-    fn trigger(&self, opcode: u32, offset: usize) -> ReturnCode {
+    fn trigger(&self, opcode: u32, bank: super::hardware::Bank) {
         self.program_erase_enable.set(0xb11924e1);
         // The offset is relative to the beginning of the flash module.
-        if offset > H1_FLASH_SIZE / BYTES_PER_WORD {
-           return ReturnCode::EINVAL
-        }
 
-        if offset < H1_FLASH_BANK_SIZE / BYTES_PER_WORD {
-            self.pe_control_0.set(opcode);
-        } else {
-            self.pe_control_1.set(opcode);
+        match bank {
+            super::hardware::Bank::Unknown => debug!("H1bHw::trigger: Flash bank not set."),
+            super::hardware::Bank::Zero => self.pe_control_0.set(opcode),
+            super::hardware::Bank::One => self.pe_control_1.set(opcode),
         }
-
-        ReturnCode::SUCCESS
     }
 }

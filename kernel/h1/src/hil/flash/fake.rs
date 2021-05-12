@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use kernel::ReturnCode;
+use super::hardware::Bank;
 
 #[derive(Clone,Copy,Default)]
 struct LogEntry {
     /// The value of the operation. u32::MAX indicates this was an erase,
     /// otherwise it was a write.
     value: u32,
+
+    /// The operation's target bank.
+    bank: Bank,
 
     /// The operation's offset. This is in units of words from the start of
     /// flash.
@@ -33,7 +36,8 @@ pub struct FakeHw {
     // Currently-executing opcode; 0 if no transaction is ongoing.
     opcode: core::cell::Cell<u32>,
 
-    transaction_offset: core::cell::Cell<usize>,
+    transaction_bank: core::cell::Cell<Bank>,
+    transaction_bank_offset: core::cell::Cell<usize>,
     transaction_size: core::cell::Cell<usize>,
     write_data: [core::cell::Cell<u32>; 32],
 
@@ -48,7 +52,8 @@ impl FakeHw {
         Self {
             error:              Default::default(),
             opcode:             Default::default(),
-            transaction_offset: Default::default(),
+            transaction_bank:   Default::default(),
+            transaction_bank_offset: Default::default(),
             transaction_size:   Default::default(),
             write_data:         Default::default(),
             log:                Default::default(),
@@ -82,12 +87,13 @@ impl FakeHw {
             if entry.value == core::u32::MAX { break; }
 
             // Check if this log entry is in the current operation's range.
-            if entry.offset >= self.transaction_offset.get() &&
-               entry.offset < self.transaction_offset.get() + self.transaction_size.get() {
+            if entry.bank == self.transaction_bank.get() &&
+               entry.offset >= self.transaction_bank_offset.get() &&
+               entry.offset < self.transaction_bank_offset.get() + self.transaction_size.get() {
                 // It overlaps; check whether this write has a bit set that the
                 // previous write did not.
                 let new_value =
-                    self.write_data[entry.offset - self.transaction_offset.get()].get();
+                    self.write_data[entry.offset - self.transaction_bank_offset.get()].get();
                 if new_value & !entry.value != 0 {
                     // This operation tried to flip a bit back to 1, so trigger
                     // an error.
@@ -105,7 +111,8 @@ impl FakeHw {
                     } else {
                         self.write_data[i].get()
                     },
-                offset: self.transaction_offset.get() + i,
+                bank: self.transaction_bank.get(),
+                offset: self.transaction_bank_offset.get() + i,
             });
             self.log_len.set(self.log_len.get() + 1);
         }
@@ -153,26 +160,17 @@ impl super::hardware::Hardware for FakeHw {
         out
     }
 
-    fn set_transaction(&self, offset: usize, size: usize) -> ReturnCode {
-        self.transaction_offset.set(offset);
+    fn set_transaction(&self, bank_offset: usize, size: usize) {
+        self.transaction_bank_offset.set(bank_offset);
         self.transaction_size.set(size + 1);
-
-        ReturnCode::SUCCESS
     }
 
-    fn set_write_data(&self, data: &[u32]) -> ReturnCode {
+    fn set_write_data(&self, data: &[u32]) {
         for (i, &v) in data.iter().enumerate() { self.write_data[i].set(v); }
-
-        ReturnCode::SUCCESS
     }
 
-    fn trigger(&self, opcode: u32, offset: usize) -> ReturnCode {
-        if self.transaction_offset.get() != offset {
-            return ReturnCode::EINVAL
-        }
-
+    fn trigger(&self, opcode: u32, bank: Bank) {
+        self.transaction_bank.set(bank);
         self.opcode.set(opcode);
-
-        ReturnCode::SUCCESS
     }
 }

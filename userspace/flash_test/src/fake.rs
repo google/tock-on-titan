@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use h1::hil::flash::Bank;
 use kernel::ReturnCode;
 
 /// Works the fake through a series of writes and erases to test its
@@ -31,12 +32,12 @@ fn fake_hw() -> bool {
     // Operation 1: successful write to two words.
     fake.set_transaction(1300, 2 - 1);
     fake.set_write_data(&[0xFFFF0FFF, 0xFFFAFFFF]);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.inject_result(0);
     require!(fake.is_programming() == false);
     require!(fake.read_error() == 0);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.finish_operation();
     require!(fake.read_error() == 0);
@@ -49,7 +50,7 @@ fn fake_hw() -> bool {
     // Operation 2: failed write. Verifies the write doesn't change anything.
     fake.set_transaction(1300, 2 - 1);
     fake.set_write_data(&[0xFFFF00FF, 0xFFAAFFFF]);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.inject_result(0x8);  // Program failed
     require!(fake.read_error() == 0x8);
@@ -63,12 +64,12 @@ fn fake_hw() -> bool {
     // overlap to the next word.
     fake.set_transaction(1300, 1 - 1);
     fake.set_write_data(&[0xFFFF00FF]);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.inject_result(0);
     require!(fake.is_programming() == false);
     require!(fake.read_error() == 0);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.finish_operation();
     require!(fake.read_error() == 0);
@@ -82,7 +83,7 @@ fn fake_hw() -> bool {
     // does not affect the third page.
     fake.set_transaction(512, 0);
     require!(fake.is_programming() == false);
-    fake.trigger(h1::hil::flash::driver::ERASE_OPCODE, 512);
+    fake.trigger(h1::hil::flash::driver::ERASE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.finish_operation();
     require!(fake.read_error() == 0);
@@ -96,7 +97,7 @@ fn fake_hw() -> bool {
     // affects the values in the third page.
     fake.set_transaction(1024, 0);
     require!(fake.is_programming() == false);
-    fake.trigger(h1::hil::flash::driver::ERASE_OPCODE, 1024);
+    fake.trigger(h1::hil::flash::driver::ERASE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.finish_operation();
     require!(fake.read_error() == 0);
@@ -111,7 +112,7 @@ fn fake_hw() -> bool {
     // otherwise valid.
     fake.set_transaction(1300, 1 - 1);
     fake.set_write_data(&[0xABCDC0FF]);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.finish_operation();
     require!(fake.read_error() == 0x8);
@@ -134,12 +135,12 @@ fn write_set_bit() -> bool {
     // Operation 1: successful write.
     fake.set_transaction(1300, 1 - 1);
     fake.set_write_data(&[0xFFFF0FFF]);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.inject_result(0);
     require!(fake.is_programming() == false);
     require!(fake.read_error() == 0);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.finish_operation();
     require!(fake.read_error() == 0);
@@ -151,12 +152,12 @@ fn write_set_bit() -> bool {
     // Operation 2: failed write. Verifies the write doesn't change anything.
     fake.set_transaction(1300, 1 - 1);
     fake.set_write_data(&[0x0000F000]);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.inject_result(0);
     require!(fake.is_programming() == false);
     require!(fake.read_error() == 0);
-    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, 1300);
+    fake.trigger(h1::hil::flash::driver::WRITE_OPCODE, Bank::One);
     require!(fake.is_programming() == true);
     fake.finish_operation();
     require!(fake.read_error() == 0x8);

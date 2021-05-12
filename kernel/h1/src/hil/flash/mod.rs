@@ -33,6 +33,7 @@ pub type FlashImpl<'h, A> = self::driver::FlashImpl<'h, A, self::fake::FakeHw>;
 pub type FlashImpl<'h, A> = self::driver::FlashImpl<'static, A, self::h1_hw::H1bHw>;
 
 pub use self::flash::{Client,Flash};
+pub use self::hardware::Bank;
 pub use self::hardware::Hardware;
 
 // Constants used by multiple submodules.
