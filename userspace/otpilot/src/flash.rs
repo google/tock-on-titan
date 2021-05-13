@@ -26,15 +26,15 @@ pub trait Flash {
     // Read from flash.
     // offset: Location relative to flash start to read from. Must be word (4 bytes) aligned.
     // buffer: Buffer for read data.
-    //         It must be: buffer.len() <= len <= MAX_BUFFER_LENGTH
-    // read_length: Number of bytes to read. Must be > 0 and a multiple of 4.
+    //         It must be: len <= buffer.len() <= MAX_BUFFER_LENGTH
+    // len: Number of bytes to read. Must be > 0 and a multiple of 4.
     fn read(&self, offset: usize, buffer: &mut[u8], len: usize) -> TockResult<()>;
 
     // Write to flash.
     // offset: Location relative to flash start to write to. Must be word (4 bytes) aligned.
     // buffer: Buffer with data to write.
     //         It must be: buffer.len() <= len <= MAX_BUFFER_LENGTH
-    // read_length: Number of bytes to write. Must be > 0 and a multiple of 4.
+    // len: Number of bytes to write. Must be > 0 and a multiple of 4.
     fn write(&self, offset: usize, buffer: &mut[u8], len: usize) -> TockResult<()>;
 
     // Erase page in flash.
