@@ -24,8 +24,8 @@ struct LogEntry {
     bank: Option<Bank>,
 
     /// The operation's offset. This is in units of words from the start of
-    /// flash.
-    offset: usize,
+    /// the flash bank.
+    bank_offset: usize,
 }
 
 /// A fake version of H1's flash modules. Starts initialized with all 1's as if
@@ -43,7 +43,7 @@ pub struct FakeHw {
 
     // Changes that have been successfully applied to the flash. Replayed during
     // simulated reads to determine the value of a cell.
-    log: [core::cell::Cell<LogEntry>; 5],
+    log: [core::cell::Cell<LogEntry>; 9],
     log_len: core::cell::Cell<usize>,
 }
 
@@ -88,12 +88,12 @@ impl FakeHw {
 
             // Check if this log entry is in the current operation's range.
             if entry.bank == self.transaction_bank.get() &&
-               entry.offset >= self.transaction_bank_offset.get() &&
-               entry.offset < self.transaction_bank_offset.get() + self.transaction_size.get() {
+               entry.bank_offset >= self.transaction_bank_offset.get() &&
+               entry.bank_offset < self.transaction_bank_offset.get() + self.transaction_size.get() {
                 // It overlaps; check whether this write has a bit set that the
                 // previous write did not.
                 let new_value =
-                    self.write_data[entry.offset - self.transaction_bank_offset.get()].get();
+                    self.write_data[entry.bank_offset - self.transaction_bank_offset.get()].get();
                 if new_value & !entry.value != 0 {
                     // This operation tried to flip a bit back to 1, so trigger
                     // an error.
@@ -112,7 +112,7 @@ impl FakeHw {
                         self.write_data[i].get()
                     },
                 bank: self.transaction_bank.get(),
-                offset: self.transaction_bank_offset.get() + i,
+                bank_offset: self.transaction_bank_offset.get() + i,
             });
             self.log_len.set(self.log_len.get() + 1);
         }
@@ -133,17 +133,21 @@ impl super::hardware::Hardware for FakeHw {
     }
 
     fn read(&self, offset: usize) -> kernel::ReturnCode {
+        const FLASH_BANK_WORDS: usize = super::h1_hw::H1_FLASH_BANK_SIZE / 4;
+        let bank_offset = offset % FLASH_BANK_WORDS;
+        let bank = if offset < FLASH_BANK_WORDS { Bank::Zero } else { Bank::One };
+
         // Replay the operation log in reverse to find the current value.
         for entry in self.log[0..self.log_len.get()].iter().rev() {
             let entry = entry.get();
             if entry.value == core::u32::MAX {
                 // Erase
-                if offset >= entry.offset && offset < entry.offset + 512 {
+                if Some(bank) == entry.bank && bank_offset >= entry.bank_offset && bank_offset < entry.bank_offset + 512 {
                     return kernel::ReturnCode::SuccessWithValue { value: core::u32::MAX as usize };
                 }
             } else {
                 // Write
-                if offset == entry.offset {
+                if Some(bank) == entry.bank && bank_offset == entry.bank_offset {
                     return kernel::ReturnCode::SuccessWithValue { value: entry.value as usize };
                 }
             }

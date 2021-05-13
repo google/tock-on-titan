@@ -25,6 +25,9 @@ const WRITE_WORD_TIME: u32 = 840;
 
 static mut WRITE_BUF: [u32; 1] = [0; 1];
 
+const WORDS_PER_BANK: usize = 0x10000;
+const PAGES_PER_BANK: usize = 128;
+
 #[cfg(test)]
 #[derive(Clone,Copy,PartialEq)]
 enum MockClientState {
@@ -43,7 +46,11 @@ impl<'a> MockClient {
         MockClient { state: core::cell::Cell::new(None) }
     }
 
-    pub fn state(&self) -> Option<MockClientState> { self.state.get() }
+    pub fn state(&self) -> Option<MockClientState> {
+        let state = self.state.get();
+        self.state.set(None);
+        state
+    }
 }
 
 #[cfg(test)]
@@ -128,9 +135,106 @@ fn erase_max_retries() -> bool {
     true
 }
 
+struct OperationsTest<'a> {
+    alarm: &'a crate::mock_alarm::MockAlarm,
+    client: &'a MockClient,
+    hw: &'a h1::hil::flash::fake::FakeHw,
+    driver: &'a h1::hil::flash::FlashImpl<'a, crate::mock_alarm::MockAlarm>,
+}
+
+impl<'a> OperationsTest<'a> {
+    fn read(&self, address: usize, expected_val: usize) -> bool {
+        require!(self.hw.read(address) == ReturnCode::SuccessWithValue { value: expected_val });
+        require!(self.driver.read(address) == ReturnCode::SuccessWithValue { value: expected_val });
+
+        true
+    }
+
+    fn write(&self, address: usize, val: usize) -> bool {
+        use kernel::hil::time::{AlarmClient,Time};
+
+        unsafe {
+            WRITE_BUF[0] = val as u32;
+            require!(self.driver.write(address, &mut WRITE_BUF) == (kernel::ReturnCode::SUCCESS, None));
+        }
+        require!(self.alarm.get_alarm() == self.alarm.now() + WRITE_WORD_TIME);
+        require!(self.client.state() == None);
+        require!(self.hw.is_programming() == true);
+        self.alarm.set_time(WRITE_WORD_TIME);
+        self.hw.inject_result(0);
+        self.driver.fired();
+        require!(self.hw.is_programming() == true);
+        require!(self.client.state() == None);
+        self.hw.finish_operation();
+        self.driver.fired();
+        require!(self.alarm.get_alarm() == 0);
+        require!(self.hw.is_programming() == false);
+        require!(self.client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::SUCCESS)));
+
+        true
+    }
+
+    fn erase(&self, page: usize) -> bool {
+        use kernel::hil::time::{AlarmClient,Time};
+
+        require!(self.driver.erase(page) == kernel::ReturnCode::SUCCESS);
+        require!(self.alarm.get_alarm() == self.alarm.now() + ERASE_TIME);
+        require!(self.hw.is_programming() == true);
+        self.alarm.set_time(WRITE_WORD_TIME + ERASE_TIME);
+        self.hw.finish_operation();
+        self.driver.fired();
+        require!(self.alarm.get_alarm() == 0);
+        require!(self.hw.is_programming() == false);
+        require!(self.client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::SUCCESS)));
+
+        true
+    }
+}
+
 #[test]
 fn write_then_erase() -> bool {
-    use kernel::hil::time::{AlarmClient,Time};
+    let alarm = crate::mock_alarm::MockAlarm::new();
+    let client = MockClient::new();
+    let hw = h1::hil::flash::fake::FakeHw::new();
+    let driver = unsafe { h1::hil::flash::FlashImpl::new(&alarm, &hw) };
+    driver.set_client(&client);
+    let ops_test = OperationsTest {
+        alarm: &alarm,
+        client: &client,
+        hw: &hw,
+        driver: &driver,
+    };
+
+    // Write bank 0
+    require!(ops_test.write(1300, 0xFFFFABCD));
+    require!(ops_test.read(1300, 0xFFFFABCD));
+
+    // Check that same address in bank 1 is untouched
+    require!(ops_test.read(WORDS_PER_BANK + 1300, 0xFFFFFFFF));
+
+    // Write bank 1
+    require!(ops_test.write(WORDS_PER_BANK + 1300, 0x12349876));
+    require!(ops_test.read(WORDS_PER_BANK + 1300, 0x12349876));
+
+    // Check that same address in bank 0 is untouched
+    require!(ops_test.read(1300, 0xFFFFABCD));
+
+    // Erase bank 0
+    require!(ops_test.erase(2));
+    require!(ops_test.read(1300, 0xFFFFFFFF));
+
+    // Check that same address in bank 1 is untouched
+    require!(ops_test.read(WORDS_PER_BANK + 1300, 0x12349876));
+
+    // Erase bank 1
+    require!(ops_test.erase(PAGES_PER_BANK + 2));
+    require!(ops_test.read(WORDS_PER_BANK + 1300, 0xFFFFFFFF));
+
+    true
+}
+
+#[test]
+fn write_to_bad_address() -> bool {
     let alarm = crate::mock_alarm::MockAlarm::new();
     let client = MockClient::new();
     let hw = h1::hil::flash::fake::FakeHw::new();
@@ -141,38 +245,8 @@ fn write_then_erase() -> bool {
 
     unsafe {
         WRITE_BUF[0] = 0xFFFFABCD;
-        require!(driver.write(1300, &mut WRITE_BUF) == (kernel::ReturnCode::SUCCESS, None));
+        require!(driver.write(0x100000, &mut WRITE_BUF) == (kernel::ReturnCode::EINVAL, Some(&mut WRITE_BUF)));
     }
-    require!(alarm.get_alarm() == alarm.now() + WRITE_WORD_TIME);
-    require!(client.state() == None);
-    require!(hw.is_programming() == true);
-    alarm.set_time(WRITE_WORD_TIME);
-    hw.inject_result(0);
-    driver.fired();
-    require!(hw.is_programming() == true);
-    require!(client.state() == None);
-    hw.finish_operation();
-    driver.fired();
-    require!(alarm.get_alarm() == 0);
-    require!(hw.is_programming() == false);
-    require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFABCD });
-    require!(client.state() == Some(MockClientState::WriteDone(kernel::ReturnCode::SUCCESS)));
-    require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFABCD });
-
-    // Erase
-    let driver = unsafe { h1::hil::flash::FlashImpl::new(&alarm, &hw) };
-    driver.set_client(&client);
-    require!(driver.erase(2) == kernel::ReturnCode::SUCCESS);
-    require!(alarm.get_alarm() == alarm.now() + ERASE_TIME);
-    require!(hw.is_programming() == true);
-    alarm.set_time(WRITE_WORD_TIME + ERASE_TIME);
-    hw.finish_operation();
-    driver.fired();
-    require!(alarm.get_alarm() == 0);
-    require!(hw.is_programming() == false);
-    require!(hw.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
-    require!(client.state() == Some(MockClientState::EraseDone(kernel::ReturnCode::SUCCESS)));
-    require!(driver.read(1300) == ReturnCode::SuccessWithValue { value: 0xFFFFFFFF });
 
     true
 }
