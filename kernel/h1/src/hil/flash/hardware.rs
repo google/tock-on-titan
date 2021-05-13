@@ -17,13 +17,8 @@ use kernel::ReturnCode;
 /// The bank to perform an operation on.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Bank {
-    Unknown,
     Zero,
     One,
-}
-
-impl Default for Bank {
-    fn default() -> Self { Bank::Unknown }
 }
 
 /// The interface between the flash driver and the (real or fake) flash module.

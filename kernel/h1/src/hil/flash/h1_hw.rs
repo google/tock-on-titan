@@ -281,7 +281,6 @@ impl super::hardware::Hardware for H1bHw {
         // The offset is relative to the beginning of the flash module.
 
         match bank {
-            super::hardware::Bank::Unknown => debug!("H1bHw::trigger: Flash bank not set."),
             super::hardware::Bank::Zero => self.pe_control_0.set(opcode),
             super::hardware::Bank::One => self.pe_control_1.set(opcode),
         }

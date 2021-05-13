@@ -21,7 +21,7 @@ struct LogEntry {
     value: u32,
 
     /// The operation's target bank.
-    bank: Bank,
+    bank: Option<Bank>,
 
     /// The operation's offset. This is in units of words from the start of
     /// flash.
@@ -36,7 +36,7 @@ pub struct FakeHw {
     // Currently-executing opcode; 0 if no transaction is ongoing.
     opcode: core::cell::Cell<u32>,
 
-    transaction_bank: core::cell::Cell<Bank>,
+    transaction_bank: core::cell::Cell<Option<Bank>>,
     transaction_bank_offset: core::cell::Cell<usize>,
     transaction_size: core::cell::Cell<usize>,
     write_data: [core::cell::Cell<u32>; 32],
@@ -170,7 +170,7 @@ impl super::hardware::Hardware for FakeHw {
     }
 
     fn trigger(&self, opcode: u32, bank: Bank) {
-        self.transaction_bank.set(bank);
+        self.transaction_bank.set(Some(bank));
         self.opcode.set(opcode);
     }
 }
