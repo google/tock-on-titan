@@ -48,7 +48,6 @@ use kernel::mpu::MPU;
 use h1::crypto::dcrypto::Dcrypto;
 use h1::hil::flash::Flash;
 use h1::hil::spi_device::SpiDevice;
-use h1::nvcounter::{FlashCounter,NvCounter};
 use h1::timels::Timels;
 
 use spiutils::driver::firmware::SegmentInfo;
@@ -99,9 +98,7 @@ pub struct Papa {
         'static,
         capsules::virtual_uart::UartDevice<'static>
     >,
-    nvcounter: &'static h1_syscalls::nvcounter_syscall::NvCounterSyscall<'static,
-        FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>>,
-    personality: &'static h1_syscalls::personality::PersonalitySyscall<'static>,
+    flash_syscalls: &'static h1_syscalls::flash::FlashSyscalls<'static >,
     fuse_syscalls: &'static h1_syscalls::fuse::FuseSyscall<'static>,
     globalsec_syscalls: &'static h1_syscalls::globalsec::GlobalSecSyscall<'static>,
     reset_syscalls: &'static h1_syscalls::reset::ResetSyscall<'static>,
@@ -290,8 +287,11 @@ pub unsafe fn reset_handler() {
         h1::hil::flash::virtual_flash::FlashUser<'static>,
         h1::hil::flash::virtual_flash::FlashUser::new(flash_mux));
 
-    let nvcounter_flash = static_init!(h1::hil::flash::virtual_flash::FlashUser<'static>,
-                                       h1::hil::flash::virtual_flash::FlashUser::new(flash_mux));
+    let flash_syscalls_buffer = static_init!([u32; 32], [0; 32]);
+    let flash_syscalls = static_init!(
+        h1_syscalls::flash::FlashSyscalls<'static>,
+        h1_syscalls::flash::FlashSyscalls::new(flash_user, flash_syscalls_buffer, kernel.create_grant(&grant_cap)));
+    flash_user.set_client(flash_syscalls);
 
     flash.set_client(flash_mux);
 
@@ -321,19 +321,6 @@ pub unsafe fn reset_handler() {
 
     h1::crypto::dcrypto::DCRYPTO.set_client(dcrypto);
 
-    let nvcounter_buffer = static_init!([u32; 1], [0]);
-    let nvcounter = static_init!(
-        FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>,
-        FlashCounter::new(nvcounter_buffer, nvcounter_flash));
-    nvcounter_flash.set_client(nvcounter);
-
-    let nvcounter_syscall = static_init!(
-        h1_syscalls::nvcounter_syscall::NvCounterSyscall<'static,
-            FlashCounter<'static, h1::hil::flash::virtual_flash::FlashUser<'static>>>,
-        h1_syscalls::nvcounter_syscall::NvCounterSyscall::new(nvcounter, kernel.create_grant(&grant_cap)));
-    nvcounter.set_client(nvcounter_syscall);
-
-
     h1::trng::TRNG0.init();
     let entropy_to_random = static_init!(
         capsules::rng::Entropy32ToRandom<'static>,
@@ -349,16 +336,6 @@ pub unsafe fn reset_handler() {
     );
     h1::trng::TRNG0.set_client(entropy_to_random);
     entropy_to_random.set_client(rng);
-
-    let personality = static_init!(
-        h1_syscalls::personality::PersonalitySyscall<'static>,
-        h1_syscalls::personality::PersonalitySyscall::new(&mut h1::personality::PERSONALITY,
-                                                          kernel.create_grant(&grant_cap)));
-
-    h1::personality::PERSONALITY.set_flash(flash_user);
-    h1::personality::PERSONALITY.set_buffer(&mut h1::personality::BUFFER);
-    h1::personality::PERSONALITY.set_client(personality);
-    flash_user.set_client(&h1::personality::PERSONALITY);
 
     h1::spi_host::SPI_HOST0.init();
     let h1_spi_host_syscalls = static_init!(
@@ -423,19 +400,15 @@ pub unsafe fn reset_handler() {
         aes: aes,
         dcrypto: dcrypto,
         low_level_debug,
-        nvcounter: nvcounter_syscall,
         rng: rng,
         spi_host_syscalls: spi_host_syscalls,
         h1_spi_host_syscalls: h1_spi_host_syscalls,
         h1_spi_device_syscalls: h1_spi_device_syscalls,
-        personality: personality,
+        flash_syscalls: flash_syscalls,
         fuse_syscalls: fuse_syscalls,
         globalsec_syscalls: globalsec_syscalls,
         reset_syscalls: reset_syscalls,
     };
-
-    // Uncomment to initialize NvCounter
-    //nvcounter_syscall.initialize();
 
     extern "C" {
         /// Beginning of the ROM region containing app images.
@@ -480,8 +453,7 @@ impl Platform for Papa {
             h1_syscalls::aes::DRIVER_NUM               => f(Some(self.aes)),
             h1_syscalls::dcrypto::DRIVER_NUM           => f(Some(self.dcrypto)),
             h1_syscalls::digest::DRIVER_NUM            => f(Some(self.digest)),
-            h1_syscalls::nvcounter_syscall::DRIVER_NUM => f(Some(self.nvcounter)),
-            h1_syscalls::personality::DRIVER_NUM       => f(Some(self.personality)),
+            h1_syscalls::flash::DRIVER_NUM             => f(Some(self.flash_syscalls)),
             h1_syscalls::fuse::DRIVER_NUM              => f(Some(self.fuse_syscalls)),
             h1_syscalls::globalsec::DRIVER_NUM         => f(Some(self.globalsec_syscalls)),
             h1_syscalls::reset::DRIVER_NUM             => f(Some(self.reset_syscalls)),
