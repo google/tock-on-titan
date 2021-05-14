@@ -161,14 +161,6 @@ fn run() -> TockResult<()> {
 
     //////////////////////////////////////////////////////////////////////////////
 
-    {
-        let mut flash_read: [u8; flash::MAX_BUFFER_LENGTH] = [0; flash::MAX_BUFFER_LENGTH];
-        flash::get().read(0x5000, &mut flash_read, 8)?;
-        writeln!(console, "flash_read = {:?}", &flash_read[0..8])?;
-    }
-
-    //////////////////////////////////////////////////////////////////////////////
-
     console_reader::get().allow_read(1)?;
 
     loop {
