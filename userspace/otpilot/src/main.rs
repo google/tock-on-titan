@@ -52,22 +52,15 @@ use spiutils::protocol::flash::AddressMode;
 //////////////////////////////////////////////////////////////////////////////
 
 fn run_host_helper_demo() -> TockResult<()> {
-    let mut console = Console::new();
-
     // We cannot use the SPI host if passthrough is enabled.
     spi_host_h1::get().set_passthrough(false)?;
 
     let host_helper = SpiHostHelper {};
-
-    writeln!(console, "Host: Entering 4B mode")?;
     host_helper.enter_4b()?;
 
-    writeln!(console, "Host: Reading data")?;
     host_helper.read_and_print_data(0x0)?;
-    host_helper.read_and_print_data(0x1)?;
 
     if spi_device::get().get_address_mode() == AddressMode::ThreeByte {
-        writeln!(console, "Host: Exiting 4B mode")?;
         host_helper.exit_4b()?;
     }
 
@@ -117,7 +110,6 @@ fn run() -> TockResult<()> {
 
     //////////////////////////////////////////////////////////////////////////////
 
-    writeln!(console, "Device: Configuring address_mode handling to KernelSpace")?;
     spi_device::get().set_address_mode_handling(HandlerMode::KernelSpace)?;
     spi_device::get().configure_addresses(AddressConfig {
         flash_virtual_base: 0x0,
@@ -169,13 +161,6 @@ fn run() -> TockResult<()> {
 
     //////////////////////////////////////////////////////////////////////////////
 
-    let mut flash_read: [u8; flash::MAX_BUFFER_LENGTH] = [0; flash::MAX_BUFFER_LENGTH];
-    writeln!(console, "reading flash ...")?;
-    flash::get().read(0x5000, &mut flash_read, 8)?;
-    writeln!(console, "flash_read = {:?}", &flash_read[0..8])?;
-
-    //////////////////////////////////////////////////////////////////////////////
-
     console_reader::get().allow_read(1)?;
 
     loop {
@@ -195,11 +180,11 @@ fn run() -> TockResult<()> {
                 Ok(()) => {}
                 Err(why) => {
                     // Ignore error from writeln. There's nothing we can do here anyway.
-                    let _ = writeln!(console, "Device: Error processing SPI packet: {:?}", why);
+                    let _ = writeln!(console, "SPI processor: Error {:?}", why);
                     if spi_device::get().is_busy_set() {
                         if let Err(_) = spi_device::get().end_transaction_with_status(true, false) {
                             // Ignore error from writeln. There's nothing we can do here anyway.
-                            let _ = writeln!(console, "Device: Error ending transaction.");
+                            let _ = writeln!(console, "SPI device: end_transaction error.");
                         }
                     } else {
                         spi_device::get().end_transaction();
@@ -213,7 +198,7 @@ fn run() -> TockResult<()> {
                 Ok(()) => {}
                 Err(_) => {
                     // Ignore error from writeln. There's nothing we can do here anyway.
-                    let _ = writeln!(console, "Device: Error processing console event.");
+                    let _ = writeln!(console, "Console processor: Error.");
                 }
             }
             console_reader::get().allow_read(1)?;
@@ -224,7 +209,7 @@ fn run() -> TockResult<()> {
                 Ok(()) => {}
                 Err(_) => {
                     // Ignore error from writeln. There's nothing we can do here anyway.
-                    let _ = writeln!(console, "Device: Error processing GPIO event.");
+                    let _ = writeln!(console, "GPIO processor (event): Error.");
                 }
             }
         }
@@ -234,7 +219,7 @@ fn run() -> TockResult<()> {
                 Ok(()) => {}
                 Err(_) => {
                     // Ignore error from writeln. There's nothing we can do here anyway.
-                    let _ = writeln!(console, "Alarm: Error processing event.");
+                    let _ = writeln!(console, "GPIO processor (alarm): Error.");
                 }
             }
         }
@@ -259,9 +244,9 @@ async fn main() -> TockResult<()> {
     writeln!(console, "clock_frequency: {}", alarm::get().get_clock_frequency())?;
     let result = run();
     if result.is_ok() {
-        writeln!(console, "Returned OK.")?;
+        writeln!(console, "main: returning OK.")?;
     } else {
-        writeln!(console, "Returned error.")?;
+        writeln!(console, "main: returning error.")?;
     }
     result
 }
