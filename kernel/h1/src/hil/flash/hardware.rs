@@ -14,8 +14,14 @@
 
 use kernel::ReturnCode;
 
-/// The interface between the flash driver and the (real or fake) flash module.
+/// The bank to perform an operation on.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Bank {
+    Zero,
+    One,
+}
 
+/// The interface between the flash driver and the (real or fake) flash module.
 pub trait Hardware {
     /// Returns true if an operation is running, false otherwise.
     fn is_programming(&self) -> bool;
@@ -28,14 +34,15 @@ pub trait Hardware {
     fn read_error(&self) -> u16;
 
     /// Set flash transaction parameters (word offset and size). The word offset
-    /// is relative to the start of flash and the size is one less than the
+    /// is relative to the start of a flash bank and the size is one less than the
     /// number of words to copy.
-    fn set_transaction(&self, offset: usize, size: usize);
+    fn set_transaction(&self, bank_offset: usize, size: usize);
 
     /// Fill the flash controller's write buffer. data must have a length no
     /// larger than 32.
     fn set_write_data(&self, data: &[u32]);
 
-    /// Kick off a smart program execution.
-    fn trigger(&self, opcode: u32);
+    /// Kick off a smart program execution on the specified `Bank` using the data
+    /// configured via `set_transaction`.
+    fn trigger(&self, opcode: u32, bank: Bank);
 }

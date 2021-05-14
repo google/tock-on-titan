@@ -43,11 +43,11 @@ impl SmartProgramState {
     /// Performs a state machine update during smart programming. This should be
     /// done during initialization and when a wait finishes.
     pub fn step<'a, A: Alarm<'a>, H: super::hardware::Hardware>(
-        self, alarm: &A, hw: &H, opcode: u32) -> Self
+        self, alarm: &A, hw: &H, opcode: u32, bank: super::hardware::Bank) -> Self
     {
         match self {
             Init(attempts_remaining, final_pulse_needed, timeout_nanoseconds) => {
-                hw.trigger(opcode);
+                hw.trigger(opcode, bank);
                 set_program_timeout(alarm, timeout_nanoseconds);
                 Running(attempts_remaining - 1, final_pulse_needed, timeout_nanoseconds)
             },
@@ -65,7 +65,7 @@ impl SmartProgramState {
                     // If final_pulse_needed, trigger one last smart programming
                     // cycle. Otherwise indicate success.
                     if final_pulse_needed {
-                        hw.trigger(opcode);
+                        hw.trigger(opcode, bank);
                         set_program_timeout(alarm, timeout_nanoseconds);
                         return Running(0, false, timeout_nanoseconds);
                     }
@@ -78,7 +78,7 @@ impl SmartProgramState {
                 // limit.
                 if attempts_remaining > 0 {
                     // Operation failed; retry.
-                    hw.trigger(opcode);
+                    hw.trigger(opcode, bank);
                     set_program_timeout(alarm, timeout_nanoseconds);
                     return SmartProgramState::Running(attempts_remaining - 1,
                         final_pulse_needed, timeout_nanoseconds);

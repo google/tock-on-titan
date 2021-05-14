@@ -31,6 +31,8 @@ pub const H1_INFO_0_START: usize    = 0x20000;
 pub const H1_INFO_1_START: usize    = 0x28000;
 pub const H1_INFO_SIZE: usize       = 0x00800;
 
+const BYTES_PER_WORD: usize = core::mem::size_of::<u32>();
+
 register_bitfields![u32,
     TransactionParameters [
         Offset OFFSET(0) NUMBITS(16) [],
@@ -42,7 +44,7 @@ register_bitfields![u32,
 #[repr(C)]
 pub struct H1bHw {
     /// Read/Program/Erase control for flash macro 0.
-    _pe_control_0: VolatileCell<u32>,
+    pe_control_0: VolatileCell<u32>,
 
     /// Read/Program/Erase control for flash macro 1.
     pe_control_1: VolatileCell<u32>,
@@ -243,8 +245,7 @@ pub struct H1bHw {
 
 impl super::hardware::Hardware for H1bHw {
     fn is_programming(&self) -> bool {
-        // TODO(jrvanwhy): Only checks the second flash bank.
-        self.pe_control_1.get() != 0
+        self.pe_control_0.get() != 0 || self.pe_control_1.get() != 0
     }
 
     fn read(&self, offset: usize) -> ReturnCode {
@@ -265,27 +266,23 @@ impl super::hardware::Hardware for H1bHw {
         self.error_code.get() as u16
     }
 
-    fn set_transaction(&self, offset: usize, size: usize) {
+    fn set_transaction(&self, bank_offset: usize, size: usize) {
         use self::TransactionParameters::{Offset,Size};
-        // The offset is relative to the beginning of the flash module. There
-        // are 128 pages per flash module.
-        // TODO(jrvanwhy): Assumes the read is from the second flash bank.
-        if offset > H1_FLASH_SIZE {
-           return; // TODO(pal): Fails silently!
-        }
 
-        let offset = offset - 128 * super::WORDS_PER_PAGE;
-        self.transaction_parameters.write(Offset.val(offset as u32) + Size.val(size as u32));
+        self.transaction_parameters.write(Offset.val(bank_offset as u32) + Size.val(size as u32));
     }
 
     fn set_write_data(&self, data: &[u32]) {
         for (i, &v) in data.iter().enumerate() { self.write_data[i].set(v); }
     }
 
-    fn trigger(&self, opcode: u32) {
+    fn trigger(&self, opcode: u32, bank: super::hardware::Bank) {
         self.program_erase_enable.set(0xb11924e1);
-        // TODO(jrvanwhy): Assumes the write is to the second flash bank (where
-        // the nvmem counter is).
-        self.pe_control_1.set(opcode);
+        // The offset is relative to the beginning of the flash module.
+
+        match bank {
+            super::hardware::Bank::Zero => self.pe_control_0.set(opcode),
+            super::hardware::Bank::One => self.pe_control_1.set(opcode),
+        }
     }
 }
