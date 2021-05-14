@@ -66,7 +66,8 @@ userspace/localtests: $(addsuffix /localtests,$(BUILD_SUBDIRS))
 .PHONY: build/gitlongtag
 build/gitlongtag:
 	mkdir -p build
-	git describe --always --dirty --long >$@
+	# Remove the trailing newline character
+	printf '%s' $$(git describe --always --dirty --long) >$@
 
 include $(addsuffix /Build.mk,$(BUILD_SUBDIRS))
 
