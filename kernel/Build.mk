@@ -30,7 +30,7 @@ kernel/build$(IMAGE): sandbox_setup
 .PHONY: kernel/build-signed$(IMAGE)
 kernel/build-signed$(IMAGE): kernel/build$(IMAGE)
 
-endef
+endef # KERNEL_IMAGE_TARGETS
 
 # Instantiate for IMAGE=-a and IMAGE=-b
 $(foreach IMAGE,$(IMAGES),$(eval $(KERNEL_IMAGE_TARGETS)))

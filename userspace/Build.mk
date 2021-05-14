@@ -124,7 +124,7 @@ build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE): \
 	cat $(TANGO_BOOTLOADER$(IMAGE)) build/userspace/$(APP)/$(BOARD)/signed_image$(IMAGE) \
 		> build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE);
 
-endef
+endef # IMAGE_TARGETS
 
 
 # ------------------------------------------------------------------------------
@@ -174,7 +174,7 @@ userspace/$(APP)/$(BOARD)/run: \
 		stty -F /dev/ttyUltraTarget2 115200 -icrnl ; \
 		build/cargo-host/release/runner'
 
-endef
+endef # C_APP_BOARD_TARGETS
 
 # C_APP_TARGET contains build rules that are specific to a C app but not an
 # (APP, BOARD) combination.
@@ -188,7 +188,7 @@ build/userspace/$(APP)/cortex-m3/cortex-m3.tbf: \
 		build/cargo-host/release/elf2tab
 	+flock build/libtock_c_lock $(BWRAP) $(MAKE) -C userspace/$(APP) -f TockMakefile
 
-endef
+endef # C_APP_TARGETS
 
 # ------------------------------------------------------------------------------
 # Generate the targets for all board-and-app combinations.
@@ -234,7 +234,7 @@ userspace/$(APP)/localtests: \
 		$(if $(filter $(APP),$(C_APPS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/localtests)) \
 		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(C_APPS_$(BOARD))),userspace/$(APP)/$(BOARD)/localtests))
 
-endef
+endef # C_APP_COMBINED_TARGET
 
 # ------------------------------------------------------------------------------
 # Generate the targets for all apps combinations.
@@ -271,7 +271,7 @@ userspace/$(APP)/$(BOARD)/doc: sandbox_setup build/gitlongtag
 .PHONY: userspace/$(APP)/$(BOARD)/localtests
 userspace/$(APP)/$(BOARD)/localtests:
 
-endef
+endef # RUST_APP_BOARD_TARGETS
 
 # ------------------------------------------------------------------------------
 # Macro to define targets for a specific board-app-and-image combination.
@@ -337,7 +337,7 @@ build/userspace/$(APP)/$(BOARD)/app$(IMAGE).tbf: \
 		     false ; \
 		fi
 
-endef
+endef # RUST_APP_BOARD_IMAGE_TARGETS
 
 # ------------------------------------------------------------------------------
 # Generate the targets for all board-and-app combinations.
@@ -385,7 +385,7 @@ userspace/$(APP)/localtests: \
 		$(if $(filter $(APP),$(RUST_APPS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/localtests)) \
 		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_APPS_$(BOARD))),userspace/$(APP)/$(BOARD)/localtests))
 
-endef
+endef # RUST_APP_TARGET
 
 # ------------------------------------------------------------------------------
 # Generate the targets for all apps combinations.
@@ -482,7 +482,7 @@ build/userspace/$(APP)/$(BOARD)/app.tbf: \
 		     false ; \
 		fi
 
-endef
+endef # RUST_TEST_BOARD_TARGETS
 
 # ------------------------------------------------------------------------------
 # Generate the targets for all board-and-app combinations.
@@ -527,7 +527,7 @@ userspace/$(APP)/localtests: \
 		$(if $(filter $(APP),$(RUST_TESTS)),$(foreach BOARD,$(BOARDS),userspace/$(APP)/$(BOARD)/localtests)) \
 		$(foreach BOARD,$(BOARDS),$(if $(filter $(APP),$(RUST_TESTS_$(BOARD))),userspace/$(APP)/$(BOARD)/localtests))
 
-endef
+endef # RUST_TEST_TARGET
 
 # ------------------------------------------------------------------------------
 # Generate the targets for all apps combinations.
