@@ -15,3 +15,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 RUST_APPS_papa += otpilot
+
+# Enable support to build app for multiple images.
+RUST_IMAGES_otpilot = $(IMAGES)
