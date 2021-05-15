@@ -33,6 +33,8 @@ use manticore::server::pa_rot::PaRot;
 
 use spiutils::io::Cursor as SpiutilsCursor;
 use spiutils::io::Write as SpiutilsWrite;
+use spiutils::protocol::error;
+use spiutils::protocol::error::Message as ErrorMessage;
 use spiutils::protocol::flash;
 use spiutils::protocol::flash::Address;
 use spiutils::protocol::flash::AddressMode;
@@ -61,7 +63,6 @@ pub enum SpiProcessorError {
     ToWire(ToWireError),
     Tock,
     Manticore(manticore::server::Error),
-    UnsupportedContentType(payload::ContentType),
     UnsupportedOpCode(OpCode),
     InvalidAddress(Option<u32>),
     Format(core::fmt::Error),
@@ -109,19 +110,51 @@ pub struct SpiProcessor<'a> {
 
 const SPI_TX_BUF_SIZE : usize = 512;
 
+// TODO(osk): We need to have this tx_buf somewhere, but putting it on the stack
+// doesn't work, since that's currently limited to 2048 bytes. Declaring it
+// static here for now until we have a better place for it to live.
+static mut SPI_TX_BUF : [u8; SPI_TX_BUF_SIZE] = [0xff; SPI_TX_BUF_SIZE];
+
 pub type SpiProcessorResult<T> = Result<T, SpiProcessorError>;
 
 impl<'a> SpiProcessor<'a> {
 
-    fn send_data(&mut self, tx_header: &payload::Header, tx_buf: &mut[u8]) -> SpiProcessorResult<()> {
+    fn send_data(&mut self, content_type: payload::ContentType, content_len: u16, tx_buf: &mut[u8]) -> SpiProcessorResult<()> {
+        let mut header = payload::Header {
+            content: content_type,
+            content_len: content_len,
+            checksum: 0,
+        };
+        header.checksum = payload::compute_checksum(&header, &tx_buf[payload::HEADER_LEN..]);
         {
-            // Scope for tx_cursor (which doesn't implement Drop).
+            // Scope for tx_cursor.
             // We need tx_cursor to go out of scope so that we can use tx_buf further down.
             let tx_cursor = SpiutilsCursor::new(tx_buf);
-            tx_header.to_wire(tx_cursor)?;
+            header.to_wire(tx_cursor)?;
         }
         spi_device::get().end_transaction_with_data(tx_buf, true, true)?;
 
+        Ok(())
+    }
+
+    fn send_error<'m, M: ErrorMessage<'m>>(&mut self, msg: M) -> SpiProcessorResult<()> {
+        let payload_len : u16;
+        unsafe {
+            // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
+            let mut tx_cursor = SpiutilsCursor::new(&mut SPI_TX_BUF[payload::HEADER_LEN..]);
+
+            let header = error::Header {
+                content: M::TYPE
+            };
+            header.to_wire(&mut tx_cursor)?;
+            msg.to_wire(&mut tx_cursor)?;
+            payload_len = u16::try_from(tx_cursor.consumed_len())
+                    .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
+        }
+        unsafe {
+            // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
+            self.send_data(payload::ContentType::Error, payload_len, &mut SPI_TX_BUF)?;
+        }
         Ok(())
     }
 
@@ -129,19 +162,18 @@ impl<'a> SpiProcessor<'a> {
         let mut console = Console::new();
         writeln!(console, "Device: Manticore!")?;
 
-        let mut tx_buf : [u8; SPI_TX_BUF_SIZE] = [0xff; SPI_TX_BUF_SIZE];
         let payload_len : u16;
-        {
-            let mut tx_cursor = ManticoreCursor::new(&mut tx_buf[payload::HEADER_LEN..]);
+        unsafe {
+            // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
+            let mut tx_cursor = ManticoreCursor::new(&mut SPI_TX_BUF[payload::HEADER_LEN..]);
             self.server.process_request(&mut data, &mut tx_cursor)?;
             payload_len = u16::try_from(tx_cursor.consumed_len())
                 .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
         }
-        let tx_header = payload::Header {
-            content: payload::ContentType::Manticore,
-            content_len: payload_len,
-        };
-        self.send_data(&tx_header, &mut tx_buf)?;
+        unsafe {
+            // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
+            self.send_data(payload::ContentType::Manticore, payload_len, &mut SPI_TX_BUF)?;
+        }
         writeln!(console, "Device: Data sent")?;
         Ok(())
     }
@@ -150,12 +182,19 @@ impl<'a> SpiProcessor<'a> {
         let mut console = Console::new();
         let header = payload::Header::from_wire(&mut data)?;
         writeln!(console, "Device: payload header: {:?}", header)?;
+
+        if header.checksum != payload::compute_checksum(&header, data) {
+            let error = error::BadChecksum {};
+            return self.send_error(error);
+        }
+
         match header.content {
             payload::ContentType::Manticore => {
                 self.process_manticore(&data[..header.content_len as usize])
             }
             _ => {
-                Err(SpiProcessorError::UnsupportedContentType(header.content))
+                let error = error::ContentTypeNotSupported {};
+                self.send_error(error)
             }
         }
     }

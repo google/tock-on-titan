@@ -50,6 +50,7 @@ fn wrap(input_file: &str, output_file: &str) {
     let header = payload::Header {
         content: payload::ContentType::Manticore,
         content_len: u16::try_from(read_buf.len()).unwrap(),
+        checksum: 0,
     };
 
     let mut stdwrite = StdWrite(&mut output);
