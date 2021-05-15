@@ -31,9 +31,6 @@ use crate::protocol::wire::WireEnum;
 wire_enum! {
     /// The content type.
     pub enum ContentType: u8 {
-        /// Unknown message type.
-        Unknown = 0xff,
-
         /// Request to prepare for an update
         UpdatePrepareRequest = 0x01,
 
@@ -262,9 +259,6 @@ impl ToWire for UpdatePrepareRequest {
 wire_enum! {
     /// The result of an update prepare request.
     pub enum UpdatePrepareResult: u8 {
-        /// Unknown result type.
-        Unknown = 0xff,
-
         /// Success
         Success = 0x00,
 
@@ -371,9 +365,6 @@ impl ToWire for WriteChunkRequest<'_> {
 wire_enum! {
     /// The result of a write chunk request.
     pub enum WriteChunkResult: u8 {
-        /// Unknown result type.
-        Unknown = 0xff,
-
         /// Success
         Success = 0x00,
 
