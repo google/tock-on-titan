@@ -443,9 +443,6 @@ impl ToWire for WriteChunkResponse {
 wire_enum! {
     /// When to perform the reboot.
     pub enum RebootTime: u8 {
-        /// Unknown result type.
-        Unknown = 0xff,
-
         /// Reboot immediately
         Immediate = 0x00,
 
@@ -490,9 +487,6 @@ impl ToWire for RebootRequest {
 wire_enum! {
     /// The result of a reboot request.
     pub enum RebootResult: u8 {
-        /// Unknown result type.
-        Unknown = 0xff,
-
         /// Success
         Success = 0x00,
 
