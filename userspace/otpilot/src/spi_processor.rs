@@ -14,9 +14,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::firmware_controller::FirmwareController;
+use crate::globalsec;
 use crate::manticore_support::Identity;
 use crate::manticore_support::NoRsa;
 use crate::manticore_support::Reset;
+use crate::reset;
 use crate::spi_host;
 use crate::spi_host_h1;
 use crate::spi_device;
@@ -33,9 +36,12 @@ use manticore::server::pa_rot::PaRot;
 
 use spiutils::io::Cursor as SpiutilsCursor;
 use spiutils::io::Write as SpiutilsWrite;
+use spiutils::driver::firmware::SegmentInfo;
 use spiutils::protocol::error;
 use spiutils::protocol::error::Message as ErrorMessage;
-use spiutils::protocol::flash;
+use spiutils::protocol::firmware;
+use spiutils::protocol::firmware::Message;
+use spiutils::protocol::flash as spi_flash;
 use spiutils::protocol::flash::Address;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::flash::OpCode;
@@ -63,6 +69,7 @@ pub enum SpiProcessorError {
     ToWire(ToWireError),
     Tock,
     Manticore(manticore::server::Error),
+    UnsupportedFirmwareOperation(firmware::ContentType),
     UnsupportedOpCode(OpCode),
     InvalidAddress(Option<u32>),
     Format(core::fmt::Error),
@@ -106,6 +113,8 @@ pub struct SpiProcessor<'a> {
 
     // Whether to print incoming flash headers.
     pub print_flash_headers: bool,
+
+    pub firmware: FirmwareController,
 }
 
 const SPI_TX_BUF_SIZE : usize = 512;
@@ -132,7 +141,8 @@ impl<'a> SpiProcessor<'a> {
             let tx_cursor = SpiutilsCursor::new(tx_buf);
             header.to_wire(tx_cursor)?;
         }
-        spi_device::get().end_transaction_with_data(tx_buf, true, true)?;
+        spi_device::get().end_transaction_with_data(
+            &mut tx_buf[..payload::HEADER_LEN + content_len as usize], true, true)?;
 
         Ok(())
     }
@@ -159,30 +169,191 @@ impl<'a> SpiProcessor<'a> {
     }
 
     fn process_manticore(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
-        let mut console = Console::new();
-        writeln!(console, "Device: Manticore!")?;
-
         let payload_len : u16;
-        unsafe {
-            // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
-            let mut tx_cursor = ManticoreCursor::new(&mut SPI_TX_BUF[payload::HEADER_LEN..]);
-            self.server.process_request(&mut data, &mut tx_cursor)?;
-            payload_len = u16::try_from(tx_cursor.consumed_len())
-                .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
+        {
+            unsafe {
+                // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
+                let mut tx_cursor = ManticoreCursor::new(&mut SPI_TX_BUF[payload::HEADER_LEN..]);
+                self.server.process_request(&mut data, &mut tx_cursor)?;
+                payload_len = u16::try_from(tx_cursor.consumed_len())
+                    .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
+            }
         }
         unsafe {
             // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
             self.send_data(payload::ContentType::Manticore, payload_len, &mut SPI_TX_BUF)?;
         }
-        writeln!(console, "Device: Data sent")?;
         Ok(())
     }
 
-    fn process_spi_payload(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
-        let mut console = Console::new();
-        let header = payload::Header::from_wire(&mut data)?;
-        writeln!(console, "Device: payload header: {:?}", header)?;
+    fn send_firmware_response<'m, M: Message<'m>>(&mut self, response: M) -> SpiProcessorResult<()> {
+        let payload_len : u16;
+        unsafe {
+            // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
+            let mut tx_cursor = SpiutilsCursor::new(&mut SPI_TX_BUF[payload::HEADER_LEN..]);
 
+            let fw_header = firmware::Header {
+                content: M::TYPE
+            };
+            fw_header.to_wire(&mut tx_cursor)?;
+            response.to_wire(&mut tx_cursor)?;
+            payload_len = u16::try_from(tx_cursor.consumed_len())
+                .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
+        }
+        unsafe {
+            // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
+            self.send_data(payload::ContentType::Firmware, payload_len, &mut SPI_TX_BUF)?;
+        }
+        Ok(())
+    }
+
+    fn process_firmware_inactive_segments(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
+        let _ = firmware::InactiveSegmentsInfoRequest::from_wire(&mut data)?;
+
+        let response = firmware::InactiveSegmentsInfoResponse {
+            ro: globalsec::get().get_inactive_ro(),
+            rw: globalsec::get().get_inactive_rw(),
+        };
+        self.send_firmware_response(response)
+    }
+
+    fn process_firmware_update_prepare(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
+        let req = firmware::UpdatePrepareRequest::from_wire(&mut data)?;
+        let segment: SegmentInfo;
+
+        if req.segment_and_location == globalsec::get().get_inactive_rw().identifier {
+            segment = globalsec::get().get_inactive_rw();
+        } else if req.segment_and_location == globalsec::get().get_inactive_ro().identifier {
+            segment = globalsec::get().get_inactive_ro();
+        } else {
+            let response = firmware::UpdatePrepareResponse {
+                segment_and_location: req.segment_and_location,
+                max_chunk_length: 0,
+                result: firmware::UpdatePrepareResult::InvalidSegmentAndLocation,
+            };
+            return self.send_firmware_response(response);
+        }
+
+        match self.firmware.erase_segment(segment) {
+            Ok(()) => {
+                let response = firmware::UpdatePrepareResponse {
+                    segment_and_location: req.segment_and_location,
+                    max_chunk_length: self.firmware.get_max_write_chunk_length() as u16,
+                    result: firmware::UpdatePrepareResult::Success,
+                };
+                self.send_firmware_response(response)
+            },
+            Err(why) => {
+                let mut console = Console::new();
+                let _ = writeln!(console, "update_prepare failed: {:?}", why);
+                let response = firmware::UpdatePrepareResponse {
+                    segment_and_location: req.segment_and_location,
+                    max_chunk_length: 0,
+                    result: firmware::UpdatePrepareResult::Error,
+                };
+                self.send_firmware_response(response)
+            }
+        }
+    }
+
+    fn send_firmware_write_chunk_response(&mut self, req: &firmware::WriteChunkRequest, result: firmware::WriteChunkResult) -> SpiProcessorResult<()> {
+        let response = firmware::WriteChunkResponse {
+            segment_and_location: req.segment_and_location,
+            offset: req.offset,
+            result: result,
+        };
+        self.send_firmware_response(response)
+    }
+
+    fn process_firmware_write_chunk(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
+        let req: firmware::WriteChunkRequest;
+        {
+            req = firmware::WriteChunkRequest::from_wire(&mut data)?;
+        }
+        let segment: SegmentInfo;
+
+        if req.segment_and_location == globalsec::get().get_inactive_rw().identifier {
+            segment = globalsec::get().get_inactive_rw();
+        } else if req.segment_and_location == globalsec::get().get_inactive_ro().identifier {
+            segment = globalsec::get().get_inactive_ro();
+        } else {
+            return self.send_firmware_write_chunk_response(&req, firmware::WriteChunkResult::InvalidSegmentAndLocation);
+        }
+
+        if req.offset >= segment.size {
+            return self.send_firmware_write_chunk_response(&req, firmware::WriteChunkResult::InvalidOffset);
+        }
+
+        if req.offset + req.data.len() as u32 > segment.size || req.data.len() > self.firmware.get_max_write_chunk_length() {
+            return self.send_firmware_write_chunk_response(&req, firmware::WriteChunkResult::DataTooLong);
+        }
+
+        let result = match self.firmware.write_and_verify_segment_chunk(segment, req.offset as usize, req.data) {
+            Err(_why) => firmware::WriteChunkResult::Error,
+            Ok(false) => firmware::WriteChunkResult::CompareFailed,
+            Ok(true) => firmware::WriteChunkResult::Success,
+        };
+
+        self.send_firmware_write_chunk_response(&req, result)
+    }
+
+    fn send_firmware_reboot_response(&mut self, req: &firmware::RebootRequest, result: firmware::RebootResult) -> SpiProcessorResult<()> {
+        let response = firmware::RebootResponse {
+            time: req.time,
+            result: result,
+        };
+        self.send_firmware_response(response)
+    }
+
+    fn process_firmware_reboot(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
+        let req: firmware::RebootRequest;
+        {
+            req = firmware::RebootRequest::from_wire(&mut data)?;
+        }
+
+        let result = match req.time {
+            firmware::RebootTime::Immediate => {
+                if let Err(_) = reset::get().reset() {
+                    firmware::RebootResult::Error
+                } else {
+                    firmware::RebootResult::Success
+                }
+            },
+            firmware::RebootTime::Delayed => {
+                // TODO(https://github.com/google/tock-on-titan/issues/236): Implement this.
+                firmware::RebootResult::Error
+            },
+        };
+
+        self.send_firmware_reboot_response(&req, result)
+    }
+
+    fn process_firmware(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
+        let header = firmware::Header::from_wire(&mut data)?;
+
+        let result = match header.content {
+            firmware::ContentType::InactiveSegmentsInfoRequest => {
+                self.process_firmware_inactive_segments(&mut data)
+            },
+            firmware::ContentType::UpdatePrepareRequest => {
+                self.process_firmware_update_prepare(&mut data)
+            },
+            firmware::ContentType::WriteChunkRequest => {
+                self.process_firmware_write_chunk(&mut data)
+            },
+            firmware::ContentType::RebootRequest => {
+                self.process_firmware_reboot(&mut data)
+            },
+            _ => {
+                Err(SpiProcessorError::UnsupportedFirmwareOperation(header.content))
+            }
+        };
+
+        result
+    }
+
+    fn process_spi_payload(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
+        let header = payload::Header::from_wire(&mut data)?;
         if header.checksum != payload::compute_checksum(&header, data) {
             let error = error::BadChecksum {};
             return self.send_error(error);
@@ -191,6 +362,9 @@ impl<'a> SpiProcessor<'a> {
         match header.content {
             payload::ContentType::Manticore => {
                 self.process_manticore(&data[..header.content_len as usize])
+            }
+            payload::ContentType::Firmware => {
+                self.process_firmware(&data[..header.content_len as usize])
             }
             _ => {
                 let error = error::ContentTypeNotSupported {};
@@ -203,7 +377,7 @@ impl<'a> SpiProcessor<'a> {
     // The transaction is split into smaller transactions that fit into the SPI host's buffer.
     // The write enable status bit is set before each transaction is executed.
     // The `pre_transaction_fn` is executed prior to each transaction.
-    fn spi_host_send<AddrType, F>(&self, header: &flash::Header::<AddrType>, mut data: &[u8], pre_transaction_fn: &F) -> SpiProcessorResult<()>
+    fn spi_host_send<AddrType, F>(&self, header: &spi_flash::Header::<AddrType>, mut data: &[u8], pre_transaction_fn: &F) -> SpiProcessorResult<()>
     where AddrType: Address,
         F: Fn() -> SpiProcessorResult<()>
     {
@@ -252,7 +426,7 @@ impl<'a> SpiProcessor<'a> {
 
     // Send a "write enable" command via the SPI host.
     fn spi_host_write_enable(&self) -> SpiProcessorResult<()> {
-        let header = flash::Header::<u32> {
+        let header = spi_flash::Header::<u32> {
             opcode: OpCode::WriteEnable,
             address: None,
         };
@@ -265,7 +439,7 @@ impl<'a> SpiProcessor<'a> {
     // Send a "write" type command (e.g. PageProgram, *Erase) via the SPI host.
     // This splits the data into smaller transactions as needed and executes
     // "enable write" for each transaction.
-    fn spi_host_write<AddrType>(&self, header: &flash::Header::<AddrType>, data: &[u8]) -> SpiProcessorResult<()>
+    fn spi_host_write<AddrType>(&self, header: &spi_flash::Header::<AddrType>, data: &[u8]) -> SpiProcessorResult<()>
     where AddrType: Address {
         self.spi_host_send(header, data, &|| self.spi_host_write_enable())
     }
@@ -280,7 +454,7 @@ impl<'a> SpiProcessor<'a> {
         addr >= SPI_MAILBOX_ADDRESS && addr < SPI_MAILBOX_ADDRESS + SPI_MAILBOX_SIZE
     }
 
-    fn process_spi_header<AddrType>(&mut self, header: &flash::Header::<AddrType>, rx_buf: &[u8]) -> SpiProcessorResult<()>
+    fn process_spi_header<AddrType>(&mut self, header: &spi_flash::Header::<AddrType>, rx_buf: &[u8]) -> SpiProcessorResult<()>
     where AddrType: Address {
         let mut data: &[u8] = rx_buf;
         if header.opcode.has_dummy_byte() {
@@ -337,14 +511,14 @@ impl<'a> SpiProcessor<'a> {
         let mut console = Console::new();
         match spi_device::get().get_address_mode() {
             AddressMode::ThreeByte => {
-                let header = flash::Header::<ux::u24>::from_wire(&mut rx_buf)?;
+                let header = spi_flash::Header::<ux::u24>::from_wire(&mut rx_buf)?;
                 if self.print_flash_headers {
                     writeln!(console, "Device: flash header (3B): {:?}", header)?;
                 }
                 self.process_spi_header(&header, rx_buf)
             }
             AddressMode::FourByte => {
-                let header = flash::Header::<u32>::from_wire(&mut rx_buf)?;
+                let header = spi_flash::Header::<u32>::from_wire(&mut rx_buf)?;
                 if self.print_flash_headers {
                     writeln!(console, "Device: flash header (4B): {:?}", header)?;
                 }

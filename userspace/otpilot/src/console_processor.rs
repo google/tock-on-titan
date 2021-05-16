@@ -15,6 +15,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::console_reader;
+use crate::firmware_controller;
+use crate::globalsec;
 use crate::gpio_processor::GpioProcessor;
 use crate::reset;
 
@@ -43,6 +45,7 @@ impl<'a> ConsoleProcessor<'a> {
         writeln!(console, "! : Deassert BMC_CPU_RST.")?;
         writeln!(console, "2 : Assert BMC_SRST.")?;
         writeln!(console, "@ : Deassert BMC_SRST.")?;
+        writeln!(console, "i : Read firmware info.")?;
         writeln!(console, "R : Reset chip.")?;
 
         Ok(())
@@ -73,6 +76,12 @@ impl<'a> ConsoleProcessor<'a> {
             '@' => {
                 writeln!(console, "Deasserting BMC_SRST")?;
                 self.gpio_processor.set_bmc_srst(false)?;
+            },
+            'i' => {
+                writeln!(console, "active RO: {:?}, {:?}", globalsec::get().get_active_ro(), firmware_controller::get_build_info(globalsec::get().get_active_ro())?)?;
+                writeln!(console, "active RW: {:?}, {:?}", globalsec::get().get_active_rw(), firmware_controller::get_build_info(globalsec::get().get_active_rw())?)?;
+                writeln!(console, "inactive RO: {:?}, {:?}", globalsec::get().get_inactive_ro(), firmware_controller::get_build_info(globalsec::get().get_inactive_ro())?)?;
+                writeln!(console, "inactive RW: {:?}, {:?}", globalsec::get().get_inactive_rw(), firmware_controller::get_build_info(globalsec::get().get_inactive_rw())?)?;
             },
             'R' => {
                 writeln!(console, "resetting ...")?;
