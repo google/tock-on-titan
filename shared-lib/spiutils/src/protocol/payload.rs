@@ -74,9 +74,6 @@ pub fn compute_checksum(header: &Header, payload: &[u8]) -> u8 {
 wire_enum! {
     /// The content type.
     pub enum ContentType: u8 {
-        /// Unknown message type.
-        Unknown = 0xff,
-
         /// Error
         Error = 0x00,
 

@@ -27,9 +27,6 @@ use crate::protocol::wire::WireEnum;
 wire_enum! {
     /// The content type.
     pub enum ContentType: u8 {
-        /// Unknown message type.
-        Unknown = 0xff,
-
         /// The checksum on the message was invalid.
         BadChecksum = 0x01,
 
