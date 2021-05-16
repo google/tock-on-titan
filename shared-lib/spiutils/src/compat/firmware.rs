@@ -27,8 +27,8 @@ use core::mem;
 
 // ----------------------------------------------------------------------------
 
-/// The location of the BuildInfo from the start of the firmware segment.
-/// This location must match the original `SignedHeader` C-struct used in
+/// The offset of the BuildInfo from the start of the firmware segment.
+/// This offset must match the original `SignedHeader` C-struct used in
 /// actual firmware images.
 pub const BUILD_INFO_OFFSET: usize = 860;
 

@@ -198,7 +198,7 @@ impl<'a> SpiProcessor<'a> {
             fw_header.to_wire(&mut tx_cursor)?;
             response.to_wire(&mut tx_cursor)?;
             payload_len = u16::try_from(tx_cursor.consumed_len())
-                    .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
+                .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
         }
         unsafe {
             // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
