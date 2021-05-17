@@ -16,9 +16,7 @@
 
 use crate::firmware_controller::FirmwareController;
 use crate::globalsec;
-use crate::manticore_support::Identity;
-use crate::manticore_support::NoRsa;
-use crate::manticore_support::Reset;
+use crate::manticore_support;
 use crate::reset;
 use crate::spi_host;
 use crate::spi_host_h1;
@@ -29,9 +27,6 @@ use core::convert::TryFrom;
 
 use libtock::println;
 use libtock::result::TockError;
-
-use manticore::io::Cursor as ManticoreCursor;
-use manticore::server::pa_rot::PaRot;
 
 use spiutils::io::Cursor as SpiutilsCursor;
 use spiutils::io::Write as SpiutilsWrite;
@@ -67,7 +62,7 @@ pub enum SpiProcessorError {
     FromWire(FromWireError),
     ToWire(ToWireError),
     Tock,
-    Manticore(manticore::server::Error),
+    Manticore(manticore_support::HandlerError),
     UnsupportedFirmwareOperation(firmware::ContentType),
     UnsupportedOpCode(OpCode),
     InvalidAddress(Option<u32>),
@@ -92,8 +87,8 @@ impl From<TockError> for SpiProcessorError {
     }
 }
 
-impl From<manticore::server::Error> for SpiProcessorError {
-    fn from(err: manticore::server::Error) -> Self {
+impl From<manticore_support::HandlerError> for SpiProcessorError {
+    fn from(err: manticore_support::HandlerError) -> Self {
         SpiProcessorError::Manticore(err)
     }
 }
@@ -107,8 +102,7 @@ impl From<core::fmt::Error> for SpiProcessorError {
 //////////////////////////////////////////////////////////////////////////////
 
 pub struct SpiProcessor<'a> {
-    // The Manticore protocol server.
-    pub server: PaRot<'a, Identity, Reset, NoRsa>,
+    pub manticore_handler: manticore_support::Handler<'a>,
 
     // Whether to print incoming flash headers.
     pub print_flash_headers: bool,
@@ -167,14 +161,13 @@ impl<'a> SpiProcessor<'a> {
         Ok(())
     }
 
-    fn process_manticore(&mut self, mut data: &[u8]) -> SpiProcessorResult<()> {
+    fn process_manticore(&mut self, data: &[u8]) -> SpiProcessorResult<()> {
         let payload_len : u16;
         {
             unsafe {
                 // TODO(osk): We need the unsafe block since we're accessing SPI_TX_BUF as &mut.
-                let mut tx_cursor = ManticoreCursor::new(&mut SPI_TX_BUF[payload::HEADER_LEN..]);
-                self.server.process_request(&mut data, &mut tx_cursor)?;
-                payload_len = u16::try_from(tx_cursor.consumed_len())
+                let manticore_len = self.manticore_handler.process_request(&data, &mut SPI_TX_BUF[payload::HEADER_LEN..])?;
+                payload_len = u16::try_from(manticore_len)
                     .map_err(|_| SpiProcessorError::FromWire(FromWireError::OutOfRange))?;
             }
         }
