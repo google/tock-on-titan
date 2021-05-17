@@ -98,7 +98,7 @@ fn run() -> TockResult<()> {
     identity.device_id[..max_len].copy_from_slice(&dev_id_bytes[..max_len]);
 
     let mut spi_processor = SpiProcessor {
-        server: manticore_support::get_pa_rot(&identity),
+        manticore_handler: manticore_support::Handler::new(&identity),
         print_flash_headers: false,  // Enable to print incoming SPI flash headers
         firmware: firmware_controller::FirmwareController::new(),
     };
