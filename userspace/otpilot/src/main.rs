@@ -69,6 +69,8 @@ fn run_host_helper_demo() -> TockResult<()> {
 }
 
 fn run() -> TockResult<()> {
+    use core::cmp::min;
+
     let mut console = Console::new();
 
     //////////////////////////////////////////////////////////////////////////////
@@ -82,21 +84,19 @@ fn run() -> TockResult<()> {
         device_id: [0; 64],
     };
 
-    {
-        let mut idx : usize = 0;
-        for val in "v1.00".as_bytes() {
-            if idx > identity.version.len() { break; }
-            identity.version[idx] = *val;
-            idx = idx + 1;
-        }
+    let banner_bytes = "v1.00".as_bytes();
+    let max_len = min(identity.version.len(), banner_bytes.len());
+    if max_len < banner_bytes.len() {
+        let _ = writeln!(console, "WARNING: Truncated identity.version.");
     }
+    identity.version[..max_len].copy_from_slice(&banner_bytes[..max_len]);
 
-    {
-        let dev_id_bytes = fuse::get().get_dev_id()?.to_be_bytes();
-        for idx in 0..dev_id_bytes.len() {
-            identity.device_id[idx] = dev_id_bytes[idx];
-        }
+    let dev_id_bytes = fuse::get().get_dev_id()?.to_be_bytes();
+    let max_len = min(identity.device_id.len(), dev_id_bytes.len());
+    if max_len < dev_id_bytes.len() {
+        let _ = writeln!(console, "WARNING: Truncated identity.device_id.");
     }
+    identity.device_id[..max_len].copy_from_slice(&dev_id_bytes[..max_len]);
 
     let mut spi_processor = SpiProcessor {
         server: manticore_support::get_pa_rot(&identity),
