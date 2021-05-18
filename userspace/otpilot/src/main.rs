@@ -84,9 +84,9 @@ fn run() -> TockResult<()> {
         device_id: [0; 64],
     };
 
-    let banner = "v1.00".as_bytes();
-    let max_len = min(identity.version.len(), banner.len());
-    identity.version[..max_len].copy_from_slice(&banner[..max_len]);
+    let banner_bytes = "v1.00".as_bytes();
+    let max_len = min(identity.version.len(), banner_bytes.len());
+    identity.version[..max_len].copy_from_slice(&banner_bytes[..max_len]);
 
     let dev_id_bytes = fuse::get().get_dev_id()?.to_be_bytes();
     let max_len = min(identity.device_id.len(), dev_id_bytes.len());
