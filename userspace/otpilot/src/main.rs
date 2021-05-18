@@ -86,10 +86,16 @@ fn run() -> TockResult<()> {
 
     let banner_bytes = "v1.00".as_bytes();
     let max_len = min(identity.version.len(), banner_bytes.len());
+    if max_len < banner_bytes.len() {
+        let _ = writeln!(console, "WARNING: Truncated identity.version.");
+    }
     identity.version[..max_len].copy_from_slice(&banner_bytes[..max_len]);
 
     let dev_id_bytes = fuse::get().get_dev_id()?.to_be_bytes();
     let max_len = min(identity.device_id.len(), dev_id_bytes.len());
+    if max_len < dev_id_bytes.len() {
+        let _ = writeln!(console, "WARNING: Truncated identity.device_id.");
+    }
     identity.device_id[..max_len].copy_from_slice(&dev_id_bytes[..max_len]);
 
     let mut spi_processor = SpiProcessor {
