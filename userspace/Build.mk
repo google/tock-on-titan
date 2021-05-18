@@ -121,7 +121,8 @@ build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE): \
 		build/userspace/$(APP)/$(BOARD)/unsigned_image$(IMAGE)
 	$(TANGO_CODESIGNER) --b --input build/userspace/$(APP)/$(BOARD)/unsigned_image$(IMAGE) \
 		--key=$(TANGO_CODESIGNER_KEY) \
-		--output=build/userspace/$(APP)/$(BOARD)/signed_image$(IMAGE);
+		--output=build/userspace/$(APP)/$(BOARD)/signed_image$(IMAGE) \
+		--bin_output=build/userspace/$(APP)/$(BOARD)/signed_image$(IMAGE).bin;
 	cat $(TANGO_BOOTLOADER$(IMAGE)) build/userspace/$(APP)/$(BOARD)/signed_image$(IMAGE) \
 		> build/userspace/$(APP)/$(BOARD)/full_image$(IMAGE);
 
