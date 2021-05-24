@@ -17,6 +17,7 @@
 // Relies on internal details of rustc, so this may break during toolchain
 // updates.
 
+#![feature(asm)]
 #![no_std]
 
 mod assertions;
@@ -24,3 +25,5 @@ mod compiler_required;
 
 pub use self::assertions::*;
 pub use self::compiler_required::*;
+
+libtock_core::stack_size!{2048}
