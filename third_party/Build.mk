@@ -22,9 +22,6 @@
 
 .PHONY: third_party/build
 third_party/build: build/cargo-host/release/elf2tab sandbox_setup
-	cd third_party/libtock-rs && \
-		CARGO_TARGET_DIR="../../build/userspace/cargo" \
-		$(BWRAP) cargo build --offline --release --target=thumbv7m-none-eabi --examples
 
 .PHONY: third_party/build-signed
 third_party/build-signed: third_party/build
@@ -33,9 +30,6 @@ third_party/build-signed: third_party/build
 third_party/check: cargo_version_check sandbox_setup build/elf2tab
 	cd build/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo check --release
-	cd third_party/libtock-rs && \
-		CARGO_TARGET_DIR="../../build/userspace/cargo" \
-		$(BWRAP) cargo check --offline --release --target=thumbv7m-none-eabi --examples
 	cd third_party/rustc-demangle && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
 		$(BWRAP) cargo check --offline --release
@@ -60,9 +54,6 @@ third_party/doc: cargo_version_check sandbox_setup build/elf2tab
 third_party/localtests: cargo_version_check sandbox_setup build/elf2tab
 	cd build/elf2tab && \
 		CARGO_TARGET_DIR="../../build/cargo-host" $(BWRAP) cargo test --release
-	cd third_party/libtock-rs && \
-		CARGO_TARGET_DIR="../../build/cargo-host" \
-		$(BWRAP) cargo test --lib --offline --release
 	cd third_party/rustc-demangle && \
 		CARGO_TARGET_DIR="../../build/cargo-host" \
 		$(BWRAP) cargo test --offline --release
