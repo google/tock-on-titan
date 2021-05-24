@@ -22,7 +22,7 @@ publish = false
 [dependencies]
 h1 = { features = ["test"], path = "../../kernel/h1" }
 kernel = { path = "../../third_party/tock/kernel" }
-libtock = { path = "../../third_party/libtock-rs" }
 
 [dev-dependencies]
+libtock = { path = "../../third_party/libtock-rs" }
 test = { path = "../test_harness" }

@@ -21,3 +21,4 @@ publish = false
 
 [dependencies]
 libtock = { path = "../../third_party/libtock-rs" }
+libtock_core = { path = "../../third_party/libtock-rs/core" }

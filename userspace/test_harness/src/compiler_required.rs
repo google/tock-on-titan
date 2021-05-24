@@ -72,26 +72,30 @@ pub enum TestType { UnitTest }
 // The test harness's equivalent of main() (it is called by a compiler-generated
 // shim).
 pub fn test_main_static(tests: &[&TestDescAndFn]) {
-    use core::fmt::Write;
-    let mut console = libtock::console::Console::new();
-    let _ = console.write("Starting tests.\n");
+    use libtock::println;
+
+    let maybe_drivers = libtock::retrieve_drivers();
+    if maybe_drivers.is_err() {
+        panic!("Could not retrieve drivers.");
+    }
+    maybe_drivers.ok().unwrap().console.create_console();
+
+    println!("Starting tests.");
     let mut overall_success = true;
     for test_case in tests {
         // Skip ignored test cases.
         let desc = &test_case.desc;
         let name = desc.name.0;
         if desc.ignore {
-            let _ = writeln!(console, "Skipping ignored test {}", name);
+            println!("Skipping ignored test {}", name);
             continue;
         }
 
         // Run the test.
-        let _ = writeln!(console, "Running test {}", name);
+        println!("Running test {}", name);
         let succeeded = test_case.testfn.0();
-        let _ = writeln!(console, "Finished test {}. Result: {}.", name,
-                         if succeeded { "succeeded" } else { "failed" });
+        println!("Finished test {}. Result: {}", name, if succeeded { "succeeded" } else { "failed" });
         overall_success &= succeeded;
     }
-    let _ = writeln!(console, "TEST_FINISHED: {}",
-           if overall_success { "SUCCESS" } else { "FAIL" });
+    println!("TEST_FINISHED: {}", if overall_success { "SUCCESS" } else { "FAIL" });
 }
