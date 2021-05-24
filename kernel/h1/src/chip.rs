@@ -42,7 +42,8 @@ impl Hotel {
 impl Chip for Hotel {
     type MPU = cortexm3::mpu::MPU;
     type UserspaceKernelBoundary = cortexm3::syscall::SysCall;
-    type SysTick = cortexm3::systick::SysTick;
+    type SchedulerTimer = cortexm3::systick::SysTick;
+    type WatchDog = ();
 
     fn has_pending_interrupts(&self) -> bool {
         unsafe { cortexm3::nvic::next_pending().is_some() }
@@ -108,9 +109,11 @@ impl Chip for Hotel {
         &self.mpu
     }
 
-    fn systick(&self) -> &Self::SysTick {
+    fn scheduler_timer(&self) -> &Self::SchedulerTimer {
         &self.systick
     }
+
+    fn watchdog(&self) -> &() { &() }
 
     fn userspace_kernel_boundary(&self) -> &cortexm3::syscall::SysCall {
         &self.userspace_kernel_boundary

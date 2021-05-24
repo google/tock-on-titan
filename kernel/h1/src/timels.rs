@@ -14,7 +14,7 @@
 
 use core::cell::Cell;
 use kernel::common::cells::VolatileCell;
-use kernel::hil::time::{self, Alarm, Frequency};
+use kernel::hil::time::{self, Alarm, Frequency, Ticks};
 
 const TIMELS0_BASE: *const Registers = 0x40540000 as *const Registers;
 const TIMELS1_BASE: *const Registers = 0x40540040 as *const Registers;
@@ -59,7 +59,7 @@ impl Timels {
         self.now.set(self.now.get().wrapping_add(regs.reload.get()));
         regs.reload.set(0);
         self.client.get().map(|client| {
-            client.fired();
+            client.alarm();
         });
     }
 }
@@ -74,23 +74,22 @@ impl Frequency for Freq256Khz {
 
 impl time::Time for Timels {
     type Frequency = Freq256Khz;
+    type Ticks = time::Ticks32;
 
-    fn now(&self) -> u32 {
+    fn now(&self) -> Self::Ticks {
         let regs = unsafe { &*self.registers };
         let cur = regs.value.get();
         let reload = regs.reload.get();
         let elapsed = reload - cur;
-        self.now.get().wrapping_add(elapsed)
-    }
-
-    fn max_tics(&self) -> u32 {
-        u32::max_value()
+        self.now.get().wrapping_add(elapsed).into()
     }
 }
     
 impl Alarm<'static> for Timels {
-    fn set_alarm(&self, tics: u32) {
-        let distance = tics.wrapping_sub(self.now.get());
+    fn set_alarm(&self, _reference: Self::Ticks, dt: Self::Ticks) {
+        // TODO: This is over-simplified, as it does not account for time since
+        // reference.
+        let distance = dt.into_u32();
         let regs = unsafe { &*self.registers };
         regs.load.set(distance);
         regs.reload.set(distance);
@@ -98,22 +97,28 @@ impl Alarm<'static> for Timels {
         regs.control.set(1);
     }
 
-    fn get_alarm(&self) -> u32 {
+    fn get_alarm(&self) -> Self::Ticks {
         let regs = unsafe { &*self.registers };
-        regs.reload.get()
+        regs.reload.get().into()
     }
 
-    fn set_client(&'static self, client: &'static dyn time::AlarmClient) {
+    fn set_alarm_client(&'static self, client: &'static dyn time::AlarmClient) {
         self.client.set(Some(client));
     }
 
-    fn is_enabled(&self) -> bool {
+    fn is_armed(&self) -> bool {
         let regs = unsafe { &*self.registers };
         regs.control.get() & 1 == 1 && regs.value.get() != 0
     }
 
-    fn disable(&self) {
+    fn disarm(&self) -> kernel::ReturnCode {
         let regs = unsafe { &*self.registers };
         regs.control.set(0);
+        kernel::ReturnCode::SUCCESS
+    }
+
+    fn minimum_dt(&self) -> Self::Ticks {
+        // TODO: placeholder value
+        1.into()
     }
 }

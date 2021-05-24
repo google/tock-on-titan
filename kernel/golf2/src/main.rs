@@ -76,9 +76,9 @@ pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 
 pub struct Golf {
     console: &'static capsules::console::Console<'static>,
-    gpio: &'static capsules::gpio::GPIO<'static>,
+    gpio: &'static capsules::gpio::GPIO<'static, h1::gpio::GPIOPin>,
     timer: &'static AlarmDriver<'static, VirtualMuxAlarm<'static, Timels>>,
-    ipc: kernel::ipc::IPC,
+    ipc: kernel::ipc::IPC<NUM_PROCS>,
     digest: &'static h1_syscalls::digest::DigestDriver<'static, h1::crypto::sha::ShaEngine>,
     aes: &'static h1_syscalls::aes::AesDriver<'static>,
     rng: &'static capsules::rng::RngDriver<'static>,
@@ -230,21 +230,28 @@ pub unsafe fn reset_handler() {
     hil::uart::Transmit::set_transmit_client(low_level_debug_uart, low_level_debug);
 
     //debug!("Booting.");
-    let gpio_pins = static_init!(
-        [&'static dyn kernel::hil::gpio::InterruptValuePin; 2],
-        [&h1::gpio::PORT0.pins[0], &h1::gpio::PORT0.pins[1]]);
+    let wrapped_pins = static_init!(
+        [kernel::hil::gpio::InterruptValueWrapper<'static, h1::gpio::GPIOPin>; 2],
+        [kernel::hil::gpio::InterruptValueWrapper::new(&h1::gpio::PORT0.pins[0]),
+         kernel::hil::gpio::InterruptValueWrapper::new(&h1::gpio::PORT0.pins[1])]
+    );
+    let capsule_pins = static_init!(
+        [Option<&'static kernel::hil::gpio::InterruptValueWrapper<'static, h1::gpio::GPIOPin>>; 2],
+        [Some(&wrapped_pins[0]), Some(&wrapped_pins[1])]
+    );
 
     let gpio = static_init!(
-        capsules::gpio::GPIO<'static>,
-        capsules::gpio::GPIO::new(gpio_pins, kernel.create_grant(&grant_cap)));
-    for pin in gpio_pins.iter() {
-        pin.set_client(gpio)
+        capsules::gpio::GPIO<'static, h1::gpio::GPIOPin>,
+        capsules::gpio::GPIO::new(capsule_pins, kernel.create_grant(&grant_cap)));
+    for pin in wrapped_pins.iter() {
+        pin.finalize();
+        kernel::hil::gpio::InterruptWithValue::set_client(pin, gpio);
     }
 
     let alarm_mux = static_init!(
         capsules::virtual_alarm::MuxAlarm<'static, Timels>,
         capsules::virtual_alarm::MuxAlarm::new(&h1::timels::TIMELS0));
-    h1::timels::TIMELS0.set_client(alarm_mux);
+    h1::timels::TIMELS0.set_alarm_client(alarm_mux);
 
     // Create flash driver and its virtualization
     let flash_virtual_alarm = static_init!(VirtualMuxAlarm<'static, Timels>,
@@ -252,7 +259,7 @@ pub unsafe fn reset_handler() {
     let flash = static_init!(
         h1::hil::flash::FlashImpl<'static, VirtualMuxAlarm<'static, Timels>>,
         h1::hil::flash::FlashImpl::new(flash_virtual_alarm, &*h1::hil::flash::h1_hw::H1_HW));
-    flash_virtual_alarm.set_client(flash);
+    flash_virtual_alarm.set_alarm_client(flash);
 
     let flash_mux = static_init!(
         h1::hil::flash::virtual_flash::MuxFlash<'static>,
@@ -272,7 +279,7 @@ pub unsafe fn reset_handler() {
     let timer = static_init!(
         AlarmDriver<'static, VirtualMuxAlarm<'static, Timels>>,
         AlarmDriver::new(timer_virtual_alarm, kernel.create_grant(&grant_cap)));
-    timer_virtual_alarm.set_client(timer);
+    timer_virtual_alarm.set_alarm_client(timer);
 
     let digest = static_init!(
         h1_syscalls::digest::DigestDriver<'static, h1::crypto::sha::ShaEngine>,
@@ -396,7 +403,7 @@ pub unsafe fn reset_handler() {
 
     let mut _ctr = 0;
     let chip = static_init!(h1::chip::Hotel, h1::chip::Hotel::new());
-    chip.mpu().enable_mpu();
+    chip.mpu().enable_app_mpu();
     CHIP = Some(chip);
 
     let end = timerhs.now();
@@ -456,14 +463,17 @@ pub unsafe fn reset_handler() {
     ).unwrap_or_else(|err| {
         debug!("Error loading processes!\n{:?}", err);
     });
+    let scheduler = components::sched::round_robin::RoundRobinComponent::new(&PROCESSES)
+        .finalize(components::rr_component_helper!(NUM_PROCS));
     debug!("Tock: starting main loop.");
     debug!(" ");
-    kernel.kernel_loop(&golf2, chip, Some(&golf2.ipc), &main_cap);
+    kernel.kernel_loop(&golf2, chip, Some(&golf2.ipc), scheduler, &main_cap);
 }
 
 impl Platform for Golf {
     fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
-        where F: FnOnce(Option<&dyn kernel::Driver>) -> R
+    where
+        F: FnOnce(Option<&dyn kernel::Driver>) -> R
     {
         match driver_num {
             capsules::alarm::DRIVER_NUM                => f(Some(self.timer)),
