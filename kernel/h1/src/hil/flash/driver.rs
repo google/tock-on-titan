@@ -142,7 +142,7 @@ pub const ERASE_OPCODE: u32 = 0x31415927;
 pub const WRITE_OPCODE: u32 = 0x27182818;
 
 impl<'d, A: Alarm<'d>, H: Hardware> ::kernel::hil::time::AlarmClient for FlashImpl<'d, A, H> {
-    fn fired(&self) {
+    fn alarm(&self) {
         if let Some(state) = self.smart_program_state.take() {
             let state = state.step(
                 self.alarm, self.hw, self.opcode.get(), self.write_bank.get());

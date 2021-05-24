@@ -310,8 +310,8 @@ impl reset::Reset for ResetImpl {
         // Wait for reboot; should never return
         loop {
             unsafe {
-                asm!("dsb" :::: "volatile");
-                asm!("wfi" :::: "volatile");
+                llvm_asm!("dsb" :::: "volatile");
+                llvm_asm!("wfi" :::: "volatile");
             }
         }
     }

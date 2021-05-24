@@ -15,7 +15,7 @@
 /// A state machine for driving execution of the flash module's smart
 /// programming functionality.
 
-use ::kernel::hil::time::{Alarm,Frequency};
+use ::kernel::hil::time::{Alarm, Frequency};
 use ::kernel::ReturnCode;
 
 #[derive(Debug)]
@@ -55,7 +55,7 @@ impl SmartProgramState {
                 // Copied from Cr50: a timeout causes an immediate failure with
                 // no retry.
                 if hw.is_programming() {
-                    alarm.disable();
+                    alarm.disarm();
                     return Finished(ReturnCode::FAIL);
                 }
 
@@ -69,7 +69,7 @@ impl SmartProgramState {
                         set_program_timeout(alarm, timeout_nanoseconds);
                         return Running(0, false, timeout_nanoseconds);
                     }
-                    alarm.disable();
+                    alarm.disarm();
                     // TODO: Extra pulse for writes?!
                     return Finished(ReturnCode::SUCCESS);
                 }
@@ -85,7 +85,7 @@ impl SmartProgramState {
                 }
 
                 // The operation failed max_attempts times -- indicate an error.
-                alarm.disable();
+                alarm.disarm();
                 return SmartProgramState::Finished(decode_error(error));
             },
             Finished(return_code) => Finished(return_code),
@@ -110,7 +110,7 @@ pub fn div_round_up(numerator: u64, denominator: u64) -> u64 {
 }
 
 fn set_program_timeout<'a, A: Alarm<'a>>(alarm: &A, timeout_nanoseconds: u32) {
-    alarm.set_alarm(alarm.now().wrapping_add(
-        div_round_up(A::Frequency::frequency() as u64 * timeout_nanoseconds as u64,
-                     1_000_000_000) as u32));
+    alarm.set_alarm(alarm.now(),
+        (div_round_up(A::Frequency::frequency() as u64 * timeout_nanoseconds as u64,
+                     1_000_000_000) as u32).into());
 }

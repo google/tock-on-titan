@@ -103,9 +103,8 @@ pub enum Pin {
 pub struct GPIOPin {
     port: *mut PortRegisters,
     pin: Pin,
-    client_data: Cell<u32>,
     change: Cell<bool>,
-    client: Cell<Option<&'static dyn hil::gpio::ClientWithValue>>,
+    client: Cell<Option<&'static dyn hil::gpio::Client>>,
 }
 
 impl GPIOPin {
@@ -114,7 +113,6 @@ impl GPIOPin {
             port: port,
             pin: pin,
             change: Cell::new(false),
-            client_data: Cell::new(0),
             client: Cell::new(None),
         }
     }
@@ -136,7 +134,7 @@ impl GPIOPin {
         }
 
         self.client.get().map(|client| {
-            client.fired(self.client_data.get())
+            client.fired()
         });
     }
 
@@ -314,15 +312,15 @@ impl hil::gpio::Output for GPIOPin {
     }
 }
 
-impl hil::gpio::InterruptWithValue for GPIOPin {
-    fn set_client(&self, client: &'static dyn hil::gpio::ClientWithValue) {
+impl hil::gpio::Interrupt<'static> for GPIOPin {
+    fn set_client(&self, client: &'static dyn hil::gpio::Client) {
         self.client.set(Some(client));
     }
 
     // `InterruptMode::Change` is not implemented in hardware, so we simulate it
     // in software. This could lead to missing events if a toggle happens before
     // we install the new events.
-    fn enable_interrupts(&self, mode: hil::gpio::InterruptEdge) -> kernel::ReturnCode {
+    fn enable_interrupts(&self, mode: hil::gpio::InterruptEdge) {
         use kernel::hil::gpio::Input;
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         let mask = 1 << (self.pin as u32);
@@ -348,7 +346,6 @@ impl hil::gpio::InterruptWithValue for GPIOPin {
         }
         port.interrupt_type_set.set(mask);
         port.interrupt_enable.set(mask);
-        kernel::ReturnCode::SUCCESS
     }
 
     fn disable_interrupts(&self) {
@@ -361,15 +358,7 @@ impl hil::gpio::InterruptWithValue for GPIOPin {
         let port: &mut PortRegisters = unsafe { transmute(self.port) };
         port.interrupt_status.get() & (1 << (self.pin as u32)) != 0
     }
-
-    fn set_value(&self, value: u32) {
-        self.client_data.set(value);
-    }
-
-    fn value(&self) -> u32 {
-        self.client_data.get()
-    }
 }
 
 impl hil::gpio::Pin for GPIOPin {}
-impl hil::gpio::InterruptValuePin for GPIOPin {}
+impl hil::gpio::InterruptPin<'static> for GPIOPin {}
