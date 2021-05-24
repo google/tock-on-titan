@@ -86,13 +86,33 @@ impl time::Time for Timels {
 }
     
 impl Alarm<'static> for Timels {
-    fn set_alarm(&self, _reference: Self::Ticks, dt: Self::Ticks) {
-        // TODO: This is over-simplified, as it does not account for time since
-        // reference.
-        let distance = dt.into_u32();
+    fn set_alarm(&self, reference: Self::Ticks, dt: Self::Ticks) {
+        use crate::kernel::hil::time::Time;
         let regs = unsafe { &*self.registers };
-        regs.load.set(distance);
-        regs.reload.set(distance);
+
+        // Before doing anything else, stop the timer so it
+        // doesn't expire on us before we can reset it.
+        regs.control.set(0);
+
+        // Re-computing now() here guarantees that we see
+        // what the caller saw (or later) instead of the
+        // potentially outdated `self.now` value.
+        let now = self.now();
+
+        // Compute the target alarm time, but check that it's
+        // not before now. If it is, set it to a minimum to
+        // ensure that it actually triggers "very soon".
+        let target = reference.wrapping_add(dt);
+
+        let distance: Self::Ticks;
+        if target <= now {
+            distance = 1.into();
+        } else {
+            distance = target.wrapping_sub(now);
+        }
+
+        regs.load.set(distance.into_u32());
+        regs.reload.set(distance.into_u32());
         regs.interrupt_enable.set(1);
         regs.control.set(1);
     }
@@ -118,7 +138,6 @@ impl Alarm<'static> for Timels {
     }
 
     fn minimum_dt(&self) -> Self::Ticks {
-        // TODO: placeholder value
         1.into()
     }
 }
