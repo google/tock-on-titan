@@ -13,39 +13,45 @@
 // limitations under the License.
 
 pub struct MockAlarm {
-    current_time: core::cell::Cell<u32>,
-    setpoint: core::cell::Cell<Option<u32>>,
+    current_time: core::cell::Cell<kernel::hil::time::Ticks32>,
+    setpoint: core::cell::Cell<Option<kernel::hil::time::Ticks32>>,
 }
 
 impl MockAlarm {
     pub fn new() -> MockAlarm {
         MockAlarm {
-            current_time: Default::default(),
-            setpoint: Default::default()
+            current_time: core::cell::Cell::new(0.into()),
+            setpoint: core::cell::Cell::new(Some(0.into())),
         }
     }
 
-    pub fn set_time(&self, new_time: u32) { self.current_time.set(new_time); }
+    pub fn set_time(&self, new_time: kernel::hil::time::Ticks32) { self.current_time.set(new_time); }
 }
 
 impl kernel::hil::time::Time for MockAlarm {
-    type Frequency = kernel::hil::time::Freq16MHz;
-    fn now(&self) -> u32 { self.current_time.get() }
-    fn max_tics(&self) -> u32 { u32::max_value() }
+    type Frequency = h1::timels::Freq256Khz;
+    type Ticks = kernel::hil::time::Ticks32;
+
+    fn now(&self) -> Self::Ticks { self.current_time.get() }
 }
 
 impl<'a> kernel::hil::time::Alarm<'a> for MockAlarm {
-    fn set_alarm(&self, tics: u32) { self.setpoint.set(Some(tics)); }
-    fn get_alarm(&self) -> u32 { self.setpoint.get().unwrap_or(0) }
-
-    // Ignored -- the test should manually trigger the client.
-    fn set_client(&'a self, _client: &'a dyn kernel::hil::time::AlarmClient) {}
-
-    fn is_enabled(&self) -> bool { self.setpoint.get().is_some() }
-
-    fn enable(&self) {
-        if self.setpoint.get().is_none() { self.setpoint.set(Some(0)); }
+    fn set_alarm(&self, reference: Self::Ticks, dt: Self::Ticks) {
+        use kernel::hil::time::Ticks;
+        self.setpoint.set(Some(reference.wrapping_add(dt)));
     }
 
-    fn disable(&self) { self.setpoint.set(None); }
+    fn get_alarm(&self) -> Self::Ticks { self.setpoint.get().unwrap_or(0.into()) }
+
+    // Ignored -- the test should manually trigger the client.
+    fn set_alarm_client(&'a self, _client: &'a dyn kernel::hil::time::AlarmClient) {}
+
+    fn is_armed(&self) -> bool { self.setpoint.get().is_some() }
+
+    fn disarm(&self) -> kernel::ReturnCode {
+        self.setpoint.set(None);
+        kernel::ReturnCode::SUCCESS
+    }
+
+    fn minimum_dt(&self) -> Self::Ticks { 1.into() }
 }
