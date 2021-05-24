@@ -99,8 +99,8 @@ prtest: build check devicetests localtests
 # Installs the necessary Rust toolchains
 .PHONY: setup
 setup:
-	cd userspace && rustup target add thumbv7m-none-eabi && cd ..
-	cd kernel && rustup target add thumbv7m-none-eabi && cd ..
+	cd userspace && rustup target add thumbv7m-none-eabi
+	cd kernel && rustup target add thumbv7m-none-eabi
 
 
 # A target that prints an error message and fails the build if the cargo version
