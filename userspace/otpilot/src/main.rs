@@ -24,6 +24,7 @@ mod flash;
 mod fuse;
 mod globalsec;
 mod gpio;
+mod gpio_control;
 mod gpio_processor;
 mod manticore_support;
 mod reset;
@@ -39,9 +40,7 @@ use crate::gpio_processor::GpioProcessor;
 use crate::spi_host_helper::SpiHostHelper;
 use crate::spi_processor::SpiProcessor;
 
-use core::fmt::Write;
-
-use libtock::console::Console;
+use libtock::println;
 use libtock::result::TockError;
 use libtock::result::TockResult;
 use libtock::syscalls::raw::yieldk;
@@ -49,6 +48,8 @@ use libtock::syscalls::raw::yieldk;
 use spiutils::driver::spi_device::AddressConfig;
 use spiutils::driver::spi_device::HandlerMode;
 use spiutils::protocol::flash::AddressMode;
+
+libtock_core::stack_size! {2048}
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -71,8 +72,6 @@ fn run_host_helper_demo() -> TockResult<()> {
 fn run() -> TockResult<()> {
     use core::cmp::min;
 
-    let mut console = Console::new();
-
     //////////////////////////////////////////////////////////////////////////////
 
     run_host_helper_demo()?;
@@ -87,14 +86,14 @@ fn run() -> TockResult<()> {
     let banner_bytes = "v1.00".as_bytes();
     let max_len = min(identity.version.len(), banner_bytes.len());
     if max_len < banner_bytes.len() {
-        let _ = writeln!(console, "WARNING: Truncated identity.version.");
+        println!("WARNING: Truncated identity.version.");
     }
     identity.version[..max_len].copy_from_slice(&banner_bytes[..max_len]);
 
     let dev_id_bytes = fuse::get().get_dev_id()?.to_be_bytes();
     let max_len = min(identity.device_id.len(), dev_id_bytes.len());
     if max_len < dev_id_bytes.len() {
-        let _ = writeln!(console, "WARNING: Truncated identity.device_id.");
+        println!("WARNING: Truncated identity.device_id.");
     }
     identity.device_id[..max_len].copy_from_slice(&dev_id_bytes[..max_len]);
 
@@ -166,7 +165,7 @@ fn run() -> TockResult<()> {
     loop {
         while !spi_device::get().have_transaction()
             && !console_reader::get().have_data()
-            && !gpio::get().have_events()
+            && !gpio_control::get().have_events()
             && !alarm::get().is_expired() {
 
             // Note: Do NOT use the console here, as that results in a "hidden"
@@ -180,11 +179,11 @@ fn run() -> TockResult<()> {
                 Ok(()) => {}
                 Err(why) => {
                     // Ignore error from writeln. There's nothing we can do here anyway.
-                    let _ = writeln!(console, "SPI processor: Error {:?}", why);
+                    println!("SPI processor: Error {:?}", why);
                     if spi_device::get().is_busy_set() {
                         if let Err(_) = spi_device::get().end_transaction_with_status(true, false) {
                             // Ignore error from writeln. There's nothing we can do here anyway.
-                            let _ = writeln!(console, "SPI device: end_transaction error.");
+                            println!("SPI device: end_transaction error.");
                         }
                     } else {
                         spi_device::get().end_transaction();
@@ -198,18 +197,18 @@ fn run() -> TockResult<()> {
                 Ok(()) => {}
                 Err(_) => {
                     // Ignore error from writeln. There's nothing we can do here anyway.
-                    let _ = writeln!(console, "Console processor: Error.");
+                    println!("Console processor: Error.");
                 }
             }
             console_reader::get().allow_read(1)?;
         }
 
-        if gpio::get().have_events() {
+        if gpio_control::get().have_events() {
             match gpio_processor.process_gpio_events() {
                 Ok(()) => {}
                 Err(_) => {
                     // Ignore error from writeln. There's nothing we can do here anyway.
-                    let _ = writeln!(console, "GPIO processor (event): Error.");
+                    println!("GPIO processor (event): Error.");
                 }
             }
         }
@@ -219,7 +218,7 @@ fn run() -> TockResult<()> {
                 Ok(()) => {}
                 Err(_) => {
                     // Ignore error from writeln. There's nothing we can do here anyway.
-                    let _ = writeln!(console, "GPIO processor (alarm): Error.");
+                    println!("GPIO processor (alarm): Error.");
                 }
             }
         }
@@ -234,20 +233,24 @@ const BANNER: &'static str = concat!(
 
 #[libtock::main]
 async fn main() -> TockResult<()> {
-    let mut console = Console::new();
-    writeln!(console, "Starting {}", BANNER)?;
-    writeln!(console, "Reset source: {:?}", reset::get().get_reset_source()?)?;
-    writeln!(console, "active RO: {:?}, {:?}", globalsec::get().get_active_ro(), firmware_controller::get_build_info(globalsec::get().get_active_ro())?)?;
-    writeln!(console, "active RW: {:?}, {:?}", globalsec::get().get_active_rw(), firmware_controller::get_build_info(globalsec::get().get_active_rw())?)?;
-    writeln!(console, "inactive RO: {:?}, {:?}", globalsec::get().get_inactive_ro(), firmware_controller::get_build_info(globalsec::get().get_inactive_ro())?)?;
-    writeln!(console, "inactive RW: {:?}, {:?}", globalsec::get().get_inactive_rw(), firmware_controller::get_build_info(globalsec::get().get_inactive_rw())?)?;
-    writeln!(console, "DEV ID: 0x{:x}", fuse::get().get_dev_id()?)?;
-    writeln!(console, "clock_frequency: {}", alarm::get().get_clock_frequency())?;
+    let drivers = libtock::retrieve_drivers()?;
+    drivers.console.create_console();
+
+    println!("Starting {}", BANNER);
+    println!("Reset source: {:?}", reset::get().get_reset_source()?);
+    println!("active RO: {:?}, {:?}", globalsec::get().get_active_ro(), firmware_controller::get_build_info(globalsec::get().get_active_ro())?);
+    println!("active RW: {:?}, {:?}", globalsec::get().get_active_rw(), firmware_controller::get_build_info(globalsec::get().get_active_rw())?);
+    println!("inactive RO: {:?}, {:?}", globalsec::get().get_inactive_ro(), firmware_controller::get_build_info(globalsec::get().get_inactive_ro())?);
+    println!("inactive RW: {:?}, {:?}", globalsec::get().get_inactive_rw(), firmware_controller::get_build_info(globalsec::get().get_inactive_rw())?);
+    println!("DEV ID: 0x{:x}", fuse::get().get_dev_id()?);
+    println!("clock_frequency: {}", alarm::get().get_clock_frequency());
+
     let result = run();
     if result.is_ok() {
-        writeln!(console, "main: returning OK.")?;
+        println!("main: returning OK.");
     } else {
-        writeln!(console, "main: returning error.")?;
+        println!("main: returning error.");
     }
+
     result
 }
