@@ -99,14 +99,8 @@ prtest: build check devicetests localtests
 # Installs the necessary Rust toolchains
 .PHONY: setup
 setup:
-	rustup toolchain add --profile minimal \
-		"$$(cat third_party/libtock-rs/rust-toolchain)"
-	rustup toolchain add --profile minimal \
-		"$$(cat third_party/tock/rust-toolchain)"
-	rustup target add --toolchain \
-		"$$(cat third_party/libtock-rs/rust-toolchain)" thumbv7m-none-eabi
-	rustup target add --toolchain \
-		"$$(cat third_party/tock/rust-toolchain)" thumbv7m-none-eabi
+	cd userspace && rustup target add thumbv7m-none-eabi && cd ..
+	cd kernel && rustup target add thumbv7m-none-eabi && cd ..
 
 
 # A target that prints an error message and fails the build if the cargo version

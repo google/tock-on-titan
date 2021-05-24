@@ -460,12 +460,12 @@ userspace/$(APP)/$(BOARD)/run: \
 
 .PHONY: build/userspace/$(APP)/$(BOARD)/app
 build/userspace/$(APP)/$(BOARD)/app: sandbox_setup
-	rm -f build/userspace/cargo/thumbv7m-none-eabi/release//$(APP)-*
+	rm -f build/userspace/cargo/thumbv7m-none-eabi/release/deps/$(APP)-*
 	cd userspace/$(APP) && TOCK_KERNEL_VERSION=$(APP) \
 		$(BWRAP) cargo test --no-run --offline --release
 	mkdir -p build/userspace/$(APP)/$(BOARD)
-	find build/userspace/cargo/thumbv7m-none-eabi/release/ -maxdepth 1 -regex \
-		'build/userspace/cargo/thumbv7m-none-eabi/release/$(APP)-[^.]+' \
+	find build/userspace/cargo/thumbv7m-none-eabi/release/deps -maxdepth 1 -regex \
+		'build/userspace/cargo/thumbv7m-none-eabi/release/deps/$(APP)-[^.]+' \
 		-exec cp '{}' build/userspace/$(APP)/$(BOARD)/app ';'
 
 # Due to b/139156455, we want to detect the case where an application's size is
