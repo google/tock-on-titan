@@ -25,6 +25,5 @@ MEMORY {
 }
 
 MPU_MIN_ALIGN = 8K;
-STACK_SIZE = 2048;
 
-INCLUDE ../third_party/libtock-rs/layout.ld
+INCLUDE ../third_party/libtock-rs/layout_generic.ld
