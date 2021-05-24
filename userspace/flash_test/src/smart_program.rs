@@ -14,7 +14,7 @@
 
 use h1::hil::flash::driver::WRITE_OPCODE;
 use h1::hil::flash::{Bank,Hardware,smart_program};
-use kernel::hil::time::{Alarm,Frequency,Time};
+use kernel::hil::time::{Alarm,Frequency,Ticks,Time};
 use super::mock_alarm::MockAlarm;
 use test::require;
 
@@ -49,21 +49,21 @@ fn successful_program() -> bool {
     // First attempt.
     let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+    require!(alarm.get_alarm() == alarm.now().wrapping_add((<MockAlarm as Time>::Frequency::frequency()/10).into()));
     require!(hw.is_programming() == true);
     require!(state.return_code() == None);
 
     // Finish.
-    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/10);
+    alarm.set_time((<MockAlarm as Time>::Frequency::frequency()/10).into());
     hw.inject_result(0);
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == <MockAlarm as Time>::Frequency::frequency()/5);
+    require!(alarm.get_alarm() == (<MockAlarm as Time>::Frequency::frequency()/5).into());
     require!(hw.is_programming() == true);
     require!(state.return_code() == None);
-    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/5);
+    alarm.set_time((<MockAlarm as Time>::Frequency::frequency()/5).into());
     hw.finish_operation();
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == 0);
+    require!(alarm.get_alarm() == 0.into());
     require!(hw.is_programming() == false);
     require!(state.return_code() == Some(kernel::ReturnCode::SUCCESS));
     true
@@ -79,29 +79,29 @@ fn retries() -> bool {
     // First programming attempt.
     let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+    require!(alarm.get_alarm() == alarm.now().wrapping_add((<MockAlarm as Time>::Frequency::frequency()/10).into()));
     require!(hw.is_programming() == true);
     require!(state.return_code() == None);
-    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/10);
+    alarm.set_time((<MockAlarm as Time>::Frequency::frequency()/10).into());
     hw.inject_result(0b100);
 
     // Second attempt.
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+    require!(alarm.get_alarm() == alarm.now().wrapping_add((<MockAlarm as Time>::Frequency::frequency()/10).into()));
     require!(hw.is_programming() == true);
     require!(state.return_code() == None);
-    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/5);
+    alarm.set_time((<MockAlarm as Time>::Frequency::frequency()/5).into());
     hw.inject_result(0);
 
     // Finish.
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == 3*<MockAlarm as Time>::Frequency::frequency()/10);
+    require!(alarm.get_alarm() == (3*<MockAlarm as Time>::Frequency::frequency()/10).into());
     require!(hw.is_programming() == true);
     require!(state.return_code() == None);
-    alarm.set_time(3*<MockAlarm as Time>::Frequency::frequency()/10);
+    alarm.set_time((3*<MockAlarm as Time>::Frequency::frequency()/5).into());
     hw.finish_operation();
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == 0);
+    require!(alarm.get_alarm() == 0.into());
     require!(hw.is_programming() == false);
     require!(state.return_code() == Some(kernel::ReturnCode::SUCCESS));
     true
@@ -117,10 +117,10 @@ fn failed() -> bool {
     let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
 
     for i in 0..8 {
-        alarm.set_time(i * <MockAlarm as Time>::Frequency::frequency()/10);
+        alarm.set_time((i*<MockAlarm as Time>::Frequency::frequency()/10).into());
         state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
         require!(alarm.get_alarm() ==
-                 alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+                 alarm.now().wrapping_add((<MockAlarm as Time>::Frequency::frequency()/10).into()));
         require!(hw.is_programming() == true);
         require!(state.return_code() == None);
         hw.inject_result(0b100);
@@ -128,7 +128,7 @@ fn failed() -> bool {
 
     // Finish.
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == 0);
+    require!(alarm.get_alarm() == 0.into());
     require!(hw.is_programming() == false);
     require!(state.return_code() == Some(kernel::ReturnCode::FAIL));
     true
@@ -144,14 +144,14 @@ fn timeout() -> bool {
     // First programming attempt.
     let mut state = smart_program::SmartProgramState::init(8, true, 100_000_000);
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == alarm.now() + <MockAlarm as Time>::Frequency::frequency()/10);
+    require!(alarm.get_alarm() == alarm.now().wrapping_add((<MockAlarm as Time>::Frequency::frequency()/10).into()));
     require!(hw.is_programming() == true);
     require!(state.return_code() == None);
 
     // Alarm trigger.
-    alarm.set_time(<MockAlarm as Time>::Frequency::frequency()/10);
+    alarm.set_time((<MockAlarm as Time>::Frequency::frequency()/10).into());
     state = state.step(&alarm, &hw, WRITE_OPCODE, Bank::One);
-    require!(alarm.get_alarm() == 0);
+    require!(alarm.get_alarm() == 0.into());
     require!(state.return_code() == Some(kernel::ReturnCode::FAIL));
     true
 }
