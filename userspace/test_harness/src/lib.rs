@@ -17,7 +17,6 @@
 // Relies on internal details of rustc, so this may break during toolchain
 // updates.
 
-#![feature(asm)]
 #![no_std]
 
 mod assertions;
