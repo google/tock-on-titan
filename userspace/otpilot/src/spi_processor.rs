@@ -26,9 +26,8 @@ use crate::spi_device;
 
 use core::cmp::min;
 use core::convert::TryFrom;
-use core::fmt::Write;
 
-use libtock::console::Console;
+use libtock::println;
 use libtock::result::TockError;
 
 use manticore::io::Cursor as ManticoreCursor;
@@ -244,8 +243,7 @@ impl<'a> SpiProcessor<'a> {
                 self.send_firmware_response(response)
             },
             Err(why) => {
-                let mut console = Console::new();
-                let _ = writeln!(console, "update_prepare failed: {:?}", why);
+                println!("update_prepare failed: {:?}", why);
                 let response = firmware::UpdatePrepareResponse {
                     segment_and_location: req.segment_and_location,
                     max_chunk_length: 0,
@@ -508,19 +506,18 @@ impl<'a> SpiProcessor<'a> {
     }
 
     pub fn process_spi_packet(&mut self, mut rx_buf: &[u8]) -> SpiProcessorResult<()> {
-        let mut console = Console::new();
         match spi_device::get().get_address_mode() {
             AddressMode::ThreeByte => {
                 let header = spi_flash::Header::<ux::u24>::from_wire(&mut rx_buf)?;
                 if self.print_flash_headers {
-                    writeln!(console, "Device: flash header (3B): {:?}", header)?;
+                    println!("Device: flash header (3B): {:?}", header);
                 }
                 self.process_spi_header(&header, rx_buf)
             }
             AddressMode::FourByte => {
                 let header = spi_flash::Header::<u32>::from_wire(&mut rx_buf)?;
                 if self.print_flash_headers {
-                    writeln!(console, "Device: flash header (4B): {:?}", header)?;
+                    println!("Device: flash header (4B): {:?}", header);
                 }
                 self.process_spi_header(&header, rx_buf)
             }

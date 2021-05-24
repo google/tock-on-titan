@@ -15,17 +15,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::alarm;
-use crate::gpio;
-use crate::gpio::GpioPin;
 use crate::gpio::GpioValue;
+use crate::gpio_control;
+use crate::gpio_control::GpioPin;
 use crate::spi_device;
 use crate::spi_host_h1;
 use crate::spi_host_helper::SpiHostHelper;
 
 use core::cell::Cell;
-use core::fmt::Write;
 
-use libtock::console::Console;
+use libtock::println;
 use libtock::result::TockResult;
 
 use spiutils::protocol::flash::AddressMode;
@@ -63,9 +62,9 @@ impl GpioProcessor {
 
     pub fn set_bmc_cpu_rst(&self, asserted: bool) -> TockResult<()> {
         if asserted {
-            gpio::get().set(GpioPin::BMC_CPU_RST_N, GpioValue::Low)?;
+            gpio_control::get().set(GpioPin::BMC_CPU_RST_N, GpioValue::Low)?;
         } else  {
-            gpio::get().set(GpioPin::BMC_CPU_RST_N, GpioValue::High)?;
+            gpio_control::get().set(GpioPin::BMC_CPU_RST_N, GpioValue::High)?;
             self.set_alarm()?;
         }
 
@@ -74,9 +73,9 @@ impl GpioProcessor {
 
     pub fn set_bmc_srst(&self, asserted: bool) -> TockResult<()> {
         if asserted {
-            gpio::get().set(GpioPin::BMC_SRST_N, GpioValue::Low)?;
+            gpio_control::get().set(GpioPin::BMC_SRST_N, GpioValue::Low)?;
         } else  {
-            gpio::get().set(GpioPin::BMC_SRST_N, GpioValue::High)?;
+            gpio_control::get().set(GpioPin::BMC_SRST_N, GpioValue::High)?;
             self.set_alarm()?;
         }
 
@@ -108,7 +107,7 @@ impl GpioProcessor {
         spi_host_h1::get().set_passthrough(true)?;
 
         // We don't care about any events that may have happened during reset.
-        gpio::get().clear_event(GpioPin::BMC_RSTMON_N);
+        gpio_control::get().clear_event(GpioPin::BMC_RSTMON_N);
 
         // Let BMC out of reset
         self.set_bmc_cpu_rst(false)?;
@@ -117,30 +116,26 @@ impl GpioProcessor {
     }
 
     pub fn process_gpio_events(&self) -> TockResult<()> {
-        let mut console = Console::new();
-
-        let bmc_rstmon_n = gpio::get().consume_event(GpioPin::BMC_RSTMON_N);
+        let bmc_rstmon_n = gpio_control::get().consume_event(GpioPin::BMC_RSTMON_N);
         if bmc_rstmon_n {
             if self.ignore_bmc_rstmon_n_events.get() {
-                writeln!(console, "Ignored bmc_rstmon_n")?;
+                println!("Ignored bmc_rstmon_n");
             } else {
-                writeln!(console, "Handling bmc_rstmon_n")?;
+                println!("Handling bmc_rstmon_n");
                 self.handle_bmc_rstmon()?;
             }
         }
 
-        let sys_rstmon_n = gpio::get().consume_event(GpioPin::SYS_RSTMON_N);
+        let sys_rstmon_n = gpio_control::get().consume_event(GpioPin::SYS_RSTMON_N);
         if sys_rstmon_n {
-            writeln!(console, "Ignored sys_rstmon_n")?;
+            println!("Ignored sys_rstmon_n");
         }
 
         Ok(())
     }
 
     pub fn alarm_expired(&self) -> TockResult<()> {
-        let mut console = Console::new();
-
-        writeln!(console, "GPIO: alarm expired")?;
+        println!("GPIO: alarm expired");
         self.ignore_bmc_rstmon_n_events.set(false);
         alarm::get().clear()
     }

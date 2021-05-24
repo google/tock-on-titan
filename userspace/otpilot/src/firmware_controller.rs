@@ -16,9 +16,8 @@
 
 use crate::flash;
 
-use core::fmt::Write;
 
-use libtock::console::Console;
+use libtock::println;
 use libtock::result::TockError;
 use libtock::result::TockResult;
 
@@ -81,8 +80,7 @@ impl FirmwareController {
         let flash_op_result = flash::get().get_operation_result();
         flash::get().clear_operation();
         if flash_op_result < 0 {
-            let mut console = Console::new();
-            writeln!(console, "flash operation error {}", flash_op_result)?;
+            println!("flash operation error {}", flash_op_result);
             return Err(FirmwareControllerError::FlashOperationFailed);
         }
 
@@ -129,8 +127,7 @@ impl FirmwareController {
         unsafe {
             // TODO(osk): We need the unsafe block since we're accessing WRITE_BUF as &mut.
             if flash::get().write(self.get_write_flash_offset(), &mut WRITE_BUF, self.write_length).is_err() {
-                let mut console = Console::new();
-                writeln!(console, "flash write failed")?;
+                println!("flash write failed");
                 return Err(FirmwareControllerError::FlashWriteError);
             }
         }
@@ -142,8 +139,7 @@ impl FirmwareController {
         // Read data back
         let mut read_buf = [0u8; flash::MAX_BUFFER_LENGTH];
         if flash::get().read(self.get_write_flash_offset(), &mut read_buf, self.write_length).is_err() {
-            let mut console = Console::new();
-            writeln!(console, "flash read failed")?;
+            println!("flash read failed");
             return Err(FirmwareControllerError::FlashReadError);
         }
 
@@ -154,8 +150,7 @@ impl FirmwareController {
                 write_val = WRITE_BUF[idx];
             }
             if read_buf[idx] != write_val {
-                let mut console = Console::new();
-                writeln!(console, "flash compare failed")?;
+                println!("flash compare failed");
                 return Ok(false);
             }
         }

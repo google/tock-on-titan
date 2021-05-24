@@ -20,9 +20,7 @@ use crate::globalsec;
 use crate::gpio_processor::GpioProcessor;
 use crate::reset;
 
-use core::fmt::Write;
-
-use libtock::console::Console;
+use libtock::println;
 use libtock::result::TockResult;
 
 pub struct ConsoleProcessor<'a> {
@@ -37,22 +35,20 @@ impl<'a> ConsoleProcessor<'a> {
     }
 
     fn print_help(&self) -> TockResult<()> {
-        let mut console = Console::new();
 
-        writeln!(console, "Available commands:")?;
-        writeln!(console, "? : This help screen.")?;
-        writeln!(console, "1 : Assert BMC_CPU_RST.")?;
-        writeln!(console, "! : Deassert BMC_CPU_RST.")?;
-        writeln!(console, "2 : Assert BMC_SRST.")?;
-        writeln!(console, "@ : Deassert BMC_SRST.")?;
-        writeln!(console, "i : Read firmware info.")?;
-        writeln!(console, "R : Reset chip.")?;
+        println!("Available commands:");
+        println!("? : This help screen.");
+        println!("1 : Assert BMC_CPU_RST.");
+        println!("! : Deassert BMC_CPU_RST.");
+        println!("2 : Assert BMC_SRST.");
+        println!("@ : Deassert BMC_SRST.");
+        println!("i : Read firmware info.");
+        println!("R : Reset chip.");
 
         Ok(())
     }
 
     pub fn process_input(&self) -> TockResult<()> {
-        let mut console = Console::new();
 
         let data = console_reader::get().get_data();
         if data.len() < 1 {
@@ -62,29 +58,29 @@ impl<'a> ConsoleProcessor<'a> {
         match data[0] as char {
             '?' => self.print_help()?,
             '1' => {
-                writeln!(console, "Asserting BMC_CPU_RST")?;
+                println!("Asserting BMC_CPU_RST");
                 self.gpio_processor.set_bmc_cpu_rst(true)?;
             },
             '!' => {
-                writeln!(console, "Deasserting BMC_CPU_RST")?;
+                println!("Deasserting BMC_CPU_RST");
                 self.gpio_processor.set_bmc_cpu_rst(false)?;
             },
             '2' => {
-                writeln!(console, "Asserting BMC_SRST")?;
+                println!("Asserting BMC_SRST");
                 self.gpio_processor.set_bmc_srst(true)?;
             },
             '@' => {
-                writeln!(console, "Deasserting BMC_SRST")?;
+                println!("Deasserting BMC_SRST");
                 self.gpio_processor.set_bmc_srst(false)?;
             },
             'i' => {
-                writeln!(console, "active RO: {:?}, {:?}", globalsec::get().get_active_ro(), firmware_controller::get_build_info(globalsec::get().get_active_ro())?)?;
-                writeln!(console, "active RW: {:?}, {:?}", globalsec::get().get_active_rw(), firmware_controller::get_build_info(globalsec::get().get_active_rw())?)?;
-                writeln!(console, "inactive RO: {:?}, {:?}", globalsec::get().get_inactive_ro(), firmware_controller::get_build_info(globalsec::get().get_inactive_ro())?)?;
-                writeln!(console, "inactive RW: {:?}, {:?}", globalsec::get().get_inactive_rw(), firmware_controller::get_build_info(globalsec::get().get_inactive_rw())?)?;
+                println!("active RO: {:?}, {:?}", globalsec::get().get_active_ro(), firmware_controller::get_build_info(globalsec::get().get_active_ro())?);
+                println!("active RW: {:?}, {:?}", globalsec::get().get_active_rw(), firmware_controller::get_build_info(globalsec::get().get_active_rw())?);
+                println!("inactive RO: {:?}, {:?}", globalsec::get().get_inactive_ro(), firmware_controller::get_build_info(globalsec::get().get_inactive_ro())?);
+                println!("inactive RW: {:?}, {:?}", globalsec::get().get_inactive_rw(), firmware_controller::get_build_info(globalsec::get().get_inactive_rw())?);
             },
             'R' => {
-                writeln!(console, "resetting ...")?;
+                println!("resetting ...");
                 reset::get().reset()?;
             }
             _ => (),
