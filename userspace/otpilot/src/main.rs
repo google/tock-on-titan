@@ -49,6 +49,7 @@ use spiutils::driver::firmware::SegmentInfo;
 use spiutils::driver::spi_device::AddressConfig;
 use spiutils::driver::spi_device::HandlerMode;
 use spiutils::io::Cursor;
+use spiutils::protocol::firmware::SegmentAndLocation;
 use spiutils::protocol::flash::AddressMode;
 use spiutils::protocol::wire::ToWire;
 
@@ -72,16 +73,30 @@ fn run_host_helper_demo() -> TockResult<()> {
     Ok(())
 }
 
-fn store_build_info(id: &str, segment_info: SegmentInfo, mut buf: &mut[u8]) {
+fn get_segment_id_string(segment: SegmentAndLocation) -> &'static str {
+    match segment {
+        SegmentAndLocation::RoA => "RO",
+        SegmentAndLocation::RoB => "RO",
+        SegmentAndLocation::RwA => "RW",
+        SegmentAndLocation::RwB => "RW",
+        _ => "?",
+    }
+}
+
+// Get the build info for the specified segment and serialize it to the
+// provided buffer.
+fn store_build_info(segment_info: SegmentInfo, mut buf: &mut[u8]) {
     match firmware_controller::get_build_info(segment_info) {
         Ok(build_info) => {
             let cursor = Cursor::new(&mut buf);
             if let Err(_) = build_info.to_wire(cursor) {
-                println!("Could not serialize {} build info", id);
+                println!("Could not serialize {} build info",
+                    get_segment_id_string(segment_info.identifier));
             }
         },
         Err(_) => {
-            println!("Could not get {} build info", id);
+            println!("Could not get {} build info",
+                get_segment_id_string(segment_info.identifier));
         }
     }
 }
@@ -111,8 +126,8 @@ fn run() -> TockResult<()> {
     }
     identity.version[..max_len].copy_from_slice(&banner_bytes[..max_len]);
 
-    store_build_info("RO", globalsec::get().get_active_ro(), &mut identity.ro_version);
-    store_build_info("RW", globalsec::get().get_active_rw(), &mut identity.rw_version);
+    store_build_info(globalsec::get().get_active_ro(), &mut identity.ro_version);
+    store_build_info(globalsec::get().get_active_rw(), &mut identity.rw_version);
 
     let dev_id_bytes = fuse::get().get_dev_id()?.to_be_bytes();
     let max_len = min(identity.device_id.len(), dev_id_bytes.len());
