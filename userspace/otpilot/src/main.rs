@@ -45,9 +45,13 @@ use libtock::result::TockError;
 use libtock::result::TockResult;
 use libtock::syscalls::raw::yieldk;
 
+use spiutils::driver::firmware::SegmentInfo;
 use spiutils::driver::spi_device::AddressConfig;
 use spiutils::driver::spi_device::HandlerMode;
+use spiutils::io::Cursor;
+use spiutils::protocol::firmware::SegmentAndLocation;
 use spiutils::protocol::flash::AddressMode;
+use spiutils::protocol::wire::ToWire;
 
 libtock_core::stack_size! {2048}
 
@@ -69,6 +73,34 @@ fn run_host_helper_demo() -> TockResult<()> {
     Ok(())
 }
 
+fn get_segment_id_string(segment: SegmentAndLocation) -> &'static str {
+    match segment {
+        SegmentAndLocation::RoA => "RO",
+        SegmentAndLocation::RoB => "RO",
+        SegmentAndLocation::RwA => "RW",
+        SegmentAndLocation::RwB => "RW",
+        _ => "?",
+    }
+}
+
+// Get the build info for the specified segment and serialize it to the
+// provided buffer.
+fn store_build_info(segment_info: SegmentInfo, mut buf: &mut[u8]) {
+    match firmware_controller::get_build_info(segment_info) {
+        Ok(build_info) => {
+            let cursor = Cursor::new(&mut buf);
+            if let Err(_) = build_info.to_wire(cursor) {
+                println!("Could not serialize {} build info",
+                    get_segment_id_string(segment_info.identifier));
+            }
+        },
+        Err(_) => {
+            println!("Could not get {} build info",
+                get_segment_id_string(segment_info.identifier));
+        }
+    }
+}
+
 fn run() -> TockResult<()> {
     use core::cmp::min;
 
@@ -78,17 +110,24 @@ fn run() -> TockResult<()> {
 
     //////////////////////////////////////////////////////////////////////////////
 
+    // Initialize Manticore identity data.
+
     let mut identity = manticore_support::Identity {
         version: [0; 32],
+        ro_version: [0; 32],
+        rw_version: [0; 32],
         device_id: [0; 64],
     };
 
-    let banner_bytes = "v1.00".as_bytes();
+    let banner_bytes = BANNER.as_bytes();
     let max_len = min(identity.version.len(), banner_bytes.len());
     if max_len < banner_bytes.len() {
         println!("WARNING: Truncated identity.version.");
     }
     identity.version[..max_len].copy_from_slice(&banner_bytes[..max_len]);
+
+    store_build_info(globalsec::get().get_active_ro(), &mut identity.ro_version);
+    store_build_info(globalsec::get().get_active_rw(), &mut identity.rw_version);
 
     let dev_id_bytes = fuse::get().get_dev_id()?.to_be_bytes();
     let max_len = min(identity.device_id.len(), dev_id_bytes.len());
@@ -96,6 +135,8 @@ fn run() -> TockResult<()> {
         println!("WARNING: Truncated identity.device_id.");
     }
     identity.device_id[..max_len].copy_from_slice(&dev_id_bytes[..max_len]);
+
+    //////////////////////////////////////////////////////////////////////////////
 
     let mut spi_processor = SpiProcessor {
         manticore_handler: manticore_support::Handler::new(&identity),
@@ -105,7 +146,6 @@ fn run() -> TockResult<()> {
 
     let gpio_processor = GpioProcessor::new();
     let console_processor = ConsoleProcessor::new(&gpio_processor);
-
 
     //////////////////////////////////////////////////////////////////////////////
 
